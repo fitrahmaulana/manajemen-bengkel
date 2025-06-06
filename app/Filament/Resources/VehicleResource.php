@@ -17,35 +17,45 @@ class VehicleResource extends Resource
 {
     protected static ?string $model = Vehicle::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack';
+    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack'; //
+    protected static ?string $navigationLabel = 'Kendaraan';
+    protected static ?string $modelLabel = 'Kendaraan';
+    protected static ?string $pluralModelLabel = 'Daftar Kendaraan';
 
     public static function form(Form $form): Form
     {
         return $form
             ->schema([
-                // Dropdown untuk memilih pelanggan
                 Forms\Components\Select::make('customer_id')
                     ->label('Pemilik Kendaraan')
-                    ->relationship('customer', 'name') // 'customer' dari nama method relasi, 'name' kolom yang ditampilkan
-                    ->searchable() // Agar dropdown bisa dicari
-                    ->preload() // Langsung load data pelanggan
+                    ->relationship('customer', 'name')
+                    ->searchable()
+                    ->preload()
                     ->required(),
 
-                Forms\Components\TextInput::make('license_plate')
-                    ->label('Nomor Polisi')
-                    ->required()
-                    ->unique(ignoreRecord: true),
+                ...self::getFormSchema()
 
-                Forms\Components\Grid::make(2)->schema([
-                    Forms\Components\TextInput::make('brand')->label('Merek Kendaraan')->required(),
-                    Forms\Components\TextInput::make('model')->label('Model Kendaraan')->required(),
-                ]),
-
-                Forms\Components\Grid::make(2)->schema([
-                    Forms\Components\TextInput::make('color')->label('Warna'),
-                    Forms\Components\TextInput::make('year')->label('Tahun')->numeric()->required(),
-                ]),
             ]);
+    }
+
+    public static function getFormSchema(): array
+    {
+        return [
+            Forms\Components\TextInput::make('license_plate')
+                ->label('Nomor Polisi')
+                ->required()
+                ->unique(ignoreRecord: true),
+
+            Forms\Components\Grid::make(2)->schema([
+                Forms\Components\TextInput::make('brand')->label('Merek Kendaraan')->required(),
+                Forms\Components\TextInput::make('model')->label('Model Kendaraan')->required(),
+            ]),
+
+            Forms\Components\Grid::make(2)->schema([
+                Forms\Components\TextInput::make('color')->label('Warna'),
+                Forms\Components\TextInput::make('year')->label('Tahun')->numeric()->required(),
+            ]),
+        ];
     }
 
     public static function table(Table $table): Table

@@ -19,7 +19,9 @@ class ItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-cube'; // Ikon kubus untuk Item
     protected static ?string $navigationGroup = 'Inventory'; // Grup navigasi untuk Item
-
+    protected static ?string $navigationLabel = 'Barang'; // Label navigasi untuk Item
+    protected static ?string $modelLabel = 'Barang'; // Label model untuk Item
+    protected static ?string $pluralModelLabel = 'Daftar Barang'; // Label jamak untuk Item
 
     public static function form(Form $form): Form
     {

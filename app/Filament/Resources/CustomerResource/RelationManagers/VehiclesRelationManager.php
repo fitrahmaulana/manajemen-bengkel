@@ -9,6 +9,7 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use App\Filament\Resources\VehicleResource;
 
 class VehiclesRelationManager extends RelationManager
 {
@@ -17,23 +18,8 @@ class VehiclesRelationManager extends RelationManager
     public function form(Form $form): Form
     {
         return $form
-            ->schema([
-                Forms\Components\TextInput::make('license_plate')
-                    ->label('Nomor Polisi')
-                    ->required()
-                    ->unique(ignoreRecord: true),
-
-                Forms\Components\Grid::make(2)->schema([
-                    Forms\Components\TextInput::make('brand')->label('Merek Kendaraan')->required(),
-                    Forms\Components\TextInput::make('model')->label('Model Kendaraan')->required(),
-                ]),
-
-                Forms\Components\Grid::make(2)->schema([
-                    Forms\Components\TextInput::make('color')->label('Warna'),
-                    Forms\Components\TextInput::make('year')->label('Tahun')->numeric()->required(),
-                ]),
-            ]);
-    }
+            ->schema(VehicleResource::getFormSchema());
+        }
 
     public function table(Table $table): Table
     {
