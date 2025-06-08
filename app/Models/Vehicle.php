@@ -3,16 +3,17 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Vehicle extends Model
 {
     protected $fillable = [
-        'customer_id', // ID pelanggan yang memiliki kendaraan ini
-        'license_plate', // Nomor Polisi
-        'brand', // Merek kendaraan
-        'model', // Model kendaraan
-        'color', // Warna kendaraan
-        'year', // Tahun pembuatan kendaraan
+        'customer_id',
+        'license_plate',
+        'brand',
+        'model',
+        'color',
+        'year',
     ];
 
     protected $casts = [
@@ -22,7 +23,11 @@ class Vehicle extends Model
 
     public function customer()
     {
-        // Satu kendaraan dimiliki oleh SATU pelanggan
         return $this->belongsTo(Customer::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 }

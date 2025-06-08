@@ -18,12 +18,13 @@ class Item extends Model
         'type_item_id',
     ];
 
-    protected $casts = [
-        'stock' => 'integer',
-    ];
-
     public function typeItem()
     {
         return $this->belongsTo(TypeItem::class);
+    }
+
+    public function invoices()
+    {
+        return $this->belongsToMany(Invoice::class, 'invoice_item');
     }
 }

@@ -33,14 +33,13 @@ class Customer extends Model
         'address',
     ];
 
-    protected $casts = [
-        'created_at' => 'datetime',
-        'updated_at' => 'datetime',
-    ];
-
     public function vehicles(): HasMany
     {
-        // Satu pelanggan memiliki BANYAK kendaraan
         return $this->hasMany(Vehicle::class);
+    }
+
+    public function invoices(): HasMany
+    {
+        return $this->hasMany(Invoice::class);
     }
 }
