@@ -18,7 +18,7 @@ class ItemResource extends Resource
     protected static ?string $model = Item::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube';
-    protected static ?string $navigationGroup = 'Inventory Management';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Barang';
     protected static ?string $modelLabel = 'Barang';
     protected static ?string $pluralModelLabel = 'Daftar Barang';

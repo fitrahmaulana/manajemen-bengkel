@@ -18,7 +18,7 @@ class TypeItemResource extends Resource
     protected static ?string $model = TypeItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
-    protected static ?string $navigationGroup = 'Inventory Management';
+    protected static ?string $navigationGroup = 'Master Data';
     protected static ?string $navigationLabel = 'Tipe Barang';
     protected static ?string $modelLabel = 'Tipe Barang';
     protected static ?string $pluralModelLabel = 'Tipe Barang';
