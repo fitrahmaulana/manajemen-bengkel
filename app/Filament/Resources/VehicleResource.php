@@ -16,11 +16,12 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class VehicleResource extends Resource
 {
     protected static ?string $model = Vehicle::class;
-
-    protected static ?string $navigationIcon = 'heroicon-o-rectangle-stack'; //
+    protected static ?string $navigationIcon = 'heroicon-o-truck';
     protected static ?string $navigationLabel = 'Kendaraan';
     protected static ?string $modelLabel = 'Kendaraan';
     protected static ?string $pluralModelLabel = 'Daftar Kendaraan';
+    protected static ?string $navigationGroup = 'Customer Management';
+    protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
     {

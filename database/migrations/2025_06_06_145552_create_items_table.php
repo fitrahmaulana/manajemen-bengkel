@@ -21,6 +21,7 @@ return new class extends Migration
             $table->integer('stock')->default(0); // Jumlah Stok
             $table->string('unit', 50)->default('Pcs'); // Satuan, misal: Pcs, Botol, Set
             $table->string('location')->nullable(); // Lokasi penyimpanan, misal: "Rak A-01"
+            $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
             $table->timestamps();
         });
     }

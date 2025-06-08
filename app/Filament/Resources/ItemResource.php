@@ -17,11 +17,12 @@ class ItemResource extends Resource
 {
     protected static ?string $model = Item::class;
 
-    protected static ?string $navigationIcon = 'heroicon-o-cube'; // Ikon kubus untuk Item
-    protected static ?string $navigationGroup = 'Inventory'; // Grup navigasi untuk Item
-    protected static ?string $navigationLabel = 'Barang'; // Label navigasi untuk Item
-    protected static ?string $modelLabel = 'Barang'; // Label model untuk Item
-    protected static ?string $pluralModelLabel = 'Daftar Barang'; // Label jamak untuk Item
+    protected static ?string $navigationIcon = 'heroicon-o-cube';
+    protected static ?string $navigationGroup = 'Inventory Management';
+    protected static ?string $navigationLabel = 'Barang';
+    protected static ?string $modelLabel = 'Barang';
+    protected static ?string $pluralModelLabel = 'Daftar Barang';
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {
@@ -32,6 +33,11 @@ class ItemResource extends Resource
                         Forms\Components\TextInput::make('name')
                             ->label('Nama Barang')
                             ->required(),
+                        Forms\Components\Select::make('type_item_id')
+                            ->label('Tipe Barang')
+                            ->relationship('typeItem', 'name')
+                            ->searchable()
+                            ->preload(),
                         // Grid untuk menempatkan Kode & Merek berdampingan
                         Forms\Components\Grid::make(2)
                             ->schema([
@@ -75,7 +81,6 @@ class ItemResource extends Resource
                                     ->default('Pcs'),
                             ]),
                     ]),
-
                 Forms\Components\TextInput::make('location')
                     ->label('Lokasi Penyimpanan'),
             ]);

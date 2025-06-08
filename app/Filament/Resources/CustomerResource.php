@@ -16,11 +16,12 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
-    protected static ?string $navigationLabel = 'Pelanggan'; // Label navigasi untuk pelanggan
-    protected static ?string $modelLabel = 'Pelanggan'; // Label model untuk pelanggan
-    protected static ?string $pluralModelLabel = 'Daftar Pelanggan'; // Label jamak untuk daftar pelanggan
-
-    protected static ?string $navigationIcon = 'heroicon-o-user-group'; // Ikon untuk pelanggan
+    protected static ?string $navigationIcon = 'heroicon-o-user-group';
+    protected static ?string $navigationLabel = 'Pelanggan';
+    protected static ?string $modelLabel = 'Pelanggan';
+    protected static ?string $pluralModelLabel = 'Daftar Pelanggan';
+    protected static ?string $navigationGroup = 'Customer Management';
+    protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
     {

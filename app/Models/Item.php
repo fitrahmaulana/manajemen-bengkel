@@ -15,9 +15,15 @@ class Item extends Model
         'stock',
         'unit',
         'location',
+        'type_item_id',
     ];
 
     protected $casts = [
         'stock' => 'integer',
     ];
+
+    public function typeItem()
+    {
+        return $this->belongsTo(TypeItem::class);
+    }
 }
