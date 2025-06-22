@@ -20,10 +20,18 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Illuminate\Database\Eloquent\SoftDeletingScope; // Required for soft delete features
+use Filament\Tables\Filters\TrashedFilter; // Required for TrashedFilter
+use Filament\Tables\Actions\ForceDeleteBulkAction; // Required for bulk force delete
+use Filament\Tables\Actions\RestoreBulkAction; // Required for bulk restore
 use Illuminate\Support\Number;
 use Filament\Infolists; // <-- Pastikan ini ada di atas
 use Filament\Infolists\Infolist;
+// Removed: use Filament\Infolists\Components\Actions\ActionGroup as InfolistActionGroup;
+// Removed unused action aliases as they are not needed if actions are in Page class
+// use Filament\Actions\DeleteAction as InfolistDeleteAction;
+// use Filament\Actions\ForceDeleteAction as InfolistForceDeleteAction;
+// use Filament\Actions\RestoreAction as InfolistRestoreAction;
 
 class InvoiceResource extends Resource
 {
@@ -164,16 +172,27 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
             ])
             ->filters([
-                //
+                TrashedFilter::make(),
             ])
             ->actions([
                 Tables\Actions\EditAction::make(),
-                Tables\Actions\ViewAction::make(), // Tambahkan ViewAction untuk melihat detail
+                Tables\Actions\ViewAction::make(),
+                // Delete, ForceDelete, Restore actions moved to Infolist
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make(), // Will now soft delete
+                    ForceDeleteBulkAction::make(),
+                    RestoreBulkAction::make(),
                 ]),
+            ]);
+    }
+
+    public static function getEloquentQuery(): Builder
+    {
+        return parent::getEloquentQuery()
+            ->withoutGlobalScopes([
+                SoftDeletingScope::class,
             ]);
     }
 
@@ -198,6 +217,8 @@ class InvoiceResource extends Resource
     {
         return $infolist
             ->schema([
+                // ActionGroup removed from here
+
                 // === BAGIAN ATAS: DETAIL PELANGGAN & FAKTUR ===
                 Infolists\Components\Section::make('Informasi Faktur')
                     ->schema([

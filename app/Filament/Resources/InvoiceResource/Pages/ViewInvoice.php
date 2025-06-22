@@ -10,27 +10,26 @@ class ViewInvoice extends ViewRecord
 {
     protected static string $resource = InvoiceResource::class;
 
-    public function getHeaderActions(): array
+    protected function getHeaderActions(): array // Changed visibility to protected as is common
     {
         return [
-            Actions\Action::make('edit')
-                ->label('Edit')
-                ->url(route('filament.admin.resources.invoices.edit', $this->record))
-                ->icon('heroicon-o-pencil')
-                ->color('primary'),
+            Actions\EditAction::make(),
+            Actions\DeleteAction::make(), // Will soft delete
+            Actions\ForceDeleteAction::make(),
+            Actions\RestoreAction::make(),
         ];
     }
 
-    public function getFooterActions(): array
-    {
-        return [
-            Actions\Action::make('print')
-                ->label('Print')
-                ->url(route('filament.admin.resources.invoices.print', $this->record))
-                ->icon('heroicon-o-printer')
-                ->color('primary'),
-        ];
-    }
-
-
+    // Footer actions can be kept if needed, or removed if not.
+    // For now, I will comment it out to focus on header actions.
+    // public function getFooterActions(): array
+    // {
+    //     return [
+    //         Actions\Action::make('print')
+    //             ->label('Print')
+    //             ->url(route('filament.admin.resources.invoices.print', $this->record))
+    //             ->icon('heroicon-o-printer')
+    //             ->color('primary'),
+    //     ];
+    // }
 }
