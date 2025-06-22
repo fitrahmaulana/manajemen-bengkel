@@ -11,11 +11,20 @@ class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
 
+    // Property to store original item quantities
+    protected array $originalItemsQuantities = [];
+
     protected function getHeaderActions(): array
     {
         return [
             Actions\DeleteAction::make(),
         ];
+    }
+
+    protected function beforeSave(): void
+    {
+        // Store original quantities before saving
+        $this->originalItemsQuantities = $this->getRecord()->items->pluck('pivot.quantity', 'id')->toArray();
     }
 
        /**
@@ -78,6 +87,43 @@ class EditInvoice extends EditRecord
         // Gunakan sync() untuk mengupdate tabel pivot.
         // Sync akan otomatis menambah, mengubah, dan menghapus record di tabel pivot sesuai data terakhir.
         $this->record->services()->sync($servicesToSync);
+        // $this->record->items()->sync($itemsToSync); // We will handle item syncing manually to adjust stock
+
+        // Adjust stock based on changes
+        $newItemsFromForm = collect($itemsData)->keyBy('item_id'); // item_id from form
+        $currentInvoiceItems = $this->record->items()->get()->keyBy('id'); // Item model id
+
+        // Iterate through items currently in the invoice (after potential form submission)
+        foreach ($newItemsFromForm as $formItemId => $formItemData) {
+            $itemModel = Item::find($formItemId);
+            if (!$itemModel) {
+                continue;
+            }
+
+            $newQuantity = (int)($formItemData['quantity'] ?? 0);
+            $originalQuantity = (int)($this->originalItemsQuantities[$formItemId] ?? 0); // Use item ID as key
+
+            if ($currentInvoiceItems->has($formItemId)) { // Item was already in invoice
+                $quantityDifference = $newQuantity - $originalQuantity;
+                $itemModel->stock -= $quantityDifference;
+            } else { // New item added to invoice
+                $itemModel->stock -= $newQuantity;
+            }
+            $itemModel->save();
+        }
+
+        // Check for items removed from the invoice
+        foreach ($this->originalItemsQuantities as $itemId => $originalQuantity) {
+            if (!$newItemsFromForm->has((string)$itemId) && $currentInvoiceItems->has($itemId)) { // Check if item was removed
+                $itemModel = Item::find($itemId);
+                if ($itemModel) {
+                    $itemModel->stock += (int)$originalQuantity; // Add back the stock
+                    $itemModel->save();
+                }
+            }
+        }
+
+        // Now sync the items with pivot data
         $this->record->items()->sync($itemsToSync);
     }
 }
