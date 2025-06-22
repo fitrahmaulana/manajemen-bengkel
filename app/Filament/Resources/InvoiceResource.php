@@ -194,31 +194,6 @@ class InvoiceResource extends Resource
         ];
     }
 
-    // Ganti juga method ini agar kalkulasi saat penyimpanan juga benar
-    protected static function afterCreate($record, array $data): void
-    {
-        // Simpan pivot untuk jasa
-        if (isset($data['services'])) {
-            foreach ($data['services'] as $service) {
-                $record->services()->attach($service['service_id'], [
-                    'price' => $service['price'],
-                    'description' => $service['description'] ?? null,
-                ]);
-            }
-        }
-
-        // Simpan pivot untuk barang
-        if (isset($data['items'])) {
-            foreach ($data['items'] as $item) {
-                $record->items()->attach($item['item_id'], [
-                    'price' => $item['price'],
-                    'quantity' => $item['quantity'] ?? 1,
-                    'description' => $item['description'] ?? null,
-                ]);
-            }
-        }
-    }
-
     public static function infolist(Infolist $infolist): Infolist
     {
         return $infolist
