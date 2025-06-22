@@ -22,6 +22,8 @@ use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Illuminate\Support\Number;
+use Filament\Infolists; // <-- Pastikan ini ada di atas
+use Filament\Infolists\Infolist;
 
 class InvoiceResource extends Resource
 {
@@ -100,7 +102,7 @@ class InvoiceResource extends Resource
             Section::make('Detail Pekerjaan & Barang')->schema([
                 // Repeater Jasa
                 Forms\Components\Repeater::make('services')
-                    ->relationship('invoice_service')->label('Jasa / Layanan')->schema([
+                    ->label('Jasa / Layanan')->schema([
                         Forms\Components\Select::make('service_id')->label('Jasa')->options(Service::all()->pluck('name', 'id'))->searchable()->required()->live()->afterStateUpdated(fn(Set $set, $state) => $set('price', Service::find($state)?->price ?? 0)),
                         Forms\Components\TextInput::make('price')->label('Harga Jasa')->numeric()->prefix('Rp')->readOnly(),
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
@@ -108,7 +110,7 @@ class InvoiceResource extends Resource
 
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
-                    ->relationship('invoice_item')->label('Barang / Suku Cadang')->schema([
+                    ->label('Barang / Suku Cadang')->schema([
                         Forms\Components\Select::make('item_id')->label('Barang')->options(Item::all()->pluck('name', 'id'))->searchable()->required()->live()->afterStateUpdated(fn(Set $set, $state) => $set('price', Item::find($state)?->selling_price ?? 0)),
                         Forms\Components\TextInput::make('quantity')->numeric()->default(1)->required()->live(),
                         Forms\Components\TextInput::make('price')->label('Harga Satuan')->numeric()->prefix('Rp')->readOnly(),
@@ -137,7 +139,7 @@ class InvoiceResource extends Resource
                                 ->default('fixed')->live(),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
-                                ->numeric()->default(0)->live(debounce: 2000)->afterStateUpdated($calculateTotals),
+                                ->numeric()->default(0)->live(debounce: 600)->afterStateUpdated($calculateTotals),
                         ]),
 
 
@@ -188,51 +190,121 @@ class InvoiceResource extends Resource
             'index' => Pages\ListInvoices::route('/'),
             'create' => Pages\CreateInvoice::route('/create'),
             'edit' => Pages\EditInvoice::route('/{record}/edit'),
+            'view' => Pages\ViewInvoice::route('/{record}'),
         ];
     }
 
     // Ganti juga method ini agar kalkulasi saat penyimpanan juga benar
-    protected static function mutateFormDataBeforeCreate(array $data): array
+    protected static function afterCreate($record, array $data): void
     {
-        $servicesData = $data['services'] ?? [];
-        $itemsData = $data['items'] ?? [];
-        $serviceIds = array_column($servicesData, 'service_id');
-        $itemIds = array_column($itemsData, 'item_id');
-        $freshServicePrices = Service::find($serviceIds)->pluck('price', 'id');
-        $freshItemPrices = Item::find($itemIds)->pluck('selling_price', 'id');
-
-        $subtotal = 0;
-        foreach ($servicesData as $service) {
-            if (!empty($service['service_id'])) {
-                $subtotal += $freshServicePrices[$service['service_id']] ?? 0;
-            }
-        }
-        foreach ($itemsData as $item) {
-            if (!empty($item['item_id'])) {
-                $price = $freshItemPrices[$item['item_id']] ?? 0;
-                $quantity = $item['quantity'] ?? 1;
-                $subtotal += $price * $quantity;
+        // Simpan pivot untuk jasa
+        if (isset($data['services'])) {
+            foreach ($data['services'] as $service) {
+                $record->services()->attach($service['service_id'], [
+                    'price' => $service['price'],
+                    'description' => $service['description'] ?? null,
+                ]);
             }
         }
 
-        // Logika Diskon Baru saat menyimpan
-        $discountValue = (float)($data['discount_value'] ?? 0);
-        $finalDiscount = 0;
-        if ($data['discount_type'] === 'percentage' && $discountValue > 0) {
-            $finalDiscount = ($subtotal * $discountValue) / 100;
-        } else {
-            $finalDiscount = $discountValue;
+        // Simpan pivot untuk barang
+        if (isset($data['items'])) {
+            foreach ($data['items'] as $item) {
+                $record->items()->attach($item['item_id'], [
+                    'price' => $item['price'],
+                    'quantity' => $item['quantity'] ?? 1,
+                    'description' => $item['description'] ?? null,
+                ]);
+            }
         }
-
-        $total = $subtotal - $finalDiscount;
-
-        $data['subtotal'] = $subtotal;
-        $data['total_amount'] = $total;
-        // Tipe dan nilai diskon sudah tersimpan otomatis dari form
-
-        dd($data);
-        return $data;
     }
 
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                // === BAGIAN ATAS: DETAIL PELANGGAN & FAKTUR ===
+                Infolists\Components\Section::make('Informasi Faktur')
+                    ->schema([
+                        Infolists\Components\Grid::make(3)
+                            ->schema([
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('customer.name')->label('Pelanggan'),
+                                    Infolists\Components\TextEntry::make('vehicle.license_plate')->label('No. Polisi'),
+                                    Infolists\Components\TextEntry::make('vehicle.brand')->label('Merk Kendaraan'),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
+                                    Infolists\Components\TextEntry::make('status')->badge()->color(fn(string $state): string => match ($state) {
+                                        'draft' => 'gray',
+                                        'sent' => 'info',
+                                        'paid' => 'success',
+                                        'overdue' => 'danger',
+                                    }),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('invoice_date')->label('Tanggal Invoice')->date('d M Y'),
+                                    Infolists\Components\TextEntry::make('due_date')->label('Tanggal Jatuh Tempo')->date('d M Y'),
+                                ]),
+                            ]),
+                    ]),
 
+                // === BAGIAN TENGAH: DAFTAR JASA & BARANG ===
+                Infolists\Components\Section::make('Detail Jasa / Layanan')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('services')
+                            ->hiddenLabel()
+                            ->schema([
+                                Infolists\Components\TextEntry::make('name')->label('Nama Jasa')->weight('bold'),
+                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->money('IDR'),
+                            ])->columns(3),
+                    ]),
+
+                Infolists\Components\Section::make('Detail Barang / Suku Cadang')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('items')
+                            ->hiddenLabel()
+                            ->schema([
+                                Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
+                                Infolists\Components\TextEntry::make('pivot.quantity')->label('Kuantitas'),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->money('IDR'),
+                                // Menghitung subtotal per item
+                                Infolists\Components\TextEntry::make('sub_total')
+                                    ->label('Subtotal')
+                                    ->money('IDR')
+                                    ->state(fn ($record): float => $record->pivot->quantity * $record->pivot->price),
+                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
+
+                            ])->columns(5),
+                    ]),
+
+                // === BAGIAN BAWAH: RINGKASAN BIAYA ===
+                Infolists\Components\Section::make('Ringkasan Biaya')
+                    ->schema([
+                        Infolists\Components\Grid::make(2)
+                            ->schema([
+                                // Kolom Kiri: Syarat & Ketentuan
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('terms')
+                                        ->label('Syarat & Ketentuan')
+                                        ->placeholder('Tidak ada syarat & ketentuan.'),
+                                ]),
+                                // Kolom Kanan: Kalkulasi
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('subtotal')->money('IDR'),
+                                    Infolists\Components\TextEntry::make('discount_value')
+                                        ->label('Diskon')
+                                        ->money(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null)
+                                        ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null),
+                                    Infolists\Components\TextEntry::make('total_amount')
+                                        ->label('Total Akhir')
+                                        ->money('IDR')
+                                        ->weight('bold')
+                                        ->size('lg'),
+                                ]), // <-- Mendorong grup ini ke kanan
+                            ]),
+                    ]),
+            ]);
+    }
 }

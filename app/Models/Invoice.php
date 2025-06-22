@@ -20,11 +20,11 @@ class Invoice extends Model
 
     public function services()
     {
-        return $this->belongsToMany(Service::class)->withPivot('price', 'description');
+        return $this->belongsToMany(Service::class, 'invoice_service')->withPivot('price', 'description');
     }
 
     public function items()
     {
-        return $this->belongsToMany(Item::class)->withPivot('quantity', 'price', 'description');
+        return $this->belongsToMany(Item::class, 'invoice_item')->withPivot('quantity', 'price', 'description');
     }
 }

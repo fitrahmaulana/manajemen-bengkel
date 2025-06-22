@@ -10,6 +10,6 @@ class Service extends Model
 
     public function invoices()
     {
-        return $this->belongsToMany(Invoice::class);
+        return $this->belongsToMany(Invoice::class, 'invoice_service');
     }
 }
