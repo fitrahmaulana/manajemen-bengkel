@@ -33,6 +33,13 @@ class CreateInvoice extends CreateRecord
                 'price' => $item['price'],
                 'description' => $item['description'],
             ]);
+
+            // Update item stock
+            $itemModel = \App\Models\Item::find($item['item_id']);
+            if ($itemModel) {
+                $itemModel->stock -= ($item['quantity'] ?? 1);
+                $itemModel->save();
+            }
         }
     }
 }
