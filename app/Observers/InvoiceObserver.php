@@ -69,7 +69,17 @@ class InvoiceObserver
      */
     public function restored(Invoice $invoice)
     {
-        //
+        // Re-decrement stock for items on the restored invoice
+        foreach ($invoice->items as $itemPivot) {
+            $itemModel = Item::find($itemPivot->id);
+            if ($itemModel) {
+                $quantityToDecrement = $itemPivot->pivot->quantity;
+                $itemModel->stock -= $quantityToDecrement;
+                $itemModel->save();
+                // Consider adding a check here if stock would go negative and how to handle it,
+                // though for now, we'll assume it's allowed or handled elsewhere.
+            }
+        }
     }
 
     /**
