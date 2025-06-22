@@ -215,6 +215,13 @@ class InvoiceResource extends Resource
                     'quantity' => $item['quantity'] ?? 1,
                     'description' => $item['description'] ?? null,
                 ]);
+
+                // Update item stock
+                $item = Item::find($itemData['item_id']);
+                if ($item) {
+                    $item->stock -= ($itemData['quantity'] ?? 1);
+                    $item->save();
+                }
             }
         }
     }
