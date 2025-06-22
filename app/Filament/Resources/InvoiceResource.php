@@ -27,6 +27,10 @@ use Filament\Tables\Actions\RestoreBulkAction; // Required for bulk restore
 use Illuminate\Support\Number;
 use Filament\Infolists; // <-- Pastikan ini ada di atas
 use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\Actions\ActionGroup as InfolistActionGroup; // For grouping actions in infolist
+use Filament\Actions\DeleteAction as InfolistDeleteAction; // Alias for Infolist DeleteAction
+use Filament\Actions\ForceDeleteAction as InfolistForceDeleteAction; // Alias for Infolist ForceDeleteAction
+use Filament\Actions\RestoreAction as InfolistRestoreAction; // Alias for Infolist RestoreAction
 
 class InvoiceResource extends Resource
 {
@@ -172,9 +176,7 @@ class InvoiceResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\DeleteAction::make(), // Will now soft delete
-                Tables\Actions\ForceDeleteAction::make(),
-                Tables\Actions\RestoreAction::make(),
+                // Delete, ForceDelete, Restore actions moved to Infolist
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -214,6 +216,14 @@ class InvoiceResource extends Resource
     {
         return $infolist
             ->schema([
+                Infolists\Components\Group::make([ // Group to hold actions at the top
+                    InfolistActionGroup::make([
+                        InfolistDeleteAction::make(), // Will soft delete
+                        InfolistForceDeleteAction::make(),
+                        InfolistRestoreAction::make(),
+                    ])->label('Actions')
+                ])->columnSpanFull(), // Make it span full width if inside a grid
+
                 // === BAGIAN ATAS: DETAIL PELANGGAN & FAKTUR ===
                 Infolists\Components\Section::make('Informasi Faktur')
                     ->schema([
