@@ -16,14 +16,14 @@ class Item extends Model
         'unit',
         'location',
         'type_item_id',
-        'parent_item_id', // Changed from parent_sku
-        'conversion_value',
-        'base_unit',
+        // 'parent_item_id', // Removed
+        // 'conversion_value', // Removed
+        // 'base_unit', // Removed
     ];
 
     protected $casts = [
         'stock' => 'integer',
-        'conversion_value' => 'decimal:2', // Good to cast decimal
+        // 'conversion_value' => 'decimal:2', // Removed
     ];
 
     public function typeItem()
@@ -36,19 +36,27 @@ class Item extends Model
         return $this->belongsToMany(Invoice::class, 'invoice_item');
     }
 
+    // Old parent() and children() relationships based on parent_item_id are removed.
+
     /**
-     * Get the parent item that this item belongs to (if it's an eceran item).
+     * The child items that this item can be converted into.
+     * (This item is the PARENT in the conversion)
      */
-    public function parent()
+    public function conversionChildren()
     {
-        return $this->belongsTo(Item::class, 'parent_item_id');
+        return $this->belongsToMany(Item::class, 'item_conversions', 'parent_item_id', 'child_item_id')
+                    ->withPivot('conversion_value', 'id') // 'id' here is the id of the pivot record
+                    ->withTimestamps();
     }
 
     /**
-     * Get the child items (eceran items) for this item (if it's a parent item).
+     * The parent items from which this item can be sourced.
+     * (This item is the CHILD in the conversion)
      */
-    public function children()
+    public function conversionParents()
     {
-        return $this->hasMany(Item::class, 'parent_item_id');
+        return $this->belongsToMany(Item::class, 'item_conversions', 'child_item_id', 'parent_item_id')
+                    ->withPivot('conversion_value', 'id') // 'id' here is the id of the pivot record
+                    ->withTimestamps();
     }
 }
