@@ -88,9 +88,12 @@ class ItemResource extends Resource
                     ->description('Isi bagian ini jika barang ini adalah barang induk yang bisa dipecah atau barang eceran hasil pecahan.')
                     ->collapsible()
                     ->schema([
-                        Forms\Components\TextInput::make('parent_sku')
-                            ->label('SKU Induk (untuk Barang Eceran)')
-                            ->helperText('Jika ini adalah barang eceran/turunan, masukkan SKU dari barang induknya.')
+                        Forms\Components\Select::make('parent_item_id')
+                            ->label('Induk Barang (untuk Barang Eceran)')
+                            ->relationship(name: 'parent', titleAttribute: 'name', modifyQueryUsing: fn (Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
+                            ->helperText('Jika ini adalah barang eceran/turunan, pilih barang induknya.')
+                            ->searchable()
+                            ->preload()
                             ->nullable(),
                         Forms\Components\TextInput::make('conversion_value')
                             ->label('Nilai Konversi (untuk Barang Induk)')
@@ -145,8 +148,8 @@ class ItemResource extends Resource
                         Forms\Components\Select::make('target_item_id')
                             ->label('Target Item (Eceran)')
                             ->options(function (Item $record) {
-                                // Only show items that have the current item's SKU as their parent_sku
-                                return Item::where('parent_sku', $record->sku)->pluck('name', 'id');
+                                // Show child items (items whose parent_item_id is the current record's id)
+                                return $record->children()->pluck('name', 'id');
                             })
                             ->required()
                             ->reactive()
