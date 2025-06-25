@@ -83,6 +83,25 @@ class ItemResource extends Resource
                     ]),
                 Forms\Components\TextInput::make('location')
                     ->label('Lokasi Penyimpanan'),
+
+                Forms\Components\Section::make('Detail Konversi Stok')
+                    ->description('Isi bagian ini jika barang ini adalah barang induk yang bisa dipecah atau barang eceran hasil pecahan.')
+                    ->collapsible()
+                    ->schema([
+                        Forms\Components\TextInput::make('parent_sku')
+                            ->label('SKU Induk (untuk Barang Eceran)')
+                            ->helperText('Jika ini adalah barang eceran/turunan, masukkan SKU dari barang induknya.')
+                            ->nullable(),
+                        Forms\Components\TextInput::make('conversion_value')
+                            ->label('Nilai Konversi (untuk Barang Induk)')
+                            ->numeric()
+                            ->helperText('Jika barang ini bisa dipecah, berapa banyak satuan dasar yang dikandungnya? (Misal: 4 untuk kemasan 4 Liter)')
+                            ->nullable(),
+                        Forms\Components\TextInput::make('base_unit')
+                            ->label('Satuan Dasar (untuk Barang Induk)')
+                            ->helperText('Jika barang ini bisa dipecah, apa satuan dasarnya? (Misal: Liter, Kg, Pcs)')
+                            ->nullable(),
+                    ])
             ]);
     }
 
