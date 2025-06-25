@@ -16,6 +16,9 @@ class Item extends Model
         'unit',
         'location',
         'type_item_id',
+        'parent_sku',
+        'conversion_value',
+        'base_unit',
     ];
 
     protected $casts = [

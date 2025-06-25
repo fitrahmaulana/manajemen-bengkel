@@ -119,6 +119,79 @@ class ItemResource extends Resource
             ->actions([
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
+                Tables\Actions\Action::make('pecahStok')
+                    ->label('Pecah Stok')
+                    ->icon('heroicon-o-arrows-right-left')
+                    ->form([
+                        Forms\Components\Select::make('target_item_id')
+                            ->label('Target Item (Eceran)')
+                            ->options(function (Item $record) {
+                                // Only show items that have the current item's SKU as their parent_sku
+                                return Item::where('parent_sku', $record->sku)->pluck('name', 'id');
+                            })
+                            ->required()
+                            ->reactive()
+                            ->helperText('Pilih produk eceran hasil konversi.'),
+                        Forms\Components\TextInput::make('quantity')
+                            ->label('Jumlah Kemasan Sumber yang Dipecah')
+                            ->numeric()
+                            ->default(1)
+                            ->required()
+                            ->minValue(1)
+                            ->helperText('Jumlah item sumber yang akan dikonversi.'),
+                    ])
+                    ->action(function (Item $record, array $data) {
+                        $sourceItem = $record;
+                        $targetItem = Item::find($data['target_item_id']);
+                        $quantityToConvert = (int)$data['quantity'];
+
+                        if (!$targetItem) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal')
+                                ->body('Target item tidak ditemukan.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        if ($sourceItem->stock < $quantityToConvert) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal')
+                                ->body('Stok item sumber tidak mencukupi.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        if (!$sourceItem->conversion_value || $sourceItem->conversion_value <= 0) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal')
+                                ->body('Nilai konversi item sumber tidak valid.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+
+                        try {
+                            \Illuminate\Support\Facades\DB::transaction(function () use ($sourceItem, $targetItem, $quantityToConvert) {
+                                $sourceItem->decrement('stock', $quantityToConvert);
+                                $targetItem->increment('stock', $quantityToConvert * $sourceItem->conversion_value);
+                            });
+
+                            \Filament\Notifications\Notification::make()
+                                ->title('Berhasil')
+                                ->body("Stok {$sourceItem->name} dikurangi {$quantityToConvert}. Stok {$targetItem->name} ditambah " . ($quantityToConvert * $sourceItem->conversion_value) . " {$sourceItem->base_unit}.")
+                                ->success()
+                                ->send();
+                        } catch (\Exception $e) {
+                            \Filament\Notifications\Notification::make()
+                                ->title('Gagal')
+                                ->body('Terjadi kesalahan saat proses konversi stok: ' . $e->getMessage())
+                                ->danger()
+                                ->send();
+                        }
+                    })
+                    ->visible(fn (Item $record): bool => !empty($record->conversion_value) && !empty($record->base_unit) && $record->conversion_value > 0),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
