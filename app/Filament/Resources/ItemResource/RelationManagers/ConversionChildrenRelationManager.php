@@ -58,11 +58,18 @@ class ConversionChildrenRelationManager extends RelationManager
             ->headerActions([
                 // Tables\Actions\CreateAction::make(), // Replaced by AttachAction
                 AttachAction::make()
-                    ->preloadRecordSelect() // Preloads options for the select field for better performance
-                    ->form(fn (AttachAction $action): array => [
-                        $action->getRecordSelect() // This adds the dropdown to select the Item to attach
+                    // ->preloadRecordSelect() // May not be needed or work the same with manual Select
+                    ->form(fn (RelationManager $livewire): array => [ // Removed AttachAction $action from params for this test
+                        // --- Replace $action->getRecordSelect() ---
+                        Forms\Components\Select::make('recordId') // Default key Filament expects for the selected record ID
                             ->label('Pilih Item Turunan (Eceran)')
-                            ->helperText('Pilih item yang sudah ada untuk dijadikan turunan/eceran.'),
+                            ->helperText('Pilih item yang sudah ada untuk dijadikan turunan/eceran.')
+                            ->options(Item::query()
+                                ->where('id', '!=', $livewire->ownerRecord->getKey()) // Exclude the parent itself
+                                ->pluck('name', 'id'))
+                            ->searchable()
+                            ->required(), // Make sure it's required
+                        // --- End of replacement ---
                         Forms\Components\TextInput::make('conversion_value')
                             ->label('Nilai Konversi')
                             ->numeric()

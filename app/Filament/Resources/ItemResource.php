@@ -203,13 +203,6 @@ class ItemResource extends Resource
     public static function getRelations(): array
     {
         return [
-            //
-        ];
-    }
-
-    public static function getRelations(): array
-    {
-        return [
             RelationManagers\ConversionChildrenRelationManager::class,
         ];
     }
