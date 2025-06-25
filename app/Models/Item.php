@@ -16,6 +16,7 @@ class Item extends Model
         'unit',
         'location',
         'type_item_id',
+        'is_convertible', // Added
         // 'parent_item_id', // Removed
         // 'conversion_value', // Removed
         // 'base_unit', // Removed
@@ -23,6 +24,7 @@ class Item extends Model
 
     protected $casts = [
         'stock' => 'integer',
+        'is_convertible' => 'boolean', // Added
         // 'conversion_value' => 'decimal:2', // Removed
     ];
 

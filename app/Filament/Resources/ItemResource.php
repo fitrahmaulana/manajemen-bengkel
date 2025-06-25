@@ -48,6 +48,10 @@ class ItemResource extends Resource
                                 Forms\Components\TextInput::make('brand')
                                     ->label('Merek'),
                             ]),
+                        Forms\Components\Toggle::make('is_convertible')
+                            ->label('Item Dapat Dikonversi (Induk)')
+                            ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
+                            ->default(false),
                     ]),
 
                 Forms\Components\Section::make('Informasi Stok & Harga')
