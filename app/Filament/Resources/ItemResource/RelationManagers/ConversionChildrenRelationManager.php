@@ -9,23 +9,30 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use App\Models\Item; // Make sure Item model is imported
 
+use Filament\Tables\Actions\AttachAction; // Import AttachAction
+
 class ConversionChildrenRelationManager extends RelationManager
 {
     protected static string $relationship = 'conversionChildren';
 
-    protected static ?string $recordTitleAttribute = 'name'; // Attribute from the Item model (child item)
+    protected static ?string $recordTitleAttribute = 'name';
 
+    // This form is now primarily for the EditAction to edit pivot fields.
+    // AttachAction will define its own form structure for selecting the record and pivot fields.
     public function form(Form $form): Form
     {
         return $form
             ->schema([
-                Forms\Components\Select::make('child_item_id') // This will store into the 'child_item_id' column of the pivot
-                    ->label('Child Item (Item Eceran)')
-                    ->options(Item::query()->pluck('name', 'id')) // Allow selecting any item as a child
-                    ->searchable()
-                    ->required()
-                    // ->relationship(name: 'record', titleAttribute: 'name') // This is for BelongsTo on main form, not ideal for pivot's target selection
-                    ->helperText('Pilih item yang akan menjadi turunan/eceran dari item induk ini.'),
+                // This field is not strictly needed here if child_item_id cannot be changed during Edit.
+                // If you want to change WHICH child is linked during an Edit action on the pivot,
+                // you might need a different setup or accept that Edit only changes pivot data.
+                // For now, focusing on editing the conversion_value.
+                // Forms\Components\Select::make('child_item_id')
+                //     ->label('Child Item (Item Eceran)')
+                //     ->options(Item::query()->pluck('name', 'id'))
+                //     ->searchable()
+                //     ->required() // Required if you allow changing it
+                //     ->disabledOn('edit'), // Typically you don't change the related item in an edit of pivot
 
                 Forms\Components\TextInput::make('conversion_value')
                     ->label('Nilai Konversi')
@@ -38,11 +45,10 @@ class ConversionChildrenRelationManager extends RelationManager
     public function table(Table $table): Table
     {
         return $table
-            // ->recordTitleAttribute('name') // This refers to the 'name' of the child Item
             ->columns([
-                Tables\Columns\TextColumn::make('name') // This will display the 'name' of the related Item (child)
+                Tables\Columns\TextColumn::make('name')
                     ->label('Nama Item Turunan (Eceran)'),
-                Tables\Columns\TextColumn::make('pivot.conversion_value') // Accessing pivot data
+                Tables\Columns\TextColumn::make('pivot.conversion_value')
                     ->label('Nilai Konversi')
                     ->numeric(),
             ])
@@ -50,20 +56,26 @@ class ConversionChildrenRelationManager extends RelationManager
                 //
             ])
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
-                // Tables\Actions\AttachAction::make() // AttachAction is good if you are selecting from existing, CreateAction makes a new pivot row.
-                                                   // For ManyToMany, CreateAction here actually creates a new pivot record,
-                                                   // and the form above defines what goes into that pivot record.
+                // Tables\Actions\CreateAction::make(), // Replaced by AttachAction
+                AttachAction::make()
+                    ->preloadRecordSelect() // Preloads options for the select field for better performance
+                    ->form(fn (AttachAction $action): array => [
+                        $action->getRecordSelect() // This adds the dropdown to select the Item to attach
+                            ->label('Pilih Item Turunan (Eceran)')
+                            ->helperText('Pilih item yang sudah ada untuk dijadikan turunan/eceran.'),
+                        Forms\Components\TextInput::make('conversion_value')
+                            ->label('Nilai Konversi')
+                            ->numeric()
+                            ->required(),
+                    ])
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DetachAction::make(), // DetachAction for ManyToMany
-                // Tables\Actions\DeleteAction::make(), // DeleteAction would delete the child Item, Detach is usually preferred for pivots
+                Tables\Actions\EditAction::make(), // Uses the main form() method by default
+                Tables\Actions\DetachAction::make(),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DetachBulkAction::make(),
-                    // Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ]);
     }
