@@ -22,12 +22,6 @@ return new class extends Migration
             $table->string('unit', 50)->default('Pcs'); // Satuan, misal: Pcs, Botol, Set
             $table->string('location')->nullable(); // Lokasi penyimpanan, misal: "Rak A-01"
             $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
-
-            // Fields for stock conversion
-            $table->string('parent_sku')->nullable()->comment('SKU of the parent item if this is an eceran item');
-            $table->decimal('conversion_value', 8, 2)->nullable()->comment('How many base units this item represents if it can be broken down');
-            $table->string('base_unit')->nullable()->comment('The base unit for eceran items, e.g., Liter');
-
             $table->timestamps();
         });
     }
