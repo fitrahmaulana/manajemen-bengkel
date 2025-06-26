@@ -51,7 +51,65 @@ class ItemResource extends Resource
                         Forms\Components\Toggle::make('is_convertible')
                             ->label('Item Dapat Dikonversi (Induk)')
                             ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
-                            ->default(false),
+                            ->default(false)
+                            ->reactive(), // Make it reactive to show/hide other fields
+                    ]),
+
+                Forms\Components\Section::make('Detail Konversi (jika item ini Induk)')
+                    ->description('Atur item eceran target dan nilai konversi jika item ini dapat dipecah.')
+                    ->collapsible()
+                    ->visible(fn (Forms\Get $get) => $get('is_convertible')) // Only show this section if is_convertible is true
+                    ->schema([
+                        Forms\Components\Select::make('target_child_item_id')
+                            ->label('Target Item Eceran (Hasil Konversi)')
+                            ->relationship(name: 'targetChild', titleAttribute: 'name', modifyQueryUsing: fn (Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
+                            ->searchable()
+                            ->preload()
+                            ->nullable()
+                            ->helperText('Pilih item eceran yang akan dihasilkan. Item ini biasanya memiliki satuan dasar (e.g., Liter, Pcs).')
+                            ->createOptionForm([ // Allow creating new eceran item on the fly
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nama Item Eceran Baru')
+                                    ->required(),
+                                Forms\Components\TextInput::make('sku')
+                                    ->label('SKU Item Eceran Baru')
+                                    ->required()
+                                    ->unique(table: Item::class, column: 'sku', ignoreRecord: true),
+                                Forms\Components\TextInput::make('unit')
+                                    ->label('Satuan Eceran')
+                                    ->required(),
+                                Forms\Components\TextInput::make('selling_price')
+                                    ->label('Harga Jual Eceran')
+                                    ->numeric()->prefix('Rp')->required()->default(0),
+                                Forms\Components\TextInput::make('purchase_price')
+                                    ->label('Harga Beli Eceran')
+                                    ->numeric()->prefix('Rp')->required()->default(0),
+                                // is_convertible for new eceran item will be false by default (model default or not set)
+                                // stock for new eceran item will be 0 by default
+                            ])
+                            ->createOptionAction(function (array $data): int {
+                                $newItem = Item::create([
+                                    'name' => $data['name'],
+                                    'sku' => $data['sku'],
+                                    'unit' => $data['unit'],
+                                    'selling_price' => $data['selling_price'],
+                                    'purchase_price' => $data['purchase_price'],
+                                    'stock' => 0,
+                                    'is_convertible' => false, // Eceran items are generally not convertible themselves
+                                ]);
+                                return $newItem->id;
+                            })
+                            ->createOptionModalHeading('Buat Item Eceran Baru'),
+                        Forms\Components\TextInput::make('conversion_value')
+                            ->label('Nilai Konversi')
+                            ->numeric()
+                            ->nullable()
+                            ->gt(0)
+                            ->helperText('Jumlah unit item eceran yang dihasilkan dari 1 unit item induk ini.'),
+                        Forms\Components\TextInput::make('base_unit')
+                            ->label('Satuan Dasar Konversi')
+                            ->nullable()
+                            ->helperText('Satuan dari item eceran target (misal: Liter, Pcs). Sebaiknya cocok dengan satuan item eceran.'),
                     ]),
 
                 Forms\Components\Section::make('Informasi Stok & Harga')
@@ -131,34 +189,25 @@ class ItemResource extends Resource
                     ->icon('heroicon-o-arrows-right-left')
                     ->requiresConfirmation()
                     ->modalHeading('Konfirmasi Pecah Stok')
-                    ->modalDescription('Apakah Anda yakin ingin memecah 1 unit dari item ini? Stok item turunan pertama yang terhubung akan bertambah sesuai nilai konversi yang diatur.')
+                    ->modalDescription('Apakah Anda yakin ingin memecah 1 unit dari item ini? Stok item eceran target akan bertambah sesuai nilai konversi.')
                     ->modalSubmitActionLabel('Ya, Pecah')
                     ->action(function (Item $record) {
                         $sourceItem = $record;
+                        $targetItem = $sourceItem->targetChild; // Using the BelongsTo relationship
 
-                        // Get the first child item from the many-to-many relationship, including pivot data
-                        $firstChildConversion = $sourceItem->conversionChildren()
-                                                          ->withPivot('conversion_value', 'id')
-                                                          ->orderByPivot('id') // Order by pivot table's ID to get the first added if multiple
-                                                          ->first();
-
-                        if (!$firstChildConversion) {
+                        if (!$targetItem) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Proses Gagal')
-                                ->body('Tidak ada item turunan (eceran) yang terhubung dengan item induk ini melalui tabel konversi.')
+                                ->body('Target item eceran belum diatur untuk item induk ini.')
                                 ->danger()
                                 ->send();
                             return;
                         }
 
-                        // $firstChildConversion is the Item model of the child
-                        $targetChildItem = $firstChildConversion;
-                        $conversionValue = (float) $targetChildItem->pivot->conversion_value;
-
-                        if ($conversionValue <= 0) {
+                        if (!$sourceItem->conversion_value || $sourceItem->conversion_value <= 0) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Proses Gagal')
-                                ->body("Nilai konversi yang diatur untuk '{$targetChildItem->name}' tidak valid (harus lebih dari 0).")
+                                ->body("Nilai konversi untuk {$sourceItem->name} tidak valid atau belum diatur.")
                                 ->danger()
                                 ->send();
                             return;
@@ -167,22 +216,22 @@ class ItemResource extends Resource
                         if ($sourceItem->stock < 1) {
                             \Filament\Notifications\Notification::make()
                                 ->title('Proses Gagal')
-                                ->body("Stok {$sourceItem->name} tidak mencukupi (kurang dari 1).")
+                                ->body("Stok {$sourceItem->name} tidak mencukupi untuk dipecah (kurang dari 1).")
                                 ->danger()
                                 ->send();
                             return;
                         }
 
                         try {
-                            \Illuminate\Support\Facades\DB::transaction(function () use ($sourceItem, $targetChildItem, $conversionValue) {
+                            \Illuminate\Support\Facades\DB::transaction(function () use ($sourceItem, $targetItem) {
                                 $sourceItem->decrement('stock', 1);
-                                $targetChildItem->increment('stock', $conversionValue);
+                                $targetItem->increment('stock', $sourceItem->conversion_value);
                             });
 
                             \Filament\Notifications\Notification::make()
                                 ->title('Berhasil Pecah Stok')
                                 ->success()
-                                ->body("1 {$sourceItem->unit} {$sourceItem->name} telah dipecah. Stok {$targetChildItem->name} bertambah {$conversionValue} {$targetChildItem->unit}.")
+                                ->body("1 {$sourceItem->unit} {$sourceItem->name} telah dipecah. Stok {$targetItem->name} bertambah {$sourceItem->conversion_value} {$targetItem->unit} (satuan eceran).")
                                 ->send();
                         } catch (\Exception $e) {
                             \Filament\Notifications\Notification::make()
@@ -193,8 +242,9 @@ class ItemResource extends Resource
                         }
                     })
                     ->visible(fn (Item $record): bool =>
-                        // Show if this item has at least one child defined in the item_conversions table
-                        $record->conversionChildren()->exists()
+                        $record->is_convertible &&
+                        $record->target_child_item_id !== null &&
+                        $record->conversion_value > 0
                     ),
             ])
             ->bulkActions([

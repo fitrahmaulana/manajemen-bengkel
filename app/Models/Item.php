@@ -16,16 +16,16 @@ class Item extends Model
         'unit',
         'location',
         'type_item_id',
-        'is_convertible', // Added
-        // 'parent_item_id', // Removed
-        // 'conversion_value', // Removed
-        // 'base_unit', // Removed
+        'is_convertible',
+        'target_child_item_id',
+        'conversion_value',
+        'base_unit',
     ];
 
     protected $casts = [
         'stock' => 'integer',
-        'is_convertible' => 'boolean', // Added
-        // 'conversion_value' => 'decimal:2', // Removed
+        'is_convertible' => 'boolean',
+        'conversion_value' => 'decimal:2',
     ];
 
     public function typeItem()
@@ -38,27 +38,19 @@ class Item extends Model
         return $this->belongsToMany(Invoice::class, 'invoice_item');
     }
 
-    // Old parent() and children() relationships based on parent_item_id are removed.
-
     /**
-     * The child items that this item can be converted into.
-     * (This item is the PARENT in the conversion)
+     * Get the target eceran item for this (parent) item.
      */
-    public function conversionChildren()
+    public function targetChild(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsToMany(Item::class, 'item_conversions', 'parent_item_id', 'child_item_id')
-                    ->withPivot('conversion_value', 'id') // 'id' here is the id of the pivot record
-                    ->withTimestamps();
+        return $this->belongsTo(Item::class, 'target_child_item_id');
     }
 
     /**
-     * The parent items from which this item can be sourced.
-     * (This item is the CHILD in the conversion)
+     * Get all parent items that convert into this (eceran) item.
      */
-    public function conversionParents()
+    public function sourceParents(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->belongsToMany(Item::class, 'item_conversions', 'child_item_id', 'parent_item_id')
-                    ->withPivot('conversion_value', 'id') // 'id' here is the id of the pivot record
-                    ->withTimestamps();
+        return $this->hasMany(Item::class, 'target_child_item_id');
     }
 }

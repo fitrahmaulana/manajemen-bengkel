@@ -3,13 +3,13 @@
 namespace App\Filament\Resources\ItemResource\Pages;
 
 use App\Filament\Resources\ItemResource;
-use App\Filament\Resources\ItemResource\RelationManagers\ConversionChildrenRelationManager;
-use App\Models\Item;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Forms\Components\TextInput;
-use Illuminate\Support\Facades\DB;
-use Filament\Notifications\Notification;
+// Removed App\Filament\Resources\ItemResource\RelationManagers\ConversionChildrenRelationManager;
+// Removed App\Models\Item;
+// Removed Filament\Forms\Components\TextInput;
+// Removed Illuminate\Support\Facades\DB;
+// Removed Filament\Notifications\Notification;
 
 class EditItem extends EditRecord
 {
@@ -18,97 +18,35 @@ class EditItem extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\Action::make('buatDanLampirkanEceran')
-                ->label('Buat & Lampirkan Item Eceran')
-                ->icon('heroicon-o-plus-circle')
-                ->visible(fn (): bool => $this->record->is_convertible && !$this->record->conversionChildren()->exists())
-                ->form([
-                    TextInput::make('eceran_name')
-                        ->label('Nama Item Eceran')
-                        ->default(fn (): string => $this->record->name . ' (Eceran)')
-                        ->required(),
-                    TextInput::make('eceran_sku')
-                        ->label('SKU Item Eceran')
-                        ->default(fn (): string => $this->record->sku . '-ECER')
-                        ->required()
-                        ->unique(table: Item::class, column: 'sku', ignoreRecord: true),
-                    TextInput::make('eceran_unit')
-                        ->label('Satuan Item Eceran')
-                        ->helperText('Contoh: Liter, Pcs, Ml')
-                        ->required(),
-                    TextInput::make('eceran_selling_price')
-                        ->label('Harga Jual Eceran')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->required(),
-                    TextInput::make('eceran_purchase_price')
-                        ->label('Harga Beli Eceran (Modal)')
-                        ->numeric()
-                        ->prefix('Rp')
-                        ->required(),
-                    TextInput::make('conversion_value')
-                        ->label('Nilai Konversi dari Induk ke Eceran ini')
-                        ->numeric()
-                        ->required()
-                        ->gt(0)
-                        ->helperText("Contoh: Jika Induk adalah 'Oli 4L' dan eceran ini dalam Liter, maka nilai konversi adalah 4."),
-                ])
-                ->action(function (array $data) {
-                    DB::transaction(function () use ($data) {
-                        // Create the new eceran item
-                        $eceranItem = Item::create([
-                            'name' => $data['eceran_name'],
-                            'sku' => $data['eceran_sku'],
-                            'unit' => $data['eceran_unit'],
-                            'selling_price' => $data['eceran_selling_price'],
-                            'purchase_price' => $data['eceran_purchase_price'],
-                            'stock' => 0, // Initial stock for eceran item
-                            'is_convertible' => false, // Eceran item itself is not convertible by default
-                            // Add other necessary fields if any, e.g., type_item_id if required
-                        ]);
-
-                        // Attach the new eceran item to the parent (current record)
-                        $this->record->conversionChildren()->attach($eceranItem->id, [
-                            'conversion_value' => $data['conversion_value']
-                        ]);
-
-                        Notification::make()
-                            ->title('Item Eceran Berhasil Dibuat dan Dilampirkan')
-                            ->success()
-                            ->send();
-
-                        // Optionally, refresh relation manager or page
-                        // $this->dispatch('refreshRelationManager', 'conversionChildren'); // Needs Livewire component event
-                        // Or simply redirect to refresh data
-                        // return redirect($this->getResource()::getUrl('edit', ['record' => $this->record]));
-
-                    });
-                    // Refresh the data on the page to show the new relation if not using livewire refresh
-                    $this->refreshFormData(['conversionChildren']);
-                    // This might not auto-refresh a relation manager immediately without more specific livewire handling.
-                    // A full page redirect or specific event listening in RM might be needed for instant RM refresh.
-                })
-                ->modalWidth('xl'), // Make modal wider for more fields
+            // The "Buat & Lampirkan Item Eceran" action is removed as this functionality
+            // is now better handled by the createOptionForm in the ItemResource main form's
+            // 'target_child_item_id' Select field.
             Actions\DeleteAction::make(),
         ];
     }
 
     /**
      * Conditionally load relation managers.
+     * Since ConversionChildrenRelationManager is removed, this method might not be needed
+     * unless there are other relation managers to be handled conditionally.
+     * For now, reverting to parent or an empty array if no other RMs.
      */
     public function getRelationManagers(): array
     {
-        $managers = parent::getRelationManagers(); // Get default managers if any
+        // If ConversionChildrenRelationManager was the only one being conditionally loaded,
+        // and ItemResource::getRelations() is empty or doesn't list it,
+        // this method can be simplified or removed to use default behavior.
+        // For now, let's ensure it doesn't try to load the removed RM.
+        $managers = parent::getRelationManagers();
 
-        if ($this->record && $this->record->is_convertible) {
-            // Add ConversionChildrenRelationManager if the item is convertible
-            $managers[] = ConversionChildrenRelationManager::class;
-        } else {
-            // Ensure it's not loaded if not convertible, by filtering it out if it was somehow added by default
-            $managers = array_filter($managers, function ($managerClass) {
-                return $managerClass !== ConversionChildrenRelationManager::class;
-            });
-        }
+        // Filter out ConversionChildrenRelationManager explicitly if it was ever registered globally
+        // and we want to ensure it's not shown based on old logic.
+        // However, the primary control is now that it should have been removed from ItemResource::getRelations() as well.
+        // $managers = array_filter($managers, function ($managerClass) {
+        //     return $managerClass !== \App\Filament\Resources\ItemResource\RelationManagers\ConversionChildrenRelationManager::class;
+        // });
+
+        // If the parent ItemResource::getRelations() is empty, this will also be empty.
         return $managers;
     }
 }
