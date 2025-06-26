@@ -58,16 +58,16 @@ class ItemResource extends Resource
                 Forms\Components\Section::make('Detail Konversi (jika item ini Induk)')
                     ->description('Atur item eceran target dan nilai konversi jika item ini dapat dipecah.')
                     ->collapsible()
-                    ->visible(fn (Forms\Get $get) => $get('is_convertible')) // Only show this section if is_convertible is true
+                    ->visible(fn(Forms\Get $get) => $get('is_convertible'))
                     ->schema([
                         Forms\Components\Select::make('target_child_item_id')
                             ->label('Target Item Eceran (Hasil Konversi)')
-                            ->relationship(name: 'targetChild', titleAttribute: 'name', modifyQueryUsing: fn (Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
+                            ->relationship(name: 'targetChild', titleAttribute: 'name', modifyQueryUsing: fn(Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
                             ->searchable()
                             ->preload()
                             ->nullable()
                             ->helperText('Pilih item eceran yang akan dihasilkan. Item ini biasanya memiliki satuan dasar (e.g., Liter, Pcs).')
-                            ->createOptionForm([ // Allow creating new eceran item on the fly
+                            ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nama Item Eceran Baru')
                                     ->required(),
@@ -84,10 +84,8 @@ class ItemResource extends Resource
                                 Forms\Components\TextInput::make('purchase_price')
                                     ->label('Harga Beli Eceran')
                                     ->numeric()->prefix('Rp')->required()->default(0),
-                                // is_convertible for new eceran item will be false by default (model default or not set)
-                                // stock for new eceran item will be 0 by default
                             ])
-                            ->createOptionAction(function (array $data): int {
+                            ->createOptionUsing(function (array $data): int {
                                 $newItem = Item::create([
                                     'name' => $data['name'],
                                     'sku' => $data['sku'],
@@ -95,7 +93,7 @@ class ItemResource extends Resource
                                     'selling_price' => $data['selling_price'],
                                     'purchase_price' => $data['purchase_price'],
                                     'stock' => 0,
-                                    'is_convertible' => false, // Eceran items are generally not convertible themselves
+                                    'is_convertible' => false,
                                 ]);
                                 return $newItem->id;
                             })
@@ -241,10 +239,11 @@ class ItemResource extends Resource
                                 ->send();
                         }
                     })
-                    ->visible(fn (Item $record): bool =>
+                    ->visible(
+                        fn(Item $record): bool =>
                         $record->is_convertible &&
-                        $record->target_child_item_id !== null &&
-                        $record->conversion_value > 0
+                            $record->target_child_item_id !== null &&
+                            $record->conversion_value > 0
                     ),
             ])
             ->bulkActions([
@@ -257,7 +256,7 @@ class ItemResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\ConversionChildrenRelationManager::class,
+            // RelationManagers\ConversionChildrenRelationManager::class,
         ];
     }
 
