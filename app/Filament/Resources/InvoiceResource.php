@@ -119,9 +119,25 @@ class InvoiceResource extends Resource
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
                     ->label('Barang / Suku Cadang')->schema([
-                        Forms\Components\Select::make('item_id')->label('Barang')->options(Item::all()->pluck('name', 'id'))->searchable()->required()->live()->afterStateUpdated(fn(Set $set, $state) => $set('price', Item::find($state)?->selling_price ?? 0)),
-                        Forms\Components\TextInput::make('quantity')->numeric()->default(1)->required()->live(),
+                        Forms\Components\Select::make('item_id')
+                            ->label('Barang')
+                            ->options(Item::all()->pluck('name', 'id'))
+                            ->searchable()
+                            ->required()
+                            ->live()
+                            ->afterStateUpdated(function (Set $set, $state) {
+                                $item = Item::find($state);
+                                $set('price', $item?->selling_price ?? 0);
+                                $set('unit_name', $item?->unit ?? ''); // Set unit name for display
+                            }),
+                        Forms\Components\TextInput::make('quantity')
+                            ->numeric()
+                            ->default(1)
+                            ->required()
+                            ->live()
+                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null), // Display unit as suffix
                         Forms\Components\TextInput::make('price')->label('Harga Satuan')->numeric()->prefix('Rp')->readOnly(),
+                        Forms\Components\Hidden::make('unit_name'), // Hidden field to store unit name
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])->columns(4)->live()->afterStateUpdated($calculateTotals),
             ]),
@@ -263,7 +279,9 @@ class InvoiceResource extends Resource
                             ->hiddenLabel()
                             ->schema([
                                 Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
-                                Infolists\Components\TextEntry::make('pivot.quantity')->label('Kuantitas'),
+                                Infolists\Components\TextEntry::make('pivot.quantity')
+                                    ->label('Kuantitas')
+                                    ->formatStateUsing(fn ($record) => $record->pivot->quantity . ' ' . $record->unit), // Display quantity with unit
                                 Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->money('IDR'),
                                 // Menghitung subtotal per item
                                 Infolists\Components\TextEntry::make('sub_total')
