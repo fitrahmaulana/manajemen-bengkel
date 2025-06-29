@@ -22,6 +22,11 @@ return new class extends Migration
             $table->string('unit', 50)->default('Pcs'); // Satuan, misal: Pcs, Botol, Set
             $table->string('location')->nullable(); // Lokasi penyimpanan, misal: "Rak A-01"
             $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
+
+            // New fields for single target child conversion
+            $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null')->comment('ID of the eceran item this parent converts to');
+            $table->decimal('conversion_value', 8, 2)->nullable()->comment('How many units of target_child_item_id are made from 1 unit of this item');
+
             $table->timestamps();
         });
     }
@@ -31,6 +36,12 @@ return new class extends Migration
      */
     public function down(): void
     {
+        // If rolling back, ensure to drop the foreign key if it was added, then the column.
+        // This down() method should ideally reverse what up() does.
+        // Given we are modifying an existing create_table, a full rollback would drop the table.
+        // If this migration was ever run with the old fields, then a more complex down()
+        // would be needed to restore them, or a separate rollback migration.
+        // For simplicity, assuming a fresh migrate:fresh scenario if this is modified.
         Schema::dropIfExists('items');
     }
 };
