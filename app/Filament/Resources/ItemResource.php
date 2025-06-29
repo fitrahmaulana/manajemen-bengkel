@@ -24,7 +24,7 @@ class ItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Barang';
     protected static ?int $navigationSort = 1;
 
-    private static function roundUpToNearestHundred($number)
+    public static function roundUpToNearestHundred($number)
     {
         if (!is_numeric($number) || $number <= 0) {
             return 0;
