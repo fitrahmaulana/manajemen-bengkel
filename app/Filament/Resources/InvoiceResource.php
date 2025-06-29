@@ -44,7 +44,10 @@ class InvoiceResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Faktur';
     protected static ?int $navigationSort = 1;
 
-
+    private static function formatRupiah($state): string
+    {
+        return 'Rp ' . number_format($state ?? 0, 0, ',', '.');
+    }
 
     public static function form(Form $form): Form
     {
@@ -112,7 +115,7 @@ class InvoiceResource extends Resource
                 Forms\Components\Repeater::make('services')
                     ->label('Jasa / Layanan')->schema([
                         Forms\Components\Select::make('service_id')->label('Jasa')->options(Service::all()->pluck('name', 'id'))->searchable()->required()->live()->afterStateUpdated(fn(Set $set, $state) => $set('price', Service::find($state)?->price ?? 0)),
-                        Forms\Components\TextInput::make('price')->label('Harga Jasa')->numeric()->prefix('Rp')->readOnly(),
+                        Forms\Components\TextInput::make('price')->label('Harga Jasa')->formatStateUsing(fn ($state) => self::formatRupiah($state))->readOnly(),
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])->columns(3)->live()->afterStateUpdated($calculateTotals),
 
@@ -136,7 +139,7 @@ class InvoiceResource extends Resource
                             ->required()
                             ->live()
                             ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null), // Display unit as suffix
-                        Forms\Components\TextInput::make('price')->label('Harga Satuan')->numeric()->prefix('Rp')->readOnly(),
+                        Forms\Components\TextInput::make('price')->label('Harga Satuan')->formatStateUsing(fn ($state) => self::formatRupiah($state))->readOnly(),
                         Forms\Components\Hidden::make('unit_name'), // Hidden field to store unit name
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])->columns(4)->live()->afterStateUpdated($calculateTotals),
@@ -153,7 +156,7 @@ class InvoiceResource extends Resource
 
                     // Grup untuk ringkasan biaya
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('subtotal')->label('Subtotal')->numeric()->prefix('Rp')->readOnly()->helperText('Total sebelum diskon & pajak.'),
+                        Forms\Components\TextInput::make('subtotal')->label('Subtotal')->formatStateUsing(fn ($state) => self::formatRupiah($state))->readOnly()->helperText('Total sebelum diskon & pajak.'),
 
                         // Grup untuk Diskon dengan pilihan Tipe
                         Grid::make(2)->schema([
@@ -163,12 +166,15 @@ class InvoiceResource extends Resource
                                 ->default('fixed')->live(),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
-                                ->numeric()->default(0)->live(debounce: 600)->afterStateUpdated($calculateTotals),
+                                ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                ->prefix('Rp')
+                                ->live(debounce: 600)
+                                ->afterStateUpdated($calculateTotals),
                         ]),
 
 
                         // Total Akhir
-                        Forms\Components\TextInput::make('total_amount')->label('Total Akhir')->numeric()->prefix('Rp')->readOnly(),
+                        Forms\Components\TextInput::make('total_amount')->label('Total Akhir')->formatStateUsing(fn ($state) => self::formatRupiah($state))->readOnly(),
                     ]),
                 ]),
             ]),
@@ -184,7 +190,7 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
                 Tables\Columns\TextColumn::make('status')->badge()->searchable(),
-                Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->money('IDR')->sortable(),
+                Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->formatStateUsing(fn ($state) => self::formatRupiah($state))->sortable(),
                 Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
             ])
             ->filters([
@@ -269,7 +275,7 @@ class InvoiceResource extends Resource
                             ->schema([
                                 Infolists\Components\TextEntry::make('name')->label('Nama Jasa')->weight('bold'),
                                 Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->money('IDR'),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->formatStateUsing(fn ($state) => self::formatRupiah($state)),
                             ])->columns(3),
                     ]),
 
@@ -282,12 +288,12 @@ class InvoiceResource extends Resource
                                 Infolists\Components\TextEntry::make('pivot.quantity')
                                     ->label('Kuantitas')
                                     ->formatStateUsing(fn ($record) => $record->pivot->quantity . ' ' . $record->unit), // Display quantity with unit
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->money('IDR'),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->formatStateUsing(fn ($state) => self::formatRupiah($state)),
                                 // Menghitung subtotal per item
-                                Infolists\Components\TextEntry::make('sub_total')
+                                Infolists\Components\TextEntry::make('sub_total_calculated') // Renamed to avoid conflict if 'sub_total' is a real attribute
                                     ->label('Subtotal')
-                                    ->money('IDR')
-                                    ->state(fn ($record): float => $record->pivot->quantity * $record->pivot->price),
+                                    ->state(fn ($record): float => $record->pivot->quantity * $record->pivot->price)
+                                    ->formatStateUsing(fn ($state) => self::formatRupiah($state)),
                                 Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -306,14 +312,18 @@ class InvoiceResource extends Resource
                                 ]),
                                 // Kolom Kanan: Kalkulasi
                                 Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('subtotal')->money('IDR'),
+                                    Infolists\Components\TextEntry::make('subtotal')->formatStateUsing(fn ($state) => self::formatRupiah($state)),
                                     Infolists\Components\TextEntry::make('discount_value')
                                         ->label('Diskon')
-                                        ->money(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null)
-                                        ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null),
+                                        ->formatStateUsing(function ($record) {
+                                            if ($record->discount_type === 'percentage') {
+                                                return $record->discount_value . '%';
+                                            }
+                                            return self::formatRupiah($record->discount_value);
+                                        }),
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
-                                        ->money('IDR')
+                                        ->formatStateUsing(fn ($state) => self::formatRupiah($state))
                                         ->weight('bold')
                                         ->size('lg'),
                                 ]), // <-- Mendorong grup ini ke kanan
