@@ -3,8 +3,10 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ItemResource\Pages;
-use App\Filament\Resources\ItemResource\RelationManagers;
+use Pelmered\FilamentMoneyField\Forms\Components\MoneyInput;
+
 use App\Models\Item;
+use Dom\Text;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Infolists\Infolist;
@@ -16,6 +18,8 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Pelmered\FilamentMoneyField\Infolists\Components\MoneyEntry;
+use Pelmered\FilamentMoneyField\Tables\Columns\MoneyColumn;
 
 class ItemResource extends Resource
 {
@@ -69,14 +73,14 @@ class ItemResource extends Resource
                             ->schema([
                                 Forms\Components\TextInput::make('purchase_price')
                                     ->label('Harga Beli (Modal)')
-                                    ->numeric()
+                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                                     ->prefix('Rp')
                                     ->required(),
                                 Forms\Components\TextInput::make('selling_price')
-                                    ->label('Harga Jual (untuk satuan di bawah)')
-                                    ->numeric()
-                                    ->prefix('Rp')
+                                    ->label('Harga Jual')
                                     ->helperText('Harga jual jika barang ini dijual utuh (per Botol/Pcs/dll).')
+                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                    ->prefix('Rp')
                                     ->required(),
                             ]),
                         Forms\Components\Grid::make(2)
@@ -163,7 +167,9 @@ class ItemResource extends Resource
                                         ->default('Liter'),
                                     Forms\Components\TextInput::make('purchase_price')
                                         ->label('Harga Beli (Modal) Eceran')
-                                        ->numeric()->prefix('Rp')->required()
+                                        ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                        ->prefix('Rp')
+                                        ->required()
                                         ->default(function () use ($get) {
                                             // Menghitung Harga Beli (Modal) eceran berdasarkan Harga Beli (Modal) induk dan nilai konversi
                                             $parentPurchasePrice = $get('purchase_price');
@@ -176,7 +182,9 @@ class ItemResource extends Resource
                                         ->helperText('Harga disarankan berdasarkan harga induk. Silakan sesuaikan.'),
                                     Forms\Components\TextInput::make('selling_price')
                                         ->label('Harga Jual Eceran')
-                                        ->numeric()->prefix('Rp')->required()
+                                        ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                        ->prefix('Rp')
+                                        ->required()
                                         ->default(function () use ($get) {
                                             // Menghitung harga jual eceran berdasarkan harga jual induk dan nilai konversi
                                             $parentSellingPrice = $get('selling_price');
@@ -231,8 +239,8 @@ class ItemResource extends Resource
                     ->label('Kode Barang')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('selling_price')
+                    ->currency('IDR')
                     ->label('Harga Jual')
-                    ->money('IDR') // Otomatis format ke Rupiah
                     ->sortable(), // Membuat kolom ini bisa diurutkan
                 Tables\Columns\TextColumn::make('stock')
                     ->badge() // Tampilkan dalam bentuk badge
@@ -360,7 +368,7 @@ class ItemResource extends Resource
                             ->trueColor('success')
                             ->falseIcon('heroicon-o-cube')
                             ->falseColor('gray')
-                            ->helperText(fn ($state) => $state ? 'Induk (dapat dipecah)' : 'Eceran/Satuan'),
+                            ->helperText(fn($state) => $state ? 'Induk (dapat dipecah)' : 'Eceran/Satuan'),
                     ]),
 
                 InfolistSection::make('Informasi Stok & Harga')
@@ -369,21 +377,22 @@ class ItemResource extends Resource
                         TextEntry::make('stock')
                             ->label('Stok Saat Ini')
                             ->badge()
-                            ->color(fn (string $state): string => $state <= 5 ? 'warning' : 'success')
-                            ->suffix(fn ($record) => ' ' . $record->unit), // Menampilkan satuan
+                            ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success')
+                            ->suffix(fn($record) => ' ' . $record->unit), // Menampilkan satuan
 
                         TextEntry::make('purchase_price')
                             ->label('Harga Beli (Modal)')
-                            ->money('IDR'),
+                           ->currency('IDR'),
 
                         TextEntry::make('selling_price')
                             ->label('Harga Jual')
-                            ->money('IDR'),
+                           ->currency('IDR')
+
                     ]),
 
                 // Section ini hanya akan muncul jika item ini adalah item induk
                 InfolistSection::make('Detail Konversi')
-                    ->visible(fn ($record) => $record->is_convertible)
+                    ->visible(fn($record) => $record->is_convertible)
                     ->schema([
                         TextEntry::make('conversion_value')
                             ->label('Nilai Konversi')
