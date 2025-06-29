@@ -57,11 +57,6 @@ class ItemResource extends Resource
                                 Forms\Components\TextInput::make('brand')
                                     ->label('Merek'),
                             ]),
-                        Forms\Components\Toggle::make('is_convertible')
-                            ->label('Item Dapat Dikonversi (Induk)')
-                            ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
-                            ->default(false)
-                            ->reactive(), // Make it reactive to show/hide other fields
                     ]),
 
                 Forms\Components\Section::make('Informasi Stok & Harga')
@@ -107,8 +102,12 @@ class ItemResource extends Resource
                     ->description('Gunakan fitur ini jika barang ini adalah kemasan besar yang bisa dipecah menjadi eceran.')
                     ->collapsible()
                     ->schema([
+                        Forms\Components\Toggle::make('is_convertible')
+                            ->label('Item Dapat Dikonversi (Induk)')
+                            ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
+                            ->default(false)
+                            ->reactive(), // Make it reactive to show/hide other fields
                         Forms\Components\Group::make()->schema([
-
                             Forms\Components\TextInput::make('conversion_value')
                                 ->label('Nilai Konversi')
                                 ->numeric()
