@@ -44,10 +44,7 @@ class InvoiceResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Faktur';
     protected static ?int $navigationSort = 1;
 
-    private static function formatDisplayCurrency($state): string
-    {
-        return 'Rp. ' . number_format($state ?? 0, 0, ',', '.');
-    }
+
 
     public static function form(Form $form): Form
     {
@@ -59,8 +56,8 @@ class InvoiceResource extends Resource
             $subtotal = 0;
             // Calculate subtotal from services
             foreach ($servicesData as $service) {
-                // Ensure price is treated as a float, accounting for currency mask
-                $price = isset($service['price']) ? (float)str_replace(['Rp.', '.'], ['', ''], $service['price']) : 0;
+                // Ensure price is treated as a float, accounting for currency mask with space
+                $price = isset($service['price']) ? (float)str_replace(['Rp. ', '.'], ['', ''], (string)$service['price']) : 0;
                 if (!empty($service['service_id'])) {
                     // No quantity for services, just sum the price
                     $subtotal += $price;
@@ -70,20 +67,23 @@ class InvoiceResource extends Resource
             // Calculate subtotal from items
             foreach ($itemsData as $item) {
                 // Ensure price and quantity are treated as floats/integers
-                $price = isset($item['price']) ? (float)str_replace(['Rp.', '.'], ['', ''], $item['price']) : 0;
-                $quantity = isset($item['quantity']) ? (int)$item['quantity'] : 1;
+                $price = isset($item['price']) ? (float)str_replace(['Rp. ', '.'], ['', ''], (string)$item['price']) : 0;
+                $quantity = isset($item['quantity']) ? (int)$item['quantity'] : 1; // Assuming quantity is not masked
                 if (!empty($item['item_id'])) {
                     $subtotal += $price * $quantity;
                 }
             }
 
             // Logika Diskon Baru
-            $discountValue = (float)($get('discount_value') ?? 0);
+            // discount_value is also a masked input now
+            $discountInput = $get('discount_value') ?? '0';
+            $discountValue = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$discountInput);
+
             $finalDiscount = 0;
             if ($get('discount_type') === 'percentage' && $discountValue > 0) {
                 $finalDiscount = ($subtotal * $discountValue) / 100;
             } else {
-                $finalDiscount = $discountValue;
+                $finalDiscount = $discountValue; // This is the actual numeric value of discount
             }
 
             $total = $subtotal - $finalDiscount;
@@ -123,30 +123,17 @@ class InvoiceResource extends Resource
                             ->searchable()
                             ->required()
                             ->live()
-                            // ->afterStateUpdated(fn(Set $set, $state) => $set('price', Service::find($state)?->price ?? 0)) // Price is now editable
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                // Optionally, still set an initial price when service changes, but it remains editable
                                 $service = Service::find($state);
                                 $set('price', $service?->price ?? 0);
-                                // Trigger recalculation if needed, or rely on price field's live update
-                                $get('../')->recalculateTotals(); // Assuming recalculateTotals is a method on the parent, or adapt
+                                // $get('../')->recalculateTotals(); // Trigger recalculation
                             }),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Jasa')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp.')
-                            ->live(debounce: 500) // Or shorter if preferred
-                            ->afterStateUpdated(function(Get $get, Set $set) {
-                                // This ensures that when this specific price is changed, totals are recalculated.
-                                // The path '../' refers to the parent component holding the calculateTotals logic.
-                                // This might need adjustment based on exact structure or by calling a global event.
-                                // For now, let's assume a direct call or event that triggers $calculateTotals.
-                                // $calculateTotals($get, $set) won't work directly here due to scope.
-                                // A common way is to dispatch an event that the main form listens to,
-                                // or make calculateTotals a public method on the Livewire component if this is within one.
-                                // For simplicity, we'll rely on the main repeater's afterStateUpdated for now,
-                                // but this is a point of attention for robust recalculation.
-                            }), // Price is now editable, remove readOnly
+                            ->prefix('Rp. ') // Note the space
+                            ->live(debounce: 500)
+                            ->required(), // Made editable, so likely required
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])->columns(3)->live()->afterStateUpdated($calculateTotals),
 
@@ -161,24 +148,23 @@ class InvoiceResource extends Resource
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 $item = Item::find($state);
-                                $set('price', $item?->selling_price ?? 0); // Set initial price
-                                $set('unit_name', $item?->unit ?? ''); // Set unit name for display
-                                // $get('../')->recalculateTotals(); // Optional: trigger recalc
+                                $set('price', $item?->selling_price ?? 0);
+                                $set('unit_name', $item?->unit ?? '');
+                                // $get('../')->recalculateTotals(); // Trigger recalculation
                             }),
                         Forms\Components\TextInput::make('quantity')
                             ->numeric()
                             ->default(1)
                             ->required()
                             ->live()
-                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null), // Display unit as suffix
+                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp.')
+                            ->prefix('Rp. ') // Note the space
                             ->live(debounce: 500)
-                            // ->afterStateUpdated(...) // Optional: for more immediate recalc
-                            , // Price is now editable
-                        Forms\Components\Hidden::make('unit_name'), // Hidden field to store unit name
+                            ->required(), // Made editable, so likely required
+                        Forms\Components\Hidden::make('unit_name'),
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])->columns(4)->live()->afterStateUpdated($calculateTotals),
             ]),
@@ -196,8 +182,8 @@ class InvoiceResource extends Resource
                     Group::make()->schema([
                         Forms\Components\TextInput::make('subtotal')
                             ->label('Subtotal')
-                            ->prefix('Rp.')
-                            ->currency('IDR') // Apply as per user request for read-only
+                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                            ->prefix('Rp. ') // Note the space
                             ->readOnly()
                             ->helperText('Total sebelum diskon & pajak.'),
 
@@ -210,7 +196,7 @@ class InvoiceResource extends Resource
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix('Rp.')
+                                ->prefix('Rp. ') // Note the space
                                 ->live(debounce: 600)
                                 ->afterStateUpdated($calculateTotals),
                         ]),
@@ -219,8 +205,8 @@ class InvoiceResource extends Resource
                         // Total Akhir
                         Forms\Components\TextInput::make('total_amount')
                             ->label('Total Akhir')
-                            ->prefix('Rp.')
-                            ->currency('IDR') // Apply as per user request for read-only
+                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                            ->prefix('Rp. ') // Note the space
                             ->readOnly(),
                     ]),
                 ]),
@@ -237,7 +223,7 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
                 Tables\Columns\TextColumn::make('status')->badge()->searchable(),
-                Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state))->sortable(),
+                Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
             ])
             ->filters([
@@ -322,7 +308,7 @@ class InvoiceResource extends Resource
                             ->schema([
                                 Infolists\Components\TextEntry::make('name')->label('Nama Jasa')->weight('bold'),
                                 Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state)),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->currency('IDR'),
                             ])->columns(3),
                     ]),
 
@@ -332,21 +318,18 @@ class InvoiceResource extends Resource
                             ->hiddenLabel()
                             ->schema([
                                 Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
-                                // Assuming unit display for quantity is still desired from previous changes.
-                                // If InvoiceResource was restored to a state before unit display, this would need to be re-added.
-                                // For now, focusing on currency. If quantity unit is missing, it's a separate issue from this step.
-                                Infolists\Components\TextEntry::make('pivot.quantity')->label('Kuantitas')
+                                Infolists\Components\TextEntry::make('pivot.quantity')
+                                    ->label('Kuantitas')
                                     ->formatStateUsing(function($record) {
-                                        // Check if $record and $record->unit exist to prevent errors if unit feature was lost in restore
                                         $unit = property_exists($record, 'unit') && $record->unit ? ' ' . $record->unit : '';
                                         return ($record->pivot->quantity ?? '') . $unit;
                                     }),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state)),
+                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->currency('IDR'),
                                 // Menghitung subtotal per item
-                                Infolists\Components\TextEntry::make('sub_total_calculated') // Renamed to avoid conflict
+                                Infolists\Components\TextEntry::make('sub_total_calculated') // Renamed key
                                     ->label('Subtotal')
-                                    ->state(fn ($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0))
-                                    ->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state)),
+                                    ->currency('IDR')
+                                    ->state(fn ($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0)),
                                 Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -365,18 +348,21 @@ class InvoiceResource extends Resource
                                 ]),
                                 // Kolom Kanan: Kalkulasi
                                 Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('subtotal')->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state)),
+                                    Infolists\Components\TextEntry::make('subtotal')->currency('IDR'),
                                     Infolists\Components\TextEntry::make('discount_value')
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
                                             if ($record->discount_type === 'percentage') {
                                                 return ($record->discount_value ?? 0) . '%';
                                             }
-                                            return self::formatDisplayCurrency($record->discount_value);
-                                        }),
+                                            // For fixed, rely on ->currency('IDR') by setting state
+                                            return $record->discount_value;
+                                        })
+                                        ->currency(fn ($record) => $record->discount_type === 'fixed' ? 'IDR' : null) // Apply currency only if fixed
+                                        ->suffix(fn ($record) => $record->discount_type === 'percentage' ? '%' : null), // Keep suffix for percentage
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
-                                        ->formatStateUsing(fn ($state) => self::formatDisplayCurrency($state))
+                                        ->currency('IDR')
                                         ->weight('bold')
                                         ->size('lg'),
                                 ]), // <-- Mendorong grup ini ke kanan
