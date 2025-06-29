@@ -26,8 +26,6 @@ return new class extends Migration
             // New fields for single target child conversion
             $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null')->comment('ID of the eceran item this parent converts to');
             $table->decimal('conversion_value', 8, 2)->nullable()->comment('How many units of target_child_item_id are made from 1 unit of this item');
-            $table->string('base_unit')->nullable()->comment('The base unit of the conversion (e.g., Liter, Pcs)');
-            // is_convertible is handled by a separate migration (2025_06_13_000000_add_is_convertible_to_items_table.php)
 
             $table->timestamps();
         });
