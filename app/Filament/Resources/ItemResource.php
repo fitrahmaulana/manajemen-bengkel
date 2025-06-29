@@ -58,56 +58,72 @@ class ItemResource extends Resource
                 Forms\Components\Section::make('Detail Konversi (jika item ini Induk)')
                     ->description('Atur item eceran target dan nilai konversi jika item ini dapat dipecah.')
                     ->collapsible()
-                    ->visible(fn(Forms\Get $get) => $get('is_convertible'))
+                    ->visible(fn (Forms\Get $get) => $get('is_convertible')) // Only show this section if is_convertible is true
                     ->schema([
                         Forms\Components\Select::make('target_child_item_id')
                             ->label('Target Item Eceran (Hasil Konversi)')
-                            ->relationship(name: 'targetChild', titleAttribute: 'name', modifyQueryUsing: fn(Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
+                            ->relationship(name: 'targetChild', titleAttribute: 'name', modifyQueryUsing: fn (Builder $query, ?Item $record) => $record ? $query->where('id', '!=', $record->id) : $query)
                             ->searchable()
                             ->preload()
                             ->nullable()
                             ->helperText('Pilih item eceran yang akan dihasilkan. Item ini biasanya memiliki satuan dasar (e.g., Liter, Pcs).')
+                            ->createOptionModalHeading('Buat Item Eceran Baru')
                             ->createOptionForm([
                                 Forms\Components\TextInput::make('name')
                                     ->label('Nama Item Eceran Baru')
-                                    ->required(),
+                                    ->required()
+                                    ->default(fn (Forms\Get $get, ?Item $record) => $record ? $record->name . ' (Eceran)' : ($get('name') ? $get('name') . ' (Eceran)' : '')),
                                 Forms\Components\TextInput::make('sku')
                                     ->label('SKU Item Eceran Baru')
                                     ->required()
-                                    ->unique(table: Item::class, column: 'sku', ignoreRecord: true),
+                                    ->unique(table: Item::class, column: 'sku', ignoreRecord: true)
+                                    ->default(fn (Forms\Get $get, ?Item $record) => $record ? $record->sku . '-ECER' : ($get('sku') ? $get('sku') . '-ECER' : '')),
                                 Forms\Components\TextInput::make('unit')
                                     ->label('Satuan Eceran')
-                                    ->required(),
+                                    ->required()
+                                    ->default('Pcs') // Default to Pcs, or make it configurable
+                                    ->helperText('Contoh: Liter, Pcs, Ml'),
                                 Forms\Components\TextInput::make('selling_price')
                                     ->label('Harga Jual Eceran')
                                     ->numeric()->prefix('Rp')->required()->default(0),
                                 Forms\Components\TextInput::make('purchase_price')
                                     ->label('Harga Beli Eceran')
-                                    ->numeric()->prefix('Rp')->required()->default(0),
+                                    ->numeric()->prefix('Rp')->required()->default(0)
+                                    ->helperText('Harga beli untuk item eceran ini (jika ada, atau biarkan 0).'),
+                                // type_item_id can be added here if needed for eceran items
+                                // Forms\Components\Select::make('type_item_id')
+                                //     ->label('Tipe Barang Eceran')
+                                //     ->relationship('typeItem', 'name') // Assuming Item model has typeItem relationship
+                                //     ->searchable()
+                                //     ->preload(),
                             ])
-                            ->createOptionUsing(function (array $data): int {
-                                $newItem = Item::create([
-                                    'name' => $data['name'],
-                                    'sku' => $data['sku'],
+                            ->createOptionAction(function (array $data, Forms\Set $set, Forms\Get $get): int { // Added Set and Get
+                                $parentItemName = $get('name'); // Get parent name from the main form
+                                $parentItemSku = $get('sku');   // Get parent SKU from the main form
+
+                                $eceranData = [
+                                    'name' => $data['name'] ?: ($parentItemName ? $parentItemName . ' (Eceran)' : 'Eceran Item Baru'),
+                                    'sku' => $data['sku'] ?: ($parentItemSku ? $parentItemSku . '-ECER' : 'ECER-' . strtoupper(uniqid())),
                                     'unit' => $data['unit'],
                                     'selling_price' => $data['selling_price'],
                                     'purchase_price' => $data['purchase_price'],
                                     'stock' => 0,
                                     'is_convertible' => false,
-                                ]);
+                                    // 'type_item_id' => $data['type_item_id'] ?? null, // if type_item_id is in createOptionForm
+                                ];
+                                $newItem = Item::create($eceranData);
                                 return $newItem->id;
-                            })
-                            ->createOptionModalHeading('Buat Item Eceran Baru'),
+                            }),
                         Forms\Components\TextInput::make('conversion_value')
                             ->label('Nilai Konversi')
                             ->numeric()
                             ->nullable()
                             ->gt(0)
                             ->helperText('Jumlah unit item eceran yang dihasilkan dari 1 unit item induk ini.'),
-                        Forms\Components\TextInput::make('base_unit')
-                            ->label('Satuan Dasar Konversi')
-                            ->nullable()
-                            ->helperText('Satuan dari item eceran target (misal: Liter, Pcs). Sebaiknya cocok dengan satuan item eceran.'),
+                        // Forms\Components\TextInput::make('base_unit') // Removed as per plan
+                        //     ->label('Satuan Dasar Konversi')
+                        //     ->nullable()
+                        //     ->helperText('Satuan dari item eceran target (misal: Liter, Pcs). Sebaiknya cocok dengan satuan item eceran.'),
                     ]),
 
                 Forms\Components\Section::make('Informasi Stok & Harga')
@@ -239,11 +255,10 @@ class ItemResource extends Resource
                                 ->send();
                         }
                     })
-                    ->visible(
-                        fn(Item $record): bool =>
+                    ->visible(fn (Item $record): bool =>
                         $record->is_convertible &&
-                            $record->target_child_item_id !== null &&
-                            $record->conversion_value > 0
+                        $record->target_child_item_id !== null &&
+                        $record->conversion_value > 0
                     ),
             ])
             ->bulkActions([
@@ -256,7 +271,7 @@ class ItemResource extends Resource
     public static function getRelations(): array
     {
         return [
-            // RelationManagers\ConversionChildrenRelationManager::class,
+            RelationManagers\ConversionChildrenRelationManager::class,
         ];
     }
 

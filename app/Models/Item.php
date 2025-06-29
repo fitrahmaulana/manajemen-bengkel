@@ -19,7 +19,7 @@ class Item extends Model
         'is_convertible',
         'target_child_item_id',
         'conversion_value',
-        'base_unit',
+        // 'base_unit', // Removed
     ];
 
     protected $casts = [
