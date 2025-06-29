@@ -40,7 +40,7 @@ class ServiceResource extends Resource
                             ->columnSpanFull(),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Jasa')
-                            ->numeric()
+                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                             ->prefix('Rp')
                             ->required(),
                     ])
@@ -56,7 +56,7 @@ class ServiceResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('price')
                     ->label('Harga')
-                    ->money('IDR') // <- Otomatis format ke Rupiah
+                    ->currency('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->dateTime('d M Y')

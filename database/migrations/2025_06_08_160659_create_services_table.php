@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->text('description')->nullable();
-            $table->decimal('price', 15, 2)->default(0);
+            $table->decimal('price', 15, 0)->default(0);
             $table->timestamps();
         });
     }

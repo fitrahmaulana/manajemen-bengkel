@@ -22,10 +22,10 @@ return new class extends Migration
 
             $table->string('status')->default('draft'); // Pilihan: draft, sent, paid, overdue
 
-            $table->decimal('subtotal', 15, 2)->default(0);
+            $table->decimal('subtotal', 15, 0)->default(0);
             $table->string('discount_type')->nullable(); // Pilihan: 'percentage' atau 'fixed'
-            $table->decimal('discount_value', 15, 2)->default(0);
-            $table->decimal('total_amount', 15, 2)->default(0);
+            $table->decimal('discount_value', 15, 0)->default(0);
+            $table->decimal('total_amount', 15, 0)->default(0);
 
             $table->text('terms')->nullable();
 

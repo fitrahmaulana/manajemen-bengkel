@@ -16,8 +16,8 @@ return new class extends Migration
             $table->string('name'); // Nama Barang, misal: "Filter Oli Avanza"
             $table->string('sku')->unique(); // Kode Barang/SKU, harus unik
             $table->string('brand')->nullable(); // Merek, misal: "Toyota Genuine Part"
-            $table->decimal('purchase_price', 15, 2); // Harga Beli (modal)
-            $table->decimal('selling_price', 15, 2); // Harga Jual
+            $table->decimal('purchase_price', 15, 0); // Harga Beli (modal)
+            $table->decimal('selling_price', 15, 0); // Harga Jual
             $table->integer('stock')->default(0); // Jumlah Stok
             $table->string('unit', 50)->default('Pcs'); // Satuan, misal: Pcs, Botol, Set
             $table->string('location')->nullable(); // Lokasi penyimpanan, misal: "Rak A-01"

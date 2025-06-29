@@ -16,7 +16,7 @@ return new class extends Migration
             $table->foreignId('invoice_id')->constrained()->cascadeOnDelete();
             $table->foreignId('item_id')->constrained()->cascadeOnDelete();
             $table->integer('quantity');
-            $table->decimal('price', 15, 2);
+            $table->decimal('price', 15, 0);
             $table->text('description')->nullable();
         });
     }
