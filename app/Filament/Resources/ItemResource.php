@@ -7,6 +7,10 @@ use App\Filament\Resources\ItemResource\RelationManagers;
 use App\Models\Item;
 use Filament\Forms;
 use Filament\Forms\Form;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\IconEntry;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
@@ -64,7 +68,7 @@ class ItemResource extends Resource
                         Forms\Components\Grid::make(2)
                             ->schema([
                                 Forms\Components\TextInput::make('purchase_price')
-                                    ->label('Harga Beli')
+                                    ->label('Harga Beli (Modal)')
                                     ->numeric()
                                     ->prefix('Rp')
                                     ->required(),
@@ -158,10 +162,10 @@ class ItemResource extends Resource
                                         ])
                                         ->default('Liter'),
                                     Forms\Components\TextInput::make('purchase_price')
-                                        ->label('Harga Beli Eceran')
+                                        ->label('Harga Beli (Modal) Eceran')
                                         ->numeric()->prefix('Rp')->required()
                                         ->default(function () use ($get) {
-                                            // Menghitung harga beli eceran berdasarkan harga beli induk dan nilai konversi
+                                            // Menghitung Harga Beli (Modal) eceran berdasarkan Harga Beli (Modal) induk dan nilai konversi
                                             $parentPurchasePrice = $get('purchase_price');
                                             $conversionValue = $get('conversion_value');
                                             if (is_numeric($parentPurchasePrice) && is_numeric($conversionValue) && $conversionValue > 0) {
@@ -247,8 +251,7 @@ class ItemResource extends Resource
                 // Nanti kita bisa tambahkan filter di sini
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Tables\Actions\DeleteAction::make(),
+                Tables\Actions\ViewAction::make(),
                 Tables\Actions\Action::make('pecahStok')
                     ->label('Pecah 1 Unit Stok')
                     ->icon('heroicon-o-arrows-right-left')
@@ -332,7 +335,66 @@ class ItemResource extends Resource
         return [
             'index' => Pages\ListItems::route('/'),
             'create' => Pages\CreateItem::route('/create'),
+            'view' => Pages\ViewItem::route('/{record}'),
             'edit' => Pages\EditItem::route('/{record}/edit'),
         ];
+    }
+
+    public static function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfolistSection::make('Informasi Dasar Barang')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('name')->label('Nama Barang'),
+                        TextEntry::make('typeItem.name')->label('Tipe Barang'),
+                        TextEntry::make('sku')->label('Kode Barang (SKU)'),
+                        TextEntry::make('brand')->label('Merek'),
+                        TextEntry::make('location')->label('Lokasi Simpan'),
+                        // Contoh komponen canggih: Menampilkan status dengan ikon
+                        IconEntry::make('is_convertible')
+                            ->label('Status Konversi')
+                            ->boolean()
+                            ->trueIcon('heroicon-o-arrows-right-left')
+                            ->trueColor('success')
+                            ->falseIcon('heroicon-o-cube')
+                            ->falseColor('gray')
+                            ->helperText(fn ($state) => $state ? 'Induk (dapat dipecah)' : 'Eceran/Satuan'),
+                    ]),
+
+                InfolistSection::make('Informasi Stok & Harga')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('stock')
+                            ->label('Stok Saat Ini')
+                            ->badge()
+                            ->color(fn (string $state): string => $state <= 5 ? 'warning' : 'success')
+                            ->suffix(fn ($record) => ' ' . $record->unit), // Menampilkan satuan
+
+                        TextEntry::make('purchase_price')
+                            ->label('Harga Beli (Modal)')
+                            ->money('IDR'),
+
+                        TextEntry::make('selling_price')
+                            ->label('Harga Jual')
+                            ->money('IDR'),
+                    ]),
+
+                // Section ini hanya akan muncul jika item ini adalah item induk
+                InfolistSection::make('Detail Konversi')
+                    ->visible(fn ($record) => $record->is_convertible)
+                    ->schema([
+                        TextEntry::make('conversion_value')
+                            ->label('Nilai Konversi')
+                            ->helperText(function ($record) {
+                                $childName = $record->targetChild?->name ?? '...';
+                                $childUnit = $record->targetChild?->unit ?? '...';
+                                return "1 {$record->unit} {$record->name} akan menghasilkan {$record->conversion_value} {$childUnit} {$childName}";
+                            }),
+                        TextEntry::make('targetChild.name')
+                            ->label('Target Item Eceran'),
+                    ]),
+            ]);
     }
 }
