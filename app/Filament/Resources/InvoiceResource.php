@@ -169,6 +169,27 @@ class InvoiceResource extends Resource
                             ->default(1)
                             ->required()
                             ->live(debounce: 500)
+                            ->rules([
+                                fn (Get $get): \Closure => function (string $attribute, $value, \Closure $fail) use ($get) {
+                                    $itemId = $get('item_id');
+                                    if (!$itemId) {
+                                        return; // Item belum dipilih
+                                    }
+                                    $item = Item::find($itemId);
+                                    if (!$item) {
+                                        $fail("Item tidak ditemukan.");
+                                        return;
+                                    }
+                                    if ((int)$value > $item->stock) {
+                                        Notification::make()
+                                            ->title('Stok Tidak Cukup')
+                                            ->body("Stok {$item->name} hanya tersisa {$item->stock} {$item->unit}. Kuantitas tidak boleh melebihi stok yang tersedia.")
+                                            ->danger()
+                                            ->send();
+                                        $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas tidak boleh melebihi stok.");
+                                    }
+                                },
+                            ])
                             ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
@@ -177,10 +198,90 @@ class InvoiceResource extends Resource
                             ->live(debounce: 500)
                             ->required(), // Made editable, so likely required
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
+                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)->columnSpanFull(),
+                        Actions::make([
+                            Action::make('pecahStokDiFaktur')
+                                ->label('Pecah 1 Unit Stok')
+                                ->icon('heroicon-m-arrows-right-left')
+                                ->color('warning')
+                                ->requiresConfirmation()
+                                ->modalHeading('Konfirmasi Pecah Stok')
+                                ->modalDescription(function (Get $get) {
+                                    $itemId = $get('item_id');
+                                    if (!$itemId) return 'Pilih item terlebih dahulu.';
+                                    $item = Item::find($itemId);
+                                    if (!$item) return 'Item tidak ditemukan.';
+                                    return "Anda yakin ingin memecah 1 {$item->unit} dari {$item->name}? Stok item eceran ({$item->targetChild?->name}) akan bertambah {$item->conversion_value} {$item->targetChild?->unit}.";
+                                })
+                                ->modalSubmitActionLabel('Ya, Pecah Stok')
+                                ->visible(function (Get $get): bool {
+                                    $itemId = $get('item_id');
+                                    if (!$itemId) return false;
+                                    $item = Item::find($itemId);
+                                    return $item && $item->is_convertible && $item->target_child_item_id && $item->conversion_value > 0 && $item->stock > 0;
+                                })
+                                ->action(function (Get $get, Set $set, callable $livewire) {
+                                    $itemId = $get('item_id');
+                                    $item = Item::find($itemId);
+
+                                    if (!$item || !$item->is_convertible || !$item->target_child_item_id || !$item->conversion_value || $item->stock < 1) {
+                                        Notification::make()
+                                            ->title('Proses Gagal')
+                                            ->body('Item tidak dapat dipecah atau stok tidak mencukupi.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    $targetItem = $item->targetChild;
+                                    if (!$targetItem) {
+                                        Notification::make()
+                                            ->title('Proses Gagal')
+                                            ->body('Item eceran target tidak ditemukan.')
+                                            ->danger()
+                                            ->send();
+                                        return;
+                                    }
+
+                                    try {
+                                        DB::transaction(function () use ($item, $targetItem) {
+                                            $item->decrement('stock', 1);
+                                            $targetItem->increment('stock', $item->conversion_value);
+                                        });
+
+                                        Notification::make()
+                                            ->title('Berhasil Pecah Stok')
+                                            ->success()
+                                            ->body("1 {$item->unit} {$item->name} telah dipecah. Stok {$targetItem->name} bertambah {$item->conversion_value} {$targetItem->unit}.")
+                                            ->send();
+
+                                        // Trigger re-evaluation of the item options to refresh stock info
+                                        // This is a bit of a hack, ideally Filament would have a more direct way to refresh specific component options
+                                        // Forcing a live update on the parent repeater or a specific field might work.
+                                        // Let's try to re-set the items data, which should trigger a re-render of the select options.
+                                        // $livewire->dispatch('updateForm'); // This might be too broad
+                                        // $set('../../items', $get('../../items')); // This might work for some versions
+                                        // Forcing a re-render of the select options is tricky.
+                                        // The most reliable way is to ensure the options closure re-fetches data.
+                                        // The current options closure already fetches fresh data, so it should update on next interaction.
+                                        // To force an immediate visual update of the select, we might need to re-set its state or the repeater's state.
+                                        // $set('item_id', $itemId); // Re-set the current item_id to potentially trigger its own update cycle.
+                                        // $livewire->form->fill($livewire->form->getState()); // Potentially refresh the whole form
+                                        // Let's assume the options closure in Select::make('item_id') will pick up the new stock on its next evaluation.
+                                        // We may need to explicitly tell Livewire to refresh certain components if not.
+
+                                    } catch (\Exception $e) {
+                                        Notification::make()
+                                            ->title('Proses Gagal')
+                                            ->body('Terjadi kesalahan internal: ' . $e->getMessage())
+                                            ->danger()
+                                            ->send();
+                                    }
+                                })
+                        ])->columnSpanFull(), // Action takes full width or adjust as needed
                     ])
-                    ->columns(4)
-                    ->live()
+                    ->columns(4) // Adjusted columns for the new layout including actions
+                    ->live() // Repeater itself is live
                     ->afterStateUpdated($calculateTotals),
             ]),
 
