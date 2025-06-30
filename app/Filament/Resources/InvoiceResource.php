@@ -220,33 +220,38 @@ class InvoiceResource extends Resource
                             ->label('Pecah Stok')
                             ->icon('heroicon-o-arrows-up-down')
                             ->color('warning')
-                            ->action(function (Get $get) {
+                            ->action(function (array $arguments, Forms\Components\Repeater $component) {
                                 // Action ini hanya memicu modal.
-                                // Logika utama ada di modal form dan modal action.
-                                // $get di sini adalah Get untuk repeater item.
+                                // Data diakses via $arguments & $component dalam konfigurasi modal.
                             })
-                            ->modalHeading(fn(Get $get) => 'Pecah Stok untuk ' . Item::find($get('item_id'))?->name)
+                            ->modalHeading(function(array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
+                            })
                             ->modalWidth('lg')
-                            ->form(function (Get $get) { // $get di sini adalah Get untuk repeater item
-                                $childItemId = $get('item_id');
-                                $childItem = Item::find($childItemId);
+                            ->form(function (array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                $childItem = $childItemId ? Item::find($childItemId) : null;
 
-                                if (!$childItem) { // Guard clause jika item eceran tidak (lagi) ditemukan
+                                if (!$childItem) {
                                     return [
                                         Forms\Components\Placeholder::make('error_child_item_not_found')
                                             ->label('Error')
-                                            ->content('Item eceran yang dipilih tidak ditemukan. Mungkin telah dihapus atau diubah.'),
+                                            ->content('Item eceran yang dipilih tidak ditemukan atau belum dipilih.'),
                                     ];
                                 }
-                                $quantityActuallyNeeded = max(0, (int)$get('quantity') - $childItem->stock);
+                                $quantityInForm = (int)($itemRepeaterState['quantity'] ?? 0);
+                                $quantityActuallyNeeded = max(0, $quantityInForm - $childItem->stock);
 
                                 return [
                                     Forms\Components\Placeholder::make('info')
                                         ->label('Informasi Kebutuhan')
-                                        ->content("Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name}. Stok saat ini: {$childItem->stock} {$childItem->unit}."),
+                                        ->content("Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name} (Kuantitas di form: {$quantityInForm}, Stok saat ini: {$childItem->stock} {$childItem->unit})."),
                                     Forms\Components\Select::make('source_parent_item_id')
                                         ->label('Pilih Item Induk untuk Dipecah')
-                                        ->options(function () use ($childItem) { // childItem sudah pasti ada di sini
+                                        ->options(function () use ($childItem) {
                                             return $childItem->sourceParents()
                                                 ->where('stock', '>', 0)
                                                 ->get()
@@ -263,7 +268,7 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true)
-                                        ->helperText(function (Get $modalGet) {
+                                        ->helperText(function (Get $modalGet) { // $modalGet adalah Get untuk form modal
                                             $sourceParentItemId = $modalGet('source_parent_item_id');
                                             $parentQuantity = (int)$modalGet('parent_quantity_to_split');
                                             if ($sourceParentItemId && $parentQuantity > 0) {
@@ -281,7 +286,7 @@ class InvoiceResource extends Resource
                                                 if (!$sourceParentItemId) return;
                                                 $parentItem = Item::find($sourceParentItemId);
                                                 if (!$parentItem) {
-                                                    $fail("Item induk tidak ditemukan."); // Seharusnya tidak terjadi jika options benar
+                                                    $fail("Item induk tidak ditemukan.");
                                                     return;
                                                 }
                                                 if ((int)$value > $parentItem->stock) {
@@ -292,9 +297,11 @@ class InvoiceResource extends Resource
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
-                            ->action(function (array $data, Get $get, Set $set) { // $get & $set dari repeater item
-                                $childItemId = $get('item_id');
-                                $childItem = Item::find($childItemId);
+                            ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getItemState($arguments['item']); // Validated state
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                $childItem = $childItemId ? Item::find($childItemId) : null;
+
                                 $sourceParentItem = Item::find($data['source_parent_item_id']);
                                 $parentQuantityToSplit = (int)$data['parent_quantity_to_split'];
 
@@ -319,15 +326,18 @@ class InvoiceResource extends Resource
                                         ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
                                         ->send();
 
-                                    $currentItemsState = $get('../../items'); // Path ke state array repeater
-                                    $set('../../items', $currentItemsState); // Set ulang untuk memicu refresh
+                                    // Refresh repeater state
+                                    $currentState = $component->getState();
+                                    $component->state($currentState); // Ini akan memicu refresh
 
                                 } catch (\Exception $e) {
                                     Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan: ' . $e->getMessage())->danger()->send();
                                 }
                             })
-                            ->visible(function (Get $get): bool { // $get dari repeater item
-                                $itemId = $get('item_id');
+                            ->visible(function (array $arguments, Forms\Components\Repeater $component): bool {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $itemId = $itemRepeaterState['item_id'] ?? null;
+
                                 if (!$itemId) return false;
 
                                 $item = Item::find($itemId);
@@ -335,7 +345,7 @@ class InvoiceResource extends Resource
                                     return false;
                                 }
 
-                                $quantityNeeded = (int)$get('quantity');
+                                $quantityNeeded = (int)($itemRepeaterState['quantity'] ?? 0);
                                 if ($item->stock >= $quantityNeeded) {
                                     return false;
                                 }
