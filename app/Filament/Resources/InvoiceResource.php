@@ -223,9 +223,7 @@ class InvoiceResource extends Resource
                             ->live(debounce: 500)
                             ->required(),
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)->columnSpan(3), // description mengambil 3 kolom
-                        // Tombol aksi akan ditambahkan di sini, di sebelah kanan deskripsi atau di bawahnya
-                        // Kita akan letakkan di sebelah tombol delete bawaan jika memungkinkan, atau sebagai action di dalam item repeater
+                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)
                     ])
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
