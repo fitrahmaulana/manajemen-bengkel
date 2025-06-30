@@ -24,14 +24,9 @@ use Illuminate\Database\Eloquent\SoftDeletingScope; // Required for soft delete 
 use Filament\Tables\Filters\TrashedFilter; // Required for TrashedFilter
 use Filament\Tables\Actions\ForceDeleteBulkAction; // Required for bulk force delete
 use Filament\Tables\Actions\RestoreBulkAction; // Required for bulk restore
-use Illuminate\Support\Number;
-use Filament\Infolists; // <-- Pastikan ini ada di atas
+use Filament\Infolists;
 use Filament\Infolists\Infolist;
-// Removed: use Filament\Infolists\Components\Actions\ActionGroup as InfolistActionGroup;
-// Removed unused action aliases as they are not needed if actions are in Page class
-// use Filament\Actions\DeleteAction as InfolistDeleteAction;
-// use Filament\Actions\ForceDeleteAction as InfolistForceDeleteAction;
-// use Filament\Actions\RestoreAction as InfolistRestoreAction;
+
 
 class InvoiceResource extends Resource
 {
@@ -59,7 +54,7 @@ class InvoiceResource extends Resource
                 // Ensure price is treated as a float, accounting for currency mask with space
                 $price = isset($service['price']) ? (float)str_replace(['Rp. ', '.'], ['', ''], (string)$service['price']) : 0;
                 if (!empty($service['service_id'])) {
-                    // No quantity for services, just sum the price
+                    // Assuming quantity is not masked, default to 1 if not set
                     $subtotal += $price;
                 }
             }
@@ -98,7 +93,11 @@ class InvoiceResource extends Resource
             Section::make()->schema([
                 Grid::make(3)->schema([
                     Group::make()->schema([
-                        Forms\Components\Select::make('customer_id')->relationship('customer', 'name')->label('Pelanggan')->searchable()->preload()->required()->live(),
+                        Forms\Components\Select::make('customer_id')->relationship('customer', 'name')->label('Pelanggan')->searchable()->preload()->required()->live()
+                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
+                                // Reset vehicle_id when customer changes
+                                $set('vehicle_id', null);
+                            }),
                         Forms\Components\Select::make('vehicle_id')->label('Kendaraan (No. Polisi)')->options(fn(Get $get) => Vehicle::query()->where('customer_id', $get('customer_id'))->pluck('license_plate', 'id'))->searchable()->preload()->required(),
                     ]),
                     Group::make()->schema([
@@ -126,7 +125,6 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 $service = Service::find($state);
                                 $set('price', $service?->price ?? 0);
-                                // $get('../')->recalculateTotals(); // Trigger recalculation
                             }),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Jasa')
@@ -135,7 +133,10 @@ class InvoiceResource extends Resource
                             ->live(debounce: 500)
                             ->required(), // Made editable, so likely required
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
-                    ])->columns(3)->live()->afterStateUpdated($calculateTotals),
+                    ])
+                        ->columns(3)
+                        ->live()
+                        ->afterStateUpdated($calculateTotals),
 
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
@@ -149,15 +150,15 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 $item = Item::find($state);
                                 $set('price', $item?->selling_price ?? 0);
-                                $set('unit_name', $item?->unit ?? '');
-                                // $get('../')->recalculateTotals(); // Trigger recalculation
+                                $set('unit_name', $item?->unit ?? null); // Set unit name for display
                             }),
                         Forms\Components\TextInput::make('quantity')
+                            ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
                             ->default(1)
                             ->required()
-                            ->live()
-                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null),
+                            ->live(debounce: 500)
+                            ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -166,17 +167,18 @@ class InvoiceResource extends Resource
                             ->required(), // Made editable, so likely required
                         Forms\Components\Hidden::make('unit_name'),
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
-                    ])->columns(4)->live()->afterStateUpdated($calculateTotals),
+                    ])
+                    ->columns(4)
+                    ->live()
+                    ->afterStateUpdated($calculateTotals),
             ]),
 
             // Bagian bawah untuk ringkasan biaya, ditata di sebelah kanan
             Section::make()->schema([
                 Grid::make(2)->schema([
-                    // Kolom kosong untuk mendorong ringkasan ke kanan
                     Group::make()->schema([
                         Forms\Components\Textarea::make('terms')->label('Syarat & Ketentuan')->rows(3),
                     ]),
-
 
                     // Grup untuk ringkasan biaya
                     Group::make()->schema([
@@ -192,7 +194,7 @@ class InvoiceResource extends Resource
                             Forms\Components\Select::make('discount_type')
                                 ->label('Tipe Diskon')
                                 ->options(['fixed' => 'Nominal (Rp)', 'percentage' => 'Persen (%)'])
-                                ->default('fixed')->live(),
+                                ->default('fixed')->live(debounce: 600),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -320,7 +322,7 @@ class InvoiceResource extends Resource
                                 Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
                                 Infolists\Components\TextEntry::make('pivot.quantity')
                                     ->label('Kuantitas')
-                                    ->formatStateUsing(function($record) {
+                                    ->formatStateUsing(function ($record) {
                                         $unit = property_exists($record, 'unit') && $record->unit ? ' ' . $record->unit : '';
                                         return ($record->pivot->quantity ?? '') . $unit;
                                     }),
@@ -329,7 +331,7 @@ class InvoiceResource extends Resource
                                 Infolists\Components\TextEntry::make('sub_total_calculated') // Renamed key
                                     ->label('Subtotal')
                                     ->currency('IDR')
-                                    ->state(fn ($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0)),
+                                    ->state(fn($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0)),
                                 Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -358,8 +360,8 @@ class InvoiceResource extends Resource
                                             // For fixed, rely on ->currency('IDR') by setting state
                                             return $record->discount_value;
                                         })
-                                        ->currency(fn ($record) => $record->discount_type === 'fixed' ? 'IDR' : null) // Apply currency only if fixed
-                                        ->suffix(fn ($record) => $record->discount_type === 'percentage' ? '%' : null), // Keep suffix for percentage
+                                        ->currency(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null) // Apply currency only if fixed
+                                        ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null), // Keep suffix for percentage
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
                                         ->currency('IDR')

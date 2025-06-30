@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ItemResource\Pages;
-use Pelmered\FilamentMoneyField\Forms\Components\MoneyInput;
 
 use App\Models\Item;
 use Dom\Text;
@@ -18,8 +17,9 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Pelmered\FilamentMoneyField\Infolists\Components\MoneyEntry;
-use Pelmered\FilamentMoneyField\Tables\Columns\MoneyColumn;
+
+use function Laravel\Prompts\text;
+use function Livewire\on;
 
 class ItemResource extends Resource
 {
@@ -114,7 +114,7 @@ class ItemResource extends Resource
                             ->label('Item Dapat Dikonversi (Induk)')
                             ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
                             ->default(false)
-                            ->reactive(), // Make it reactive to show/hide other fields
+                            ->live(), // Make it reactive to show/hide other fields
                         Forms\Components\Group::make()->schema([
                             Forms\Components\TextInput::make('conversion_value')
                                 ->label('Nilai Konversi')
@@ -132,7 +132,7 @@ class ItemResource extends Resource
                                     }
                                     return '...';
                                 })
-                                ->reactive(), // Tetap reactive agar suffix bisa update
+                                ->live(onBlur: true), // Tetap reactive agar suffix bisa update
 
                             // 2. BARU PILIH TARGETNYA
                             Forms\Components\Select::make('target_child_item_id')
@@ -218,7 +218,7 @@ class ItemResource extends Resource
                                     $newItem = Item::create($eceranData);
                                     return $newItem->id;
                                 })
-                                ->reactive(), // Select juga dibuat reactive agar suffix di atas bisa update
+                                ->live(), // Select juga dibuat reactive agar suffix di atas bisa update
 
                         ])->visible(fn(Forms\Get $get) => $get('is_convertible')),
                     ]),
@@ -372,7 +372,7 @@ class ItemResource extends Resource
                     ]),
 
                 InfolistSection::make('Informasi Stok & Harga')
-                    ->columns(2)
+                    ->columns(3)
                     ->schema([
                         TextEntry::make('stock')
                             ->label('Stok Saat Ini')
@@ -382,12 +382,13 @@ class ItemResource extends Resource
 
                         TextEntry::make('purchase_price')
                             ->label('Harga Beli (Modal)')
-                           ->currency('IDR'),
+                            ->currency('IDR'),
 
                         TextEntry::make('selling_price')
                             ->label('Harga Jual')
-                           ->currency('IDR')
-
+                            ->currency('IDR')
+                            ->weight('bold')
+                            ->size('lg'),
                     ]),
 
                 // Section ini hanya akan muncul jika item ini adalah item induk
