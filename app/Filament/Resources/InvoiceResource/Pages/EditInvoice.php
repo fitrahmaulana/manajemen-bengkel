@@ -47,6 +47,7 @@ class EditInvoice extends EditRecord
                 'item_id' => $item->id,
                 'quantity' => $item->pivot->quantity,
                 'price' => $item->pivot->price,
+                'unit_name' => $item->unit,
                 'description' => $item->pivot->description
             ];
         })->all();
