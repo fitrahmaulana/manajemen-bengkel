@@ -180,8 +180,6 @@ class InvoiceResource extends Resource
                             ->default(1)
                             ->required()
                             ->live(debounce: 500)
-                            // Validasi kuantitas akan disesuaikan di langkah berikutnya atau saat implementasi modal
-                            // Untuk saat ini, kita biarkan validasi standar, atau bisa dimodifikasi agar tidak terlalu ketat jika ada opsi pecah stok
                             ->rules([
                                 function (Get $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
@@ -213,14 +211,9 @@ class InvoiceResource extends Resource
                                             if (!$hasPotentialToSplit) {
                                                 $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
                                             }
-                                            // Jika $hasPotentialToSplit true, jangan $fail di sini. Biarkan tombol pecah stok muncul.
-                                            // Validasi akhir ada di mutateDataBeforeSave.
                                         }
                                     };
                                 },
-                                // Bisa juga tambahkan rule standar jika perlu, misal:
-                                // 'numeric',
-                                // \Filament\Forms\Components\TextInput\Rules\MinValue::make(1),
                             ])
                             ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
@@ -388,6 +381,7 @@ class InvoiceResource extends Resource
                                 ->default('fixed')->live(debounce: 600),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
+                                ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                                 ->prefix('Rp. ') // Note the space
                                 ->live(debounce: 600)
