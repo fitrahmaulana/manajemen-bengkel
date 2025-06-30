@@ -186,34 +186,41 @@ class InvoiceResource extends Resource
                                 function (Get $get) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get) {
                                         $itemId = $get('item_id');
-                                        if (!$itemId) return;
-                                        $item = Item::find($itemId);
-                                        if (!$item) return;
+                                        $quantityInput = (int)$value; // Konversi sekali saja
 
-                                        // Jika item adalah eceran dan stoknya kurang, jangan langsung fail jika ada potensi pecah stok
-                                        // Kondisi ini akan disempurnakan saat modal pecah stok diimplementasikan
-                                        $potentialToSplit = false;
-                                        if (!$item->is_convertible) { // Ini item eceran
-                                            $sourceParents = $item->sourceParents()->where('stock', '>', 0)->exists();
-                                            if ($sourceParents) {
-                                                $potentialToSplit = true;
-                                            }
-                                        }
-
-                                        if (!$potentialToSplit && (int)$value > $item->stock) {
-                                            // Hapus Notifikasi dari rules, cukup $fail untuk validasi inline
-                                            // Notification::make()
-                                            //     ->title('Stok Tidak Cukup')
-                                            //     ->body("Stok {$item->name} hanya tersisa {$item->stock} {$item->unit}.")
-                                            //     ->danger()
-                                            //     ->send();
-                                            $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas tidak boleh melebihi stok yang tersedia tanpa opsi pecah stok.");
-                                        } elseif ((int)$value <= 0) {
+                                        if ($quantityInput <= 0) {
                                             $fail("Kuantitas harus lebih dari 0.");
+                                            return; // Hentikan jika kuantitas tidak valid
                                         }
-                                        // Jika ada potensi pecah stok, validasi akan ditangani lebih lanjut oleh mekanisme pecah stok
+
+                                        $itemId = $get('item_id');
+                                        if (!$itemId) { // Jika item belum dipilih, jangan validasi stok dulu
+                                            return;
+                                        }
+
+                                        $item = Item::find($itemId);
+                                        if (!$item) { // Jika item tidak ditemukan (seharusnya tidak terjadi jika select valid)
+                                            $fail("Item tidak valid.");
+                                            return;
+                                        }
+
+                                        if ($quantityInput > $item->stock) { // Kuantitas melebihi stok yang ada di DB untuk item ini
+                                            $hasPotentialToSplit = false;
+                                            if (!$item->is_convertible) { // Hanya cek potensi pecah jika ini item eceran
+                                                $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
+                                            }
+
+                                            if (!$hasPotentialToSplit) {
+                                                $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                            }
+                                            // Jika $hasPotentialToSplit true, jangan $fail di sini. Biarkan tombol pecah stok muncul.
+                                            // Validasi akhir ada di mutateDataBeforeSave.
+                                        }
                                     };
                                 },
+                                // Bisa juga tambahkan rule standar jika perlu, misal:
+                                // 'numeric',
+                                // \Filament\Forms\Components\TextInput\Rules\MinValue::make(1),
                             ])
                             ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
@@ -223,7 +230,9 @@ class InvoiceResource extends Resource
                             ->live(debounce: 500)
                             ->required(),
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)
+                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)->columnSpan(3), // description mengambil 3 kolom
+                        // Tombol aksi akan ditambahkan di sini, di sebelah kanan deskripsi atau di bawahnya
+                        // Kita akan letakkan di sebelah tombol delete bawaan jika memungkinkan, atau sebagai action di dalam item repeater
                     ])
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')

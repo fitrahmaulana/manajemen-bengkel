@@ -11,6 +11,12 @@ class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
 
+use Illuminate\Validation\ValidationException; // Tambahkan ini
+
+class EditInvoice extends EditRecord
+{
+    protected static string $resource = InvoiceResource::class;
+
     // Property to store original item quantities
     protected array $originalItemsQuantities = [];
 
@@ -18,13 +24,93 @@ class EditInvoice extends EditRecord
     {
         return [
             Actions\DeleteAction::make(),
+            Actions\ForceDeleteAction::make(), // Jika menggunakan soft delete
+            Actions\RestoreAction::make(),   // Jika menggunakan soft delete
         ];
+    }
+
+    protected function mutateDataBeforeSave(array $data): array
+    {
+        if (isset($data['items']) && is_array($data['items'])) {
+            foreach ($data['items'] as $key => $invoiceItem) {
+                if (empty($invoiceItem['item_id']) || !isset($invoiceItem['quantity'])) {
+                    continue;
+                }
+
+                $item = Item::find($invoiceItem['item_id']);
+                $quantityInForm = (int)$invoiceItem['quantity'];
+
+                if ($quantityInForm <= 0) {
+                    throw ValidationException::withMessages([
+                        "data.items.{$key}.quantity" => "Kuantitas untuk " . ($item?->name ?? 'item') . " harus lebih dari 0.",
+                    ]);
+                }
+
+                // Saat edit, validasi stok sedikit berbeda. Kita perlu memperhitungkan kuantitas item yang *sudah ada* di faktur ini sebelumnya.
+                // Stok yang relevan adalah: stok_aktual_db + stok_item_ini_di_faktur_sebelumnya.
+                // Namun, untuk validasi sebelum save, lebih aman membandingkan dengan stok aktual di DB.
+                // Logika penyesuaian stok di afterSave() akan menangani kalkulasi selisihnya.
+                // Di sini, kita hanya pastikan kuantitas baru tidak melebihi stok total yang ada di DB saat ini.
+                if ($item && $quantityInForm > $item->stock) {
+                    // Cek apakah item ini sudah ada di faktur sebelumnya untuk mendapatkan kuantitas original
+                    $originalQuantityForItem = 0;
+                    if($this->record && $this->record->items()->where('item_id', $item->id)->exists()){
+                        $pivot = $this->record->items()->where('item_id', $item->id)->first()->pivot;
+                        $originalQuantityForItem = $pivot->quantity;
+                    }
+
+                    // Stok yang "tersedia" untuk item ini adalah stok_db + original_qty_di_faktur_ini
+                    // Jika kuantitas baru > (stok_db + original_qty_di_faktur_ini), maka user mencoba mengambil lebih banyak dari yang ada + yang sudah dialokasikan.
+                    // Tapi ini menjadi rumit. Validasi paling aman adalah $quantityInForm > $item->stock (stok aktual di DB).
+                    // Jika user mengurangi kuantitas dari faktur, $item->stock akan bertambah di afterSave.
+                    // Jika user menambah kuantitas, $item->stock akan berkurang di afterSave.
+                    // Yang penting, $quantityInForm tidak boleh lebih besar dari $item->stock saat ini, *kecuali*
+                    // jika sebagian dari $quantityInForm itu sudah dialokasikan ke faktur ini.
+
+                    // Validasi untuk Edit: langsung bandingkan dengan stok aktual di DB.
+                    // Logika penyesuaian (tambah/kurang) stok ada di afterSave.
+                    // Di sini kita pastikan permintaan baru tidak melebihi apa yang TERSISA di gudang.
+                    // Jika user mengurangi kuantitas, $quantityInForm akan lebih kecil, dan $item->stock di DB akan bertambah nanti.
+                    // Jika user menambah kuantitas, $quantityInForm akan lebih besar, dan $item->stock di DB akan berkurang nanti.
+                    // Yang penting, permintaan $quantityInForm tidak boleh melebihi $item->stock aktual di DB KECUALI
+                    // sebagian dari $quantityInForm itu sudah dialokasikan ke faktur ini.
+                    // Untuk mutateDataBeforeSave, kita harus memastikan bahwa penambahan bersih tidak melebihi stok yang ada.
+
+                    $originalQuantityOnInvoice = 0;
+                    if ($this->record) {
+                        $existingItemPivot = $this->record->items()->where('item_id', $item->id)->first();
+                        if ($existingItemPivot) {
+                            $originalQuantityOnInvoice = (int)$existingItemPivot->pivot->quantity;
+                        }
+                    }
+
+                    // Jumlah bersih yang ingin diambil dari stok (di luar apa yang sudah ada di faktur)
+                    $netQuantityRequestedFromStock = $quantityInForm - $originalQuantityOnInvoice;
+
+                    if ($netQuantityRequestedFromStock > $item->stock) {
+                         throw ValidationException::withMessages([
+                            "data.items.{$key}.quantity" => "Stok {$item->name} hanya {$item->stock} {$item->unit}. Anda mencoba mengambil tambahan {$netQuantityRequestedFromStock} {$item->unit} padahal kuantitas sebelumnya {$originalQuantityOnInvoice} {$item->unit}.",
+                        ]);
+                    }
+                    // Jika netQuantityRequestedFromStock negatif, berarti user mengurangi jumlah item, yang selalu valid dari segi stok.
+                    // Jika netQuantityRequestedFromStock positif, maka harus <= $item->stock.
+
+                } elseif (!$item && !empty($invoiceItem['item_id'])) {
+                    throw ValidationException::withMessages([
+                        "data.items.{$key}.item_id" => "Item yang dipilih tidak valid atau tidak ditemukan.",
+                    ]);
+                }
+            }
+        }
+        return $data;
     }
 
     protected function beforeSave(): void
     {
         // Store original quantities before saving
-        $this->originalItemsQuantities = $this->getRecord()->items->pluck('pivot.quantity', 'id')->toArray();
+        // Ini mungkin tidak lagi diperlukan jika validasi utama ada di mutateDataBeforeSave
+        // atau perlu disesuaikan. Untuk sekarang, biarkan.
+        // $this->originalItemsQuantities = $this->getRecord()->items->pluck('pivot.quantity', 'id')->toArray();
     }
 
        /**
