@@ -6,11 +6,6 @@ use App\Filament\Resources\InvoiceResource;
 use App\Models\Item;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-
-class EditInvoice extends EditRecord
-{
-    protected static string $resource = InvoiceResource::class;
-
 use Illuminate\Validation\ValidationException; // Tambahkan ini
 
 class EditInvoice extends EditRecord
