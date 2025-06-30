@@ -224,18 +224,19 @@ class InvoiceResource extends Resource
                                 // Aksi ini akan memanggil modal. Implementasi modal ada di langkah berikutnya.
                                 // $arguments['itemData'] akan berisi data dari item repeater
                                 // $get('item_id'), $get('quantity') dari repeater item
-                                $itemId = $get('item_id');
-                                $quantityNeeded = (int)$get('quantity');
-                                $item = Item::find($itemId);
+                                // $itemId = $get('item_id');
+                                // $quantityNeeded = (int)$get('quantity');
+                                // $item = Item::find($itemId);
 
-                                if ($item && !$item->is_convertible && $item->stock < $quantityNeeded) {
-                                    // Simpan state yang dibutuhkan untuk modal
-                                // Data yang akan dikirim ke action modal
-                                $repeaterItemState = $get('.'); // Mendapatkan state dari item repeater saat ini
-
-                                // Memanggil action modal dengan data yang diperlukan
-                                // Ini akan membuka modal yang form-nya didefinisikan di bawah
-                            })
+                                // if ($item && !$item->is_convertible && $item->stock < $quantityNeeded) {
+                                    // Logika di sini tidak begitu diperlukan karena visibilitas tombol sudah dikontrol
+                                    // dan modal akan mengambil data yang relevan saat dibuka.
+                                    // Cukup pastikan action ini ada untuk memicu modal.
+                                // }
+                                // $repeaterItemState = $get('.'); // Mendapatkan state dari item repeater saat ini
+                                // Tidak ada aksi spesifik yang perlu dilakukan di sini sebelum modal terbuka,
+                                // karena modal akan menangani pengambilan data dan form.
+                            }) // Penutup untuk ->action dari triggerSplitStockModal
                             ->modalHeading(fn(Get $get) => 'Pecah Stok untuk ' . Item::find($get('item_id'))?->name)
                             ->modalWidth('lg')
                             ->form(function (Get $get) { // $get di sini adalah Get untuk repeater item
