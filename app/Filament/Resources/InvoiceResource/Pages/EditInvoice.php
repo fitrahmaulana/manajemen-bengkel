@@ -11,14 +11,16 @@ class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
 
-use Illuminate\Validation\ValidationException; // Tambahkan ini
+    // use Illuminate\Validation\ValidationException; // Sudah di-import oleh duplikat di bawah, atau pastikan hanya ada satu
+    // Hapus atau pastikan hanya ada satu 'use Item;' jika ada duplikasi juga.
 
 class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
+    protected $listeners = ['stockUpdated' => '$refresh']; // Tambahkan listener
 
     // Property to store original item quantities
-    protected array $originalItemsQuantities = [];
+    // protected array $originalItemsQuantities = []; // Ditangani secara berbeda atau tidak lagi krusial dengan validasi baru
 
     protected function getHeaderActions(): array
     {

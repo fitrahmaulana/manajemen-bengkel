@@ -9,9 +9,14 @@ use Filament\Resources\Pages\CreateRecord;
 use App\Models\Item; // Tambahkan ini
 use Illuminate\Validation\ValidationException; // Tambahkan ini
 
+use App\Models\Item;
+use Illuminate\Validation\ValidationException;
+
 class CreateInvoice extends CreateRecord
 {
     protected static string $resource = InvoiceResource::class;
+
+    protected $listeners = ['stockUpdated' => '$refresh']; // Tambahkan listener
 
     protected function mutateDataBeforeSave(array $data): array
     {
