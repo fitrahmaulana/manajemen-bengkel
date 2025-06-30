@@ -268,17 +268,20 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true)
-                                        ->helperText(function (Get $modalGet) { // $modalGet adalah Get untuk form modal
+                                        ->helperText(function (Get $modalGet) {
                                             $sourceParentItemId = $modalGet('source_parent_item_id');
                                             $parentQuantity = (int)$modalGet('parent_quantity_to_split');
+
+                                            // Hanya proses jika kedua field memiliki nilai yang valid
                                             if ($sourceParentItemId && $parentQuantity > 0) {
                                                 $parentItem = Item::find($sourceParentItemId);
-                                                if ($parentItem && $parentItem->targetChild) {
+                                                // Pastikan parentItem dan targetChild ada sebelum mengakses propertinya
+                                                if ($parentItem && $parentItem->targetChild && is_numeric($parentItem->conversion_value)) {
                                                     $generatedChildQty = $parentQuantity * $parentItem->conversion_value;
                                                     return "Akan menghasilkan: {$generatedChildQty} {$parentItem->targetChild->unit}";
                                                 }
                                             }
-                                            return null;
+                                            return null; // Default jika kondisi tidak terpenuhi
                                         })
                                         ->rules([
                                             fn(Get $modalGet): \Closure => function (string $attribute, $value, \Closure $fail) use ($modalGet) {
