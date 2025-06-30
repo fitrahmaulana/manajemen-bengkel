@@ -142,7 +142,19 @@ class InvoiceResource extends Resource
 
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
-                    ->label('Barang / Suku Cadang')->schema([
+                    ->label('Barang / Suku Cadang')
+                    ->itemLabel(function (array $state): ?string {
+                        if (empty($state['item_id'])) {
+                            return null;
+                        }
+                        // Ambil data item terbaru dari database untuk memastikan stok akurat
+                        $item = Item::find($state['item_id']);
+                        if (!$item) {
+                            return 'Item tidak ditemukan';
+                        }
+                        return $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
+                    })
+                    ->schema([
                         Forms\Components\Select::make('item_id')
                             ->label('Barang')
                             ->options(function () {
@@ -298,23 +310,30 @@ class InvoiceResource extends Resource
                                     return;
                                 }
 
+                                // Hitung generatedChildQuantity di luar transaksi agar bisa di-use dan untuk notifikasi
+                                $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
+                                if (!is_numeric($generatedChildQuantity) || $generatedChildQuantity < 0) {
+                                     Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
+                                    return;
+                                }
+
                                 try {
-                                    DB::transaction(function () use ($sourceParentItem, $childItem, $parentQuantityToSplit) {
+                                    DB::transaction(function () use ($sourceParentItem, $childItem, $parentQuantityToSplit, $generatedChildQuantity) {
                                         $sourceParentItem->decrement('stock', $parentQuantityToSplit);
-                                        $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
                                         $childItem->increment('stock', $generatedChildQuantity);
                                     });
 
+                                    // Notifikasi hanya dikirim sekali setelah transaksi berhasil
                                     Notification::make()->title('Berhasil Pecah Stok')->success()
                                         ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
                                         ->send();
 
-                                    // Refresh repeater state
                                     $currentState = $component->getState();
                                     $component->state($currentState); // Ini akan memicu refresh
 
                                 } catch (\Exception $e) {
-                                    Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan: ' . $e->getMessage())->danger()->send();
+                                    // Notifikasi error jika transaksi gagal
+                                    Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan internal saat memproses pecah stok: ' . $e->getMessage())->danger()->send();
                                 }
                             })
                             ->visible(function (array $arguments, Forms\Components\Repeater $component): bool {
