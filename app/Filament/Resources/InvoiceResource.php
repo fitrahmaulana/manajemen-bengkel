@@ -268,20 +268,23 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true)
-                                        ->helperText(function (Get $modalGet) {
+                                        ->helperText(function (Get $modalGet, $state) { // $state adalah nilai dari parent_quantity_to_split
                                             $sourceParentItemId = $modalGet('source_parent_item_id');
-                                            $parentQuantity = (int)$modalGet('parent_quantity_to_split');
+                                            $parentQuantity = (int)$state; // Gunakan $state untuk nilai field saat ini
 
-                                            // Hanya proses jika kedua field memiliki nilai yang valid
-                                            if ($sourceParentItemId && $parentQuantity > 0) {
+                                            // Jika source_parent_item_id belum dipilih, jangan tampilkan helper text dinamis
+                                            if (!$sourceParentItemId) {
+                                                return null;
+                                            }
+
+                                            if ($parentQuantity > 0) {
                                                 $parentItem = Item::find($sourceParentItemId);
-                                                // Pastikan parentItem dan targetChild ada sebelum mengakses propertinya
                                                 if ($parentItem && $parentItem->targetChild && is_numeric($parentItem->conversion_value)) {
                                                     $generatedChildQty = $parentQuantity * $parentItem->conversion_value;
                                                     return "Akan menghasilkan: {$generatedChildQty} {$parentItem->targetChild->unit}";
                                                 }
                                             }
-                                            return null; // Default jika kondisi tidak terpenuhi
+                                            return null;
                                         })
                                         ->rules([
                                             fn(Get $modalGet): \Closure => function (string $attribute, $value, \Closure $fail) use ($modalGet) {
