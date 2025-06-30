@@ -161,10 +161,9 @@ class InvoiceResource extends Resource
                                 return Item::query()
                                     ->get()
                                     ->mapWithKeys(function ($item) {
-                                        // Formatnya: "Nama Barang (Stok: X Unit)"
-                                        $stockInfo = " (Stok: " . ($item->stock ?? 0) . " " . $item->unit . ")";
-                                        // Return the formatted name with stock info
-                                        return [$item->id => $item->name . $stockInfo];
+                                        // Menampilkan SKU bukan Stok di opsi Select
+                                        $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
+                                        return [$item->id => $item->name . $skuInfo];
                                     });
                             })
                             ->searchable()
@@ -202,11 +201,12 @@ class InvoiceResource extends Resource
                                         }
 
                                         if (!$potentialToSplit && (int)$value > $item->stock) {
-                                            Notification::make()
-                                                ->title('Stok Tidak Cukup')
-                                                ->body("Stok {$item->name} hanya tersisa {$item->stock} {$item->unit}.")
-                                                ->danger()
-                                                ->send();
+                                            // Hapus Notifikasi dari rules, cukup $fail untuk validasi inline
+                                            // Notification::make()
+                                            //     ->title('Stok Tidak Cukup')
+                                            //     ->body("Stok {$item->name} hanya tersisa {$item->stock} {$item->unit}.")
+                                            //     ->danger()
+                                            //     ->send();
                                             $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas tidak boleh melebihi stok yang tersedia tanpa opsi pecah stok.");
                                         } elseif ((int)$value <= 0) {
                                             $fail("Kuantitas harus lebih dari 0.");
