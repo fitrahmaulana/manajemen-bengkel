@@ -142,17 +142,28 @@ class InvoiceResource extends Resource
 
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
-                    ->label('Barang / Suku Cadang')->schema([
+                    ->label('Barang / Suku Cadang')
+                    ->itemLabel(function (array $state): ?string {
+                        if (empty($state['item_id'])) {
+                            return null;
+                        }
+                        // Ambil data item terbaru dari database untuk memastikan stok akurat
+                        $item = Item::find($state['item_id']);
+                        if (!$item) {
+                            return 'Item tidak ditemukan';
+                        }
+                        return $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
+                    })
+                    ->schema([
                         Forms\Components\Select::make('item_id')
                             ->label('Barang')
                             ->options(function () {
                                 return Item::query()
                                     ->get()
                                     ->mapWithKeys(function ($item) {
-                                        // Formatnya: "Nama Barang (Stok: X Unit)"
-                                        $stockInfo = " (Stok: " . ($item->stock ?? 0) . " " . $item->unit . ")";
-                                        // Return the formatted name with stock info
-                                        return [$item->id => $item->name . $stockInfo];
+                                        // Menampilkan SKU bukan Stok di opsi Select
+                                        $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
+                                        return [$item->id => $item->name . $skuInfo];
                                     });
                             })
                             ->searchable()
@@ -169,17 +180,186 @@ class InvoiceResource extends Resource
                             ->default(1)
                             ->required()
                             ->live(debounce: 500)
+                            // Validasi kuantitas akan disesuaikan di langkah berikutnya atau saat implementasi modal
+                            // Untuk saat ini, kita biarkan validasi standar, atau bisa dimodifikasi agar tidak terlalu ketat jika ada opsi pecah stok
+                            ->rules([
+                                function (Get $get) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                        $itemId = $get('item_id');
+                                        $quantityInput = (int)$value; // Konversi sekali saja
+
+                                        if ($quantityInput <= 0) {
+                                            $fail("Kuantitas harus lebih dari 0.");
+                                            return; // Hentikan jika kuantitas tidak valid
+                                        }
+
+                                        $itemId = $get('item_id');
+                                        if (!$itemId) { // Jika item belum dipilih, jangan validasi stok dulu
+                                            return;
+                                        }
+
+                                        $item = Item::find($itemId);
+                                        if (!$item) { // Jika item tidak ditemukan (seharusnya tidak terjadi jika select valid)
+                                            $fail("Item tidak valid.");
+                                            return;
+                                        }
+
+                                        if ($quantityInput > $item->stock) { // Kuantitas melebihi stok yang ada di DB untuk item ini
+                                            $hasPotentialToSplit = false;
+                                            if (!$item->is_convertible) { // Hanya cek potensi pecah jika ini item eceran
+                                                $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
+                                            }
+
+                                            if (!$hasPotentialToSplit) {
+                                                $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                            }
+                                            // Jika $hasPotentialToSplit true, jangan $fail di sini. Biarkan tombol pecah stok muncul.
+                                            // Validasi akhir ada di mutateDataBeforeSave.
+                                        }
+                                    };
+                                },
+                                // Bisa juga tambahkan rule standar jika perlu, misal:
+                                // 'numeric',
+                                // \Filament\Forms\Components\TextInput\Rules\MinValue::make(1),
+                            ])
                             ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                             ->prefix('Rp. ') // Note the space
                             ->live(debounce: 500)
-                            ->required(), // Made editable, so likely required
+                            ->required(),
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
+                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)
                     ])
-                    ->columns(4)
+                    ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
+                        Action::make('triggerSplitStockModal')
+                            ->label('Pecah Stok')
+                            ->icon('heroicon-o-arrows-up-down')
+                            ->color('warning')
+                            ->action(function (array $arguments, Forms\Components\Repeater $component) {
+                                // Action ini hanya memicu modal.
+                                // Data diakses via $arguments & $component dalam konfigurasi modal.
+                            })
+                            ->modalHeading(function(array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
+                            })
+                            ->modalWidth('lg')
+                            ->form(function (array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                $childItem = $childItemId ? Item::find($childItemId) : null;
+
+                                if (!$childItem) {
+                                    return [
+                                        Forms\Components\Placeholder::make('error_child_item_not_found')
+                                            ->label('Error')
+                                            ->content('Item eceran yang dipilih tidak ditemukan atau belum dipilih.'),
+                                    ];
+                                }
+                                $quantityInForm = (int)($itemRepeaterState['quantity'] ?? 0);
+                                $quantityActuallyNeeded = max(0, $quantityInForm - $childItem->stock);
+
+                                return [
+                                    Forms\Components\Placeholder::make('info')
+                                        ->label('Informasi Kebutuhan')
+                                        ->content("Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name} (Kuantitas di form: {$quantityInForm}, Stok saat ini: {$childItem->stock} {$childItem->unit})."),
+                                    Forms\Components\Select::make('source_parent_item_id')
+                                        ->label('Pilih Item Induk untuk Dipecah')
+                                        ->options(function () use ($childItem) {
+                                            return $childItem->sourceParents()
+                                                ->where('stock', '>', 0)
+                                                ->get()
+                                                ->mapWithKeys(function ($parentItem) {
+                                                    $targetChildUnit = $parentItem->targetChild?->unit ?? 'eceran';
+                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock} {$parentItem->unit}, 1 {$parentItem->unit} = {$parentItem->conversion_value} {$targetChildUnit})"];
+                                                });
+                                        })
+                                        ->required()
+                                        ->live(),
+                                    Forms\Components\TextInput::make('parent_quantity_to_split')
+                                        ->label('Jumlah Unit Induk yang Akan Dipecah')
+                                        ->numeric()
+                                        ->minValue(1)
+                                        ->required()
+                                        ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
+                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.') // Helper text statis
+                                        ->rules([
+                                            'required',
+                                            'numeric',
+                                            'min:1',
+                                            // Rule yang membandingkan dengan stok induk dihapus dari sini untuk tes
+                                        ]),
+                                ];
+                            })
+                            ->modalSubmitActionLabel('Lakukan Pecah Stok')
+                            ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
+                                $itemRepeaterState = $component->getItemState($arguments['item']); // Validated state
+                                $childItemId = $itemRepeaterState['item_id'] ?? null;
+                                $childItem = $childItemId ? Item::find($childItemId) : null;
+
+                                $sourceParentItemId = $data['source_parent_item_id'] ?? null; // Ambil dari data modal
+                                $sourceParentItem = $sourceParentItemId ? Item::find($sourceParentItemId) : null;
+                                $parentQuantityToSplit = (int)($data['parent_quantity_to_split'] ?? 0);
+
+                                if (!$childItem || !$sourceParentItem || $parentQuantityToSplit <= 0) {
+                                    Notification::make()->title('Error')->body('Data tidak valid untuk proses pecah stok. Pastikan item induk dan jumlah dipilih dengan benar.')->danger()->send();
+                                    return;
+                                }
+
+                                // Validasi stok induk dilakukan di sini, sebelum transaksi
+                                if ($parentQuantityToSplit > $sourceParentItem->stock) {
+                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok " . ($sourceParentItem->name) . " hanya " . ($sourceParentItem->stock) . " unit.")->danger()->send();
+                                    return;
+                                }
+
+                                // Hitung generatedChildQuantity di luar transaksi agar bisa di-use dan untuk notifikasi
+                                $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
+                                if (!is_numeric($generatedChildQuantity) || $generatedChildQuantity < 0) {
+                                     Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
+                                    return;
+                                }
+
+                                try {
+                                    DB::transaction(function () use ($sourceParentItem, $childItem, $parentQuantityToSplit, $generatedChildQuantity) {
+                                        $sourceParentItem->decrement('stock', $parentQuantityToSplit);
+                                        $childItem->increment('stock', $generatedChildQuantity);
+                                    });
+
+                                    // Notifikasi hanya dikirim sekali setelah transaksi berhasil
+                                    Notification::make()->title('Berhasil Pecah Stok')->success()
+                                        ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
+                                        ->send();
+
+                                    $currentState = $component->getState();
+                                    $component->state($currentState); // Ini akan memicu refresh
+
+                                } catch (\Exception $e) {
+                                    // Notifikasi error jika transaksi gagal
+                                    Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan internal saat memproses pecah stok: ' . $e->getMessage())->danger()->send();
+                                }
+                            })
+                            ->visible(function (array $arguments, Forms\Components\Repeater $component): bool {
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $itemId = $itemRepeaterState['item_id'] ?? null;
+
+                                if (!$itemId) return false;
+
+                                $item = Item::find($itemId);
+                                if (!$item || $item->is_convertible) {
+                                    return false;
+                                }
+
+                                $quantityNeeded = (int)($itemRepeaterState['quantity'] ?? 0);
+                                if ($item->stock >= $quantityNeeded) {
+                                    return false;
+                                }
+                                return $item->sourceParents()->where('stock', '>', 0)->exists();
+                            }),
+                    ])
+                    ->columns(4) // Sesuaikan jumlah kolom jika perlu
                     ->live()
                     ->afterStateUpdated($calculateTotals),
             ]),
