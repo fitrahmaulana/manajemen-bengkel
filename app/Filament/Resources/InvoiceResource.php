@@ -215,54 +215,44 @@ class InvoiceResource extends Resource
                         // Tombol aksi akan ditambahkan di sini, di sebelah kanan deskripsi atau di bawahnya
                         // Kita akan letakkan di sebelah tombol delete bawaan jika memungkinkan, atau sebagai action di dalam item repeater
                     ])
-                    ->addAction( // Menambahkan action pada level repeater item, ini akan muncul di setiap item
+                    ->itemActions([ // Menggunakan itemActions untuk action per item
                         Action::make('triggerSplitStockModal')
                             ->label('Pecah Stok')
                             ->icon('heroicon-o-arrows-up-down')
                             ->color('warning')
-                            ->action(function (array $arguments, Forms\ComponentContainer $form, Get $get, Set $set, callable $livewire) {
-                                // Aksi ini akan memanggil modal. Implementasi modal ada di langkah berikutnya.
-                                // $arguments['itemData'] akan berisi data dari item repeater
-                                // $get('item_id'), $get('quantity') dari repeater item
-                                // $itemId = $get('item_id');
-                                // $quantityNeeded = (int)$get('quantity');
-                                // $item = Item::find($itemId);
-
-                                // if ($item && !$item->is_convertible && $item->stock < $quantityNeeded) {
-                                    // Logika di sini tidak begitu diperlukan karena visibilitas tombol sudah dikontrol
-                                    // dan modal akan mengambil data yang relevan saat dibuka.
-                                    // Cukup pastikan action ini ada untuk memicu modal.
-                                // }
-                                // $repeaterItemState = $get('.'); // Mendapatkan state dari item repeater saat ini
-                                // Tidak ada aksi spesifik yang perlu dilakukan di sini sebelum modal terbuka,
-                                // karena modal akan menangani pengambilan data dan form.
-                            }) // Penutup untuk ->action dari triggerSplitStockModal
+                            ->action(function (Get $get) {
+                                // Action ini hanya memicu modal.
+                                // Logika utama ada di modal form dan modal action.
+                                // $get di sini adalah Get untuk repeater item.
+                            })
                             ->modalHeading(fn(Get $get) => 'Pecah Stok untuk ' . Item::find($get('item_id'))?->name)
                             ->modalWidth('lg')
                             ->form(function (Get $get) { // $get di sini adalah Get untuk repeater item
                                 $childItemId = $get('item_id');
                                 $childItem = Item::find($childItemId);
-                                $quantityActuallyNeeded = (int)$get('quantity') - $childItem->stock; // Kuantitas eceran yg benar-benar kurang
+
+                                if (!$childItem) { // Guard clause jika item eceran tidak (lagi) ditemukan
+                                    return [
+                                        Forms\Components\Placeholder::make('error_child_item_not_found')
+                                            ->label('Error')
+                                            ->content('Item eceran yang dipilih tidak ditemukan. Mungkin telah dihapus atau diubah.'),
+                                    ];
+                                }
+                                $quantityActuallyNeeded = max(0, (int)$get('quantity') - $childItem->stock);
 
                                 return [
                                     Forms\Components\Placeholder::make('info')
                                         ->label('Informasi Kebutuhan')
-                                        ->content(function () use ($childItem, $quantityActuallyNeeded) {
-                                            if (!$childItem) return 'Item eceran tidak ditemukan.';
-                                            return "Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name}. Stok saat ini: {$childItem->stock} {$childItem->unit}.";
-                                        }),
+                                        ->content("Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name}. Stok saat ini: {$childItem->stock} {$childItem->unit}."),
                                     Forms\Components\Select::make('source_parent_item_id')
                                         ->label('Pilih Item Induk untuk Dipecah')
-                                        ->options(function () use ($childItemId) {
-                                            if (!$childItemId) return [];
-                                            $childItem = Item::find($childItemId);
-                                            if (!$childItem) return [];
-
+                                        ->options(function () use ($childItem) { // childItem sudah pasti ada di sini
                                             return $childItem->sourceParents()
                                                 ->where('stock', '>', 0)
                                                 ->get()
                                                 ->mapWithKeys(function ($parentItem) {
-                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock} {$parentItem->unit}, 1 {$parentItem->unit} = {$parentItem->conversion_value} {$parentItem->targetChild?->unit})"];
+                                                    $targetChildUnit = $parentItem->targetChild?->unit ?? 'eceran';
+                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock} {$parentItem->unit}, 1 {$parentItem->unit} = {$parentItem->conversion_value} {$targetChildUnit})"];
                                                 });
                                         })
                                         ->required()
@@ -272,15 +262,15 @@ class InvoiceResource extends Resource
                                         ->numeric()
                                         ->minValue(1)
                                         ->required()
-                                        ->live(onBlur: true) // Untuk update helper text
-                                        ->helperText(function (Get $modalGet) { // $modalGet adalah Get untuk form modal
+                                        ->live(onBlur: true)
+                                        ->helperText(function (Get $modalGet) {
                                             $sourceParentItemId = $modalGet('source_parent_item_id');
                                             $parentQuantity = (int)$modalGet('parent_quantity_to_split');
                                             if ($sourceParentItemId && $parentQuantity > 0) {
                                                 $parentItem = Item::find($sourceParentItemId);
-                                                if ($parentItem) {
+                                                if ($parentItem && $parentItem->targetChild) {
                                                     $generatedChildQty = $parentQuantity * $parentItem->conversion_value;
-                                                    return "Akan menghasilkan: {$generatedChildQty} {$parentItem->targetChild?->unit}";
+                                                    return "Akan menghasilkan: {$generatedChildQty} {$parentItem->targetChild->unit}";
                                                 }
                                             }
                                             return null;
@@ -290,7 +280,11 @@ class InvoiceResource extends Resource
                                                 $sourceParentItemId = $modalGet('source_parent_item_id');
                                                 if (!$sourceParentItemId) return;
                                                 $parentItem = Item::find($sourceParentItemId);
-                                                if ($parentItem && (int)$value > $parentItem->stock) {
+                                                if (!$parentItem) {
+                                                    $fail("Item induk tidak ditemukan."); // Seharusnya tidak terjadi jika options benar
+                                                    return;
+                                                }
+                                                if ((int)$value > $parentItem->stock) {
                                                     $fail("Stok item induk ({$parentItem->name}) hanya tersisa {$parentItem->stock} {$parentItem->unit}.");
                                                 }
                                             }
@@ -298,19 +292,19 @@ class InvoiceResource extends Resource
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
-                            ->action(function (array $data, Get $get, Set $set, callable $livewire) { // $get, $set di sini adalah untuk repeater item
-                                $childItemId = $get('item_id'); // Item eceran dari repeater
+                            ->action(function (array $data, Get $get, Set $set) { // $get & $set dari repeater item
+                                $childItemId = $get('item_id');
                                 $childItem = Item::find($childItemId);
                                 $sourceParentItem = Item::find($data['source_parent_item_id']);
                                 $parentQuantityToSplit = (int)$data['parent_quantity_to_split'];
 
                                 if (!$childItem || !$sourceParentItem || $parentQuantityToSplit <= 0) {
-                                    Notification::make()->title('Error')->body('Data tidak valid.')->danger()->send();
+                                    Notification::make()->title('Error')->body('Data tidak valid untuk proses pecah stok.')->danger()->send();
                                     return;
                                 }
 
                                 if ($parentQuantityToSplit > $sourceParentItem->stock) {
-                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok {$sourceParentItem->name} hanya {$sourceParentItem->stock}.")->danger()->send();
+                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok {$sourceParentItem->name} hanya {$sourceParentItem->stock} unit.")->danger()->send();
                                     return;
                                 }
 
@@ -322,47 +316,35 @@ class InvoiceResource extends Resource
                                     });
 
                                     Notification::make()->title('Berhasil Pecah Stok')->success()
-                                        ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah.")
+                                        ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
                                         ->send();
 
-                                    // Refresh repeater atau form untuk update stok
-                                    // Cara paling mudah adalah dengan 'mengetuk' state repeater
-                                    // Ini akan memaksa options pada select item_id untuk dievaluasi ulang
-                                    $currentItems = $get('../../items'); // Path relatif ke state repeater 'items'
-                                    $set('../../items', $currentItems); // Set ulang state, memicu re-render
-                                    // $livewire->dispatch('itemUpdated'); // Atau menggunakan event jika ada listener global
+                                    $currentItemsState = $get('../../items'); // Path ke state array repeater
+                                    $set('../../items', $currentItemsState); // Set ulang untuk memicu refresh
 
                                 } catch (\Exception $e) {
-                                    Notification::make()->title('Gagal Pecah Stok')->body($e->getMessage())->danger()->send();
+                                    Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan: ' . $e->getMessage())->danger()->send();
                                 }
                             })
-                            ->visible(function (Get $get): bool { // $get di sini adalah Get untuk repeater item
+                            ->visible(function (Get $get): bool { // $get dari repeater item
                                 $itemId = $get('item_id');
                                 if (!$itemId) return false;
 
                                 $item = Item::find($itemId);
-                                if (!$item || $item->is_convertible) { // Hanya untuk item eceran (bukan convertible)
+                                if (!$item || $item->is_convertible) {
                                     return false;
                                 }
 
                                 $quantityNeeded = (int)$get('quantity');
-                                if ($item->stock >= $quantityNeeded) { // Stok eceran cukup
+                                if ($item->stock >= $quantityNeeded) {
                                     return false;
                                 }
-
-                                // Cek apakah ada item induk yang bisa dipecah untuk item eceran ini
                                 return $item->sourceParents()->where('stock', '>', 0)->exists();
-                            })
-                    )
+                            }),
+                    ])
                     ->columns(4) // Sesuaikan jumlah kolom jika perlu
                     ->live()
-                    ->afterStateUpdated($calculateTotals)
-                    // ->reorderableWithButtons() // Jika ingin tombol reorder di samping delete
-                    // ->deleteAction( // Kustomisasi delete action jika perlu
-                    //     fn (Action $action) => $action->label('Hapus Item'),
-                    // )
-                    // ->addActionLabel('Tambah Barang Lagi')
-                    ,
+                    ->afterStateUpdated($calculateTotals),
             ]),
 
             // Bagian bawah untuk ringkasan biaya, ditata di sebelah kanan
