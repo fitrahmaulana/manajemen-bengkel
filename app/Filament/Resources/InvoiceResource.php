@@ -267,38 +267,13 @@ class InvoiceResource extends Resource
                                         ->numeric()
                                         ->minValue(1)
                                         ->required()
-                                        ->live(onBlur: true)
-                                        ->helperText(function (Get $modalGet, $state) { // $state adalah nilai dari parent_quantity_to_split
-                                            $sourceParentItemId = $modalGet('source_parent_item_id');
-                                            $parentQuantity = (int)$state; // Gunakan $state untuk nilai field saat ini
-
-                                            // Jika source_parent_item_id belum dipilih, jangan tampilkan helper text dinamis
-                                            if (!$sourceParentItemId) {
-                                                return null;
-                                            }
-
-                                            if ($parentQuantity > 0) {
-                                                $parentItem = Item::find($sourceParentItemId);
-                                                if ($parentItem && $parentItem->targetChild && is_numeric($parentItem->conversion_value)) {
-                                                    $generatedChildQty = $parentQuantity * $parentItem->conversion_value;
-                                                    return "Akan menghasilkan: {$generatedChildQty} {$parentItem->targetChild->unit}";
-                                                }
-                                            }
-                                            return null;
-                                        })
+                                        ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
+                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.') // Helper text statis
                                         ->rules([
-                                            fn(Get $modalGet): \Closure => function (string $attribute, $value, \Closure $fail) use ($modalGet) {
-                                                $sourceParentItemId = $modalGet('source_parent_item_id');
-                                                if (!$sourceParentItemId) return;
-                                                $parentItem = Item::find($sourceParentItemId);
-                                                if (!$parentItem) {
-                                                    $fail("Item induk tidak ditemukan.");
-                                                    return;
-                                                }
-                                                if ((int)$value > $parentItem->stock) {
-                                                    $fail("Stok item induk ({$parentItem->name}) hanya tersisa {$parentItem->stock} {$parentItem->unit}.");
-                                                }
-                                            }
+                                            'required',
+                                            'numeric',
+                                            'min:1',
+                                            // Rule yang membandingkan dengan stok induk dihapus dari sini untuk tes
                                         ]),
                                 ];
                             })
@@ -308,16 +283,18 @@ class InvoiceResource extends Resource
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 $childItem = $childItemId ? Item::find($childItemId) : null;
 
-                                $sourceParentItem = Item::find($data['source_parent_item_id']);
-                                $parentQuantityToSplit = (int)$data['parent_quantity_to_split'];
+                                $sourceParentItemId = $data['source_parent_item_id'] ?? null; // Ambil dari data modal
+                                $sourceParentItem = $sourceParentItemId ? Item::find($sourceParentItemId) : null;
+                                $parentQuantityToSplit = (int)($data['parent_quantity_to_split'] ?? 0);
 
                                 if (!$childItem || !$sourceParentItem || $parentQuantityToSplit <= 0) {
-                                    Notification::make()->title('Error')->body('Data tidak valid untuk proses pecah stok.')->danger()->send();
+                                    Notification::make()->title('Error')->body('Data tidak valid untuk proses pecah stok. Pastikan item induk dan jumlah dipilih dengan benar.')->danger()->send();
                                     return;
                                 }
 
+                                // Validasi stok induk dilakukan di sini, sebelum transaksi
                                 if ($parentQuantityToSplit > $sourceParentItem->stock) {
-                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok {$sourceParentItem->name} hanya {$sourceParentItem->stock} unit.")->danger()->send();
+                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok " . ($sourceParentItem->name) . " hanya " . ($sourceParentItem->stock) . " unit.")->danger()->send();
                                     return;
                                 }
 
