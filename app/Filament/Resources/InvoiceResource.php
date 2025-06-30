@@ -215,7 +215,7 @@ class InvoiceResource extends Resource
                         // Tombol aksi akan ditambahkan di sini, di sebelah kanan deskripsi atau di bawahnya
                         // Kita akan letakkan di sebelah tombol delete bawaan jika memungkinkan, atau sebagai action di dalam item repeater
                     ])
-                    ->itemActions([ // Menggunakan itemActions untuk action per item
+                    ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
                             ->label('Pecah Stok')
                             ->icon('heroicon-o-arrows-up-down')
