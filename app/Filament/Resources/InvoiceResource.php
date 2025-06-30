@@ -26,7 +26,10 @@ use Filament\Tables\Actions\ForceDeleteBulkAction; // Required for bulk force de
 use Filament\Tables\Actions\RestoreBulkAction; // Required for bulk restore
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-
+use Filament\Notifications\Notification;
+use Illuminate\Support\Facades\DB;
+use Filament\Forms\Components\Actions;
+use Filament\Forms\Components\Actions\Action;
 
 class InvoiceResource extends Resource
 {
@@ -69,7 +72,6 @@ class InvoiceResource extends Resource
                 }
             }
 
-            // Logika Diskon Baru
             // discount_value is also a masked input now
             $discountInput = $get('discount_value') ?? '0';
             $discountValue = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$discountInput);
@@ -87,7 +89,7 @@ class InvoiceResource extends Resource
             $set('total_amount', $total);
         };
 
-        // --- TATA LETAK FORM BARU DIMULAI DARI SINI ---
+
         return $form->schema([
             // Bagian atas untuk detail invoice dan pelanggan
             Section::make()->schema([
@@ -134,23 +136,32 @@ class InvoiceResource extends Resource
                             ->required(), // Made editable, so likely required
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
                     ])
-                        ->columns(3)
-                        ->live()
-                        ->afterStateUpdated($calculateTotals),
+                    ->columns(3)
+                    ->live()
+                    ->afterStateUpdated($calculateTotals),
 
                 // Repeater Barang
                 Forms\Components\Repeater::make('items')
                     ->label('Barang / Suku Cadang')->schema([
                         Forms\Components\Select::make('item_id')
                             ->label('Barang')
-                            ->options(Item::all()->pluck('name', 'id'))
+                            ->options(function () {
+                                return Item::query()
+                                    ->get()
+                                    ->mapWithKeys(function ($item) {
+                                        // Formatnya: "Nama Barang (Stok: X Unit)"
+                                        $stockInfo = " (Stok: " . ($item->stock ?? 0) . " " . $item->unit . ")";
+                                        // Return the formatted name with stock info
+                                        return [$item->id => $item->name . $stockInfo];
+                                    });
+                            })
                             ->searchable()
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 $item = Item::find($state);
                                 $set('price', $item?->selling_price ?? 0);
-                                $set('unit_name', $item?->unit ?? null); // Set unit name for display
+                                $set('unit_name', $item?->unit ?? null);
                             }),
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
