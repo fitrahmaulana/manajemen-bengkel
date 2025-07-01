@@ -47,33 +47,42 @@ class EditPayment extends EditRecord
     {
         // This hook is called after the payment record is saved (updated).
         $payment = $this->record;
+        /** @var Invoice $invoice */
         $invoice = $payment->invoice;
 
         if ($invoice) {
-            $invoice->refresh(); // Recalculate balance_due based on the updated payment
+            $invoice->refresh();
+
+            $currentStatus = $invoice->status;
+            $newStatus = $currentStatus;
 
             if ($invoice->balance_due <= 0) {
-                if ($invoice->status !== 'paid') {
-                    $invoice->status = 'paid';
-                    $invoice->save();
-                    Notification::make()
-                        ->title('Invoice Paid')
-                        ->body("Invoice {$invoice->invoice_number} has been fully paid.")
-                        ->success()
-                        ->sendToDatabase(auth()->user());
-                }
+                $newStatus = 'paid';
             } else {
-                // If balance is now due, and status was 'paid', change it.
-                // Also, if it's not 'overdue', set to 'sent'.
-                if ($invoice->status === 'paid' || ($invoice->status !== 'overdue' && $invoice->status !== 'sent')) {
-                    $invoice->status = 'sent'; // Or 'partially_paid'
-                    $invoice->save();
-                     Notification::make()
-                        ->title('Invoice Status Updated')
-                        ->body("Invoice {$invoice->invoice_number} status updated due to payment modification.")
-                        ->info()
-                        ->sendToDatabase(auth()->user());
+                // Balance is due
+                if ($currentStatus === 'paid') { // Was paid, but now isn't due to this edit
+                    $newStatus = 'sent';
+                } elseif ($currentStatus !== 'overdue') { // Don't override overdue unless it becomes paid by this edit
+                    $newStatus = 'sent';
                 }
+                // If $currentStatus is 'overdue' and balance_due > 0, it remains 'overdue'.
+            }
+
+            if ($newStatus !== $currentStatus) {
+                $invoice->status = $newStatus;
+                $invoice->save();
+                Notification::make()
+                    ->title('Invoice Status Updated')
+                    ->body("Invoice {$invoice->invoice_number} status automatically updated to {$invoice->status}.")
+                    ->success()
+                    ->sendToDatabase(auth()->user());
+            } elseif ($newStatus === 'paid' && $newStatus === $currentStatus && $this->record->wasChanged('amount_paid')) {
+                 // If it was already paid and still paid, but the payment amount changed.
+                 Notification::make()
+                    ->title('Invoice Still Paid')
+                    ->body("Invoice {$invoice->invoice_number} remains fully paid after payment update.")
+                    ->success()
+                    ->sendToDatabase(auth()->user());
             }
         }
     }

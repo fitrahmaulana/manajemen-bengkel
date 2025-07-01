@@ -30,6 +30,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentRelationManager;
 
 class InvoiceResource extends Resource
 {
@@ -486,10 +487,12 @@ class InvoiceResource extends Resource
             ]);
     }
 
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentRelationManager;
+
     public static function getRelations(): array
     {
         return [
-            //
+            PaymentRelationManager::class,
         ];
     }
 
@@ -616,35 +619,7 @@ class InvoiceResource extends Resource
                             ]),
                     ]),
 
-                // === BAGIAN PEMBAYARAN ===
-                Infolists\Components\Section::make('Riwayat Pembayaran')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('payments')
-                            ->hiddenLabel()
-                            ->placeholder('Belum ada pembayaran.')
-                            ->schema([
-                                Infolists\Components\TextEntry::make('payment_date')
-                                    ->label('Tanggal Bayar')
-                                    ->date('d M Y')
-                                    ->badge(),
-                                Infolists\Components\TextEntry::make('amount_paid')
-                                    ->label('Jumlah Dibayar')
-                                    ->currency('IDR'),
-                                Infolists\Components\TextEntry::make('payment_method')
-                                    ->label('Metode Bayar')
-                                    ->badge(),
-                                Infolists\Components\TextEntry::make('reference_number')
-                                    ->label('No. Referensi')
-                                    ->placeholder('N/A'),
-                                Infolists\Components\TextEntry::make('notes')
-                                    ->label('Catatan')
-                                    ->columnSpanFull()
-                                    ->placeholder('Tidak ada catatan.'),
-                            ])
-                            ->columns(4), // Adjust columns as needed
-                    ])
-                    ->collapsible()
-                    ->collapsed(fn ($record) => $record->payments->isEmpty()),
+                // Payment history is now handled by PaymentRelationManager
             ]);
     }
 }
