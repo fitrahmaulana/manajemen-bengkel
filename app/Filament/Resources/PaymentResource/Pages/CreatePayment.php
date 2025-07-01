@@ -21,41 +21,24 @@ class CreatePayment extends CreateRecord
     protected function afterCreate(): void
     {
         $payment = $this->record;
-        /** @var Invoice $invoice */
         $invoice = $payment->invoice;
 
         if ($invoice) {
-            $invoice->refresh();
-
-            $currentStatus = $invoice->status;
-            $newStatus = $currentStatus;
+            $invoice->refresh(); // Make sure totals are up-to-date
 
             if ($invoice->balance_due <= 0) {
-                $newStatus = 'paid';
-            } else {
-                // If balance is due, and it's not 'overdue', set to 'sent'.
-                // (If it was 'draft', it should become 'sent' after first payment)
-                if ($currentStatus !== 'overdue') {
-                    $newStatus = 'sent';
-                }
-            }
-
-            if ($newStatus !== $currentStatus) {
-                $invoice->status = $newStatus;
+                $invoice->status = 'paid';
                 $invoice->save();
                 Notification::make()
-                    ->title('Invoice Status Updated')
-                    ->body("Invoice {$invoice->invoice_number} status automatically updated to {$invoice->status}.")
-                    ->success()
-                    ->sendToDatabase(auth()->user()); // Optional
-            } elseif ($newStatus === 'paid' && $newStatus === $currentStatus) {
-                // If it was already paid and still paid (e.g. editing payment but still fully covered)
-                // or if a new payment made it paid.
-                 Notification::make()
                     ->title('Invoice Paid')
-                    ->body("Invoice {$invoice->invoice_number} is fully paid.")
+                    ->body("Invoice {$invoice->invoice_number} has been fully paid.")
                     ->success()
-                    ->sendToDatabase(auth()->user());
+                    ->sendToDatabase(auth()->user()); // Optional: send to specific users
+            } elseif ($invoice->status !== 'overdue' && $invoice->status !== 'paid') {
+                // If not fully paid, and not already overdue, set to 'sent' (or 'partially_paid')
+                // Avoid changing 'paid' status here if for some reason balance_due became > 0 by other means
+                $invoice->status = 'sent';
+                $invoice->save();
             }
         }
     }
