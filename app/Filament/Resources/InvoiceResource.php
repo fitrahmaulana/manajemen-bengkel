@@ -179,48 +179,78 @@ class InvoiceResource extends Resource
                             ->numeric()
                             ->default(1)
                             ->required()
-                            ->live(debounce: 500)
-                            // Validasi kuantitas akan disesuaikan di langkah berikutnya atau saat implementasi modal
-                            // Untuk saat ini, kita biarkan validasi standar, atau bisa dimodifikasi agar tidak terlalu ketat jika ada opsi pecah stok
+                            ->live(onBlur: true)
                             ->rules([
-                                function (Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                function (Get $get, callable $set, $record, $operation) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
+                                        $quantityInput = (int)$value;
                                         $itemId = $get('item_id');
-                                        $quantityInput = (int)$value; // Konversi sekali saja
 
                                         if ($quantityInput <= 0) {
                                             $fail("Kuantitas harus lebih dari 0.");
-                                            return; // Hentikan jika kuantitas tidak valid
-                                        }
-
-                                        $itemId = $get('item_id');
-                                        if (!$itemId) { // Jika item belum dipilih, jangan validasi stok dulu
                                             return;
                                         }
 
+                                        if (!$itemId) {
+                                            return; // Item not selected yet
+                                        }
+
                                         $item = Item::find($itemId);
-                                        if (!$item) { // Jika item tidak ditemukan (seharusnya tidak terjadi jika select valid)
+                                        if (!$item) {
                                             $fail("Item tidak valid.");
                                             return;
                                         }
 
-                                        if ($quantityInput > $item->stock) { // Kuantitas melebihi stok yang ada di DB untuk item ini
+                                        $currentInvoiceRecord = $record;
+                                        $originalQuantityOnInvoice = 0;
+                                        $isEditOperation = $operation === 'edit' && $currentInvoiceRecord instanceof Invoice;
+                                        if ($isEditOperation) {
+                                            // Get the original item quantity from the invoice being edited
+                                            $originalItemOnInvoice = $currentInvoiceRecord->items()->where('item_id', $itemId)->first();
+                                            if ($originalItemOnInvoice) {
+                                                $originalQuantityOnInvoice = $originalItemOnInvoice->pivot->quantity;
+                                            }
+                                        }
+
+                                        $neededStock = 0;
+                                        if ($isEditOperation) {
+                                            // For edits, only check stock for the *increase* in quantity
+                                            $quantityDifference = $quantityInput - $originalQuantityOnInvoice;
+                                            if ($quantityDifference > 0) {
+                                                $neededStock = $quantityDifference;
+                                            } else {
+                                                // Quantity decreased or stayed the same, no additional stock needed
+                                                return;
+                                            }
+                                        } else {
+                                            // For new items (on create page or new item in repeater on edit page)
+                                            // Check stock for the full quantity
+                                            $neededStock = $quantityInput;
+                                        }
+
+                                        // jika stok yang dibutuhkan lebih dari 0 dan jika stok item tidak cukup lakukan validasi
+                                        if ($neededStock > 0 && $item->stock < $neededStock) {
                                             $hasPotentialToSplit = false;
-                                            if (!$item->is_convertible) { // Hanya cek potensi pecah jika ini item eceran
+                                            if (!$item->is_convertible) {
                                                 $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
                                             }
 
-                                            if (!$hasPotentialToSplit) {
-                                                $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                            if ($hasPotentialToSplit) {
+                                                //lakukan validasi jika stok eceran tidak cukup untuk melakukan pecah stok
+                                                $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok' untuk mengatasi masalah ini.");
                                             }
-                                            // Jika $hasPotentialToSplit true, jangan $fail di sini. Biarkan tombol pecah stok muncul.
-                                            // Validasi akhir ada di mutateDataBeforeSave.
+
+                                            if (!$hasPotentialToSplit) {
+                                                if ($isEditOperation) {
+                                                    $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit} (stok saat ini: {$item->stock} {$item->unit}, sudah ada {$originalQuantityOnInvoice} {$item->unit} di faktur ini).");
+                                                } else {
+                                                    $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantityInput} {$item->unit}) melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                                }
+                                            }
+                                            // If potential to split, validation passes here, relying on user to use split action
                                         }
                                     };
                                 },
-                                // Bisa juga tambahkan rule standar jika perlu, misal:
-                                // 'numeric',
-                                // \Filament\Forms\Components\TextInput\Rules\MinValue::make(1),
                             ])
                             ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
@@ -241,7 +271,7 @@ class InvoiceResource extends Resource
                                 // Action ini hanya memicu modal.
                                 // Data diakses via $arguments & $component dalam konfigurasi modal.
                             })
-                            ->modalHeading(function(array $arguments, Forms\Components\Repeater $component) {
+                            ->modalHeading(function (array $arguments, Forms\Components\Repeater $component) {
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
@@ -285,18 +315,29 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
-                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.') // Helper text statis
+                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.')
                                         ->rules([
-                                            'required',
-                                            'numeric',
-                                            'min:1',
-                                            // Rule yang membandingkan dengan stok induk dihapus dari sini untuk tes
+                                            function (Get $get, callable $set) {
+                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    $sourceParentItemId = $get('source_parent_item_id');
+                                                    if (!$sourceParentItemId) {
+                                                        $fail("Item induk yang akan dipecah harus dipilih.");
+                                                        return;
+                                                    }
+
+                                                    $sourceParentItem = Item::find($sourceParentItemId);
+                                                    if ($value > $sourceParentItem->stock) {
+                                                        $fail("Jumlah unit induk yang akan dipecah melebihi stok yang tersedia.");
+                                                        return;
+                                                    }
+                                                };
+                                            },
                                         ]),
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
                             ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
-                                $itemRepeaterState = $component->getItemState($arguments['item']); // Validated state
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']); // Validated state
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 $childItem = $childItemId ? Item::find($childItemId) : null;
 
@@ -318,7 +359,7 @@ class InvoiceResource extends Resource
                                 // Hitung generatedChildQuantity di luar transaksi agar bisa di-use dan untuk notifikasi
                                 $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
                                 if (!is_numeric($generatedChildQuantity) || $generatedChildQuantity < 0) {
-                                     Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
+                                    Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
                                     return;
                                 }
 
@@ -388,6 +429,7 @@ class InvoiceResource extends Resource
                                 ->default('fixed')->live(debounce: 600),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
+                                ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                                 ->prefix('Rp. ') // Note the space
                                 ->live(debounce: 600)
