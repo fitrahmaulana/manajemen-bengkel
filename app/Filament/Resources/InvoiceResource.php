@@ -181,36 +181,68 @@ class InvoiceResource extends Resource
                             ->required()
                             ->live(debounce: 500)
                             ->rules([
-                                function (Get $get) {
-                                    return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                function (Get $get, callable $set, Forms\Form $form) { // Added Forms\Form $form
+                                    return function (string $attribute, $value, \Closure $fail) use ($get, $form) {
+                                        $quantityInput = (int)$value;
                                         $itemId = $get('item_id');
-                                        $quantityInput = (int)$value; // Konversi sekali saja
 
                                         if ($quantityInput <= 0) {
                                             $fail("Kuantitas harus lebih dari 0.");
-                                            return; // Hentikan jika kuantitas tidak valid
-                                        }
-
-                                        $itemId = $get('item_id');
-                                        if (!$itemId) { // Jika item belum dipilih, jangan validasi stok dulu
                                             return;
                                         }
 
+                                        if (!$itemId) {
+                                            return; // Item not selected yet
+                                        }
+
                                         $item = Item::find($itemId);
-                                        if (!$item) { // Jika item tidak ditemukan (seharusnya tidak terjadi jika select valid)
+                                        if (!$item) {
                                             $fail("Item tidak valid.");
                                             return;
                                         }
 
-                                        if ($quantityInput > $item->stock) { // Kuantitas melebihi stok yang ada di DB untuk item ini
+                                        $currentInvoiceRecord = $form->getRecord();
+                                        $originalQuantityOnInvoice = 0;
+                                        $isEditOperation = $currentInvoiceRecord && $currentInvoiceRecord->exists;
+
+                                        if ($isEditOperation) {
+                                            // Get the original item quantity from the invoice being edited
+                                            $originalItemOnInvoice = $currentInvoiceRecord->items()->where('item_id', $itemId)->first();
+                                            if ($originalItemOnInvoice) {
+                                                $originalQuantityOnInvoice = $originalItemOnInvoice->pivot->quantity;
+                                            }
+                                        }
+
+                                        $neededStock = 0;
+                                        if ($isEditOperation) {
+                                            // For edits, only check stock for the *increase* in quantity
+                                            $quantityDifference = $quantityInput - $originalQuantityOnInvoice;
+                                            if ($quantityDifference > 0) {
+                                                $neededStock = $quantityDifference;
+                                            } else {
+                                                // Quantity decreased or stayed the same, no additional stock needed
+                                                return;
+                                            }
+                                        } else {
+                                            // For new items (on create page or new item in repeater on edit page)
+                                            // Check stock for the full quantity
+                                            $neededStock = $quantityInput;
+                                        }
+
+                                        if ($neededStock > 0 && $item->stock < $neededStock) {
                                             $hasPotentialToSplit = false;
-                                            if (!$item->is_convertible) { // Hanya cek potensi pecah jika ini item eceran
+                                            if (!$item->is_convertible) {
                                                 $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
                                             }
 
-                                            if (!$hasPotentialToSplit && $item->stock > 0) {
-                                                $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                            if (!$hasPotentialToSplit) {
+                                                if ($isEditOperation) {
+                                                    $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit} (stok saat ini: {$item->stock} {$item->unit}, sudah ada {$originalQuantityOnInvoice} {$item->unit} di faktur ini).");
+                                                } else {
+                                                    $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantityInput} {$item->unit}) melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
+                                                }
                                             }
+                                            // If potential to split, validation passes here, relying on user to use split action
                                         }
                                     };
                                 },
