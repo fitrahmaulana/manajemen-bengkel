@@ -12,24 +12,33 @@ class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
 
-    // Property to store original item quantities
+    // Property to store original item quantities, keyed by item ID
     protected array $originalItemsQuantities = [];
 
     protected function getHeaderActions(): array
     {
         return [
             Actions\DeleteAction::make(),
+            Actions\ForceDeleteAction::make(),
+            Actions\RestoreAction::make(),
         ];
     }
 
     /**
      * Hook ini dijalankan SEBELUM form diisi dengan data dari database.
-     * Kita memanfaatkannya untuk memuat dan memformat data dari relasi.
+     * Kita memanfaatkannya untuk memuat dan memformat data dari relasi
+     * dan menyimpan kuantitas item original.
      */
     protected function mutateFormDataBeforeFill(array $data): array
     {
+        $invoiceRecord = $this->getRecord();
+        // Store original quantities before form data is applied
+        foreach ($invoiceRecord->items as $item) {
+            $this->originalItemsQuantities[$item->id] = $item->pivot->quantity;
+        }
+
         // 1. Ambil data relasi services dan items dari record Invoice yang sedang diedit
-        $services = $this->getRecord()->services->map(function ($service) {
+        $services = $invoiceRecord->services->map(function ($service) {
             return [
                 'service_id' => $service->id,
                 'price' => $service->pivot->price,
@@ -37,9 +46,11 @@ class EditInvoice extends EditRecord
             ];
         })->all();
 
-        $items = $this->getRecord()->items->map(function ($item) {
+        $items = $invoiceRecord->items->map(function ($item) {
+            // Store original quantity for stock adjustment
+            // $this->originalItemsQuantities[$item->id] = $item->pivot->quantity;
             return [
-                'item_id' => $item->id,
+                'item_id' => $item->id, // Ensure this is just the ID
                 'quantity' => $item->pivot->quantity,
                 'price' => $item->pivot->price,
                 'unit_name' => $item->unit,
@@ -55,12 +66,59 @@ class EditInvoice extends EditRecord
     }
 
     /**
-     * Hook ini dijalankan SETELAH record Invoice utama berhasil di-update.
+     * Hook ini dijalankan SEBELUM data dari form di-save ke database.
+     * Di sini kita akan menangani logika penyesuaian stok.
+     *
+     * @param \Illuminate\Database\Eloquent\Model $record
+     * @param array $data
+     * @return \Illuminate\Database\Eloquent\Model
+     */
+    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
+    {
+        $newItemsData = collect($data['items'] ?? [])->keyBy('item_id');
+        $originalItemsData = collect($this->originalItemsQuantities);
+
+        // Items to add or update quantity
+        foreach ($newItemsData as $newItemId => $newItemDetails) {
+            $item = Item::find($newItemId);
+            if (!$item) continue;
+
+            $newQuantity = (int)$newItemDetails['quantity'];
+            $originalQuantity = (int)($originalItemsData->get($newItemId) ?? 0); // Default to 0 if item is new
+
+            $quantityDifference = $newQuantity - $originalQuantity;
+
+            // If quantityDifference is positive, stock decreases (more items sold)
+            // If quantityDifference is negative, stock increases (less items sold or returned)
+            $item->stock -= $quantityDifference;
+            $item->save();
+        }
+
+        // Items removed from invoice
+        foreach ($originalItemsData as $originalItemId => $originalQuantity) {
+            if (!$newItemsData->has($originalItemId)) {
+                $item = Item::find($originalItemId);
+                if ($item) {
+                    $item->stock += (int)$originalQuantity; // Add back the full original quantity
+                    $item->save();
+                }
+            }
+        }
+
+        // Proceed with the default update behavior after stock adjustments
+        return parent::handleRecordUpdate($record, $data);
+    }
+
+
+    /**
+     * Hook ini dijalankan SETELAH record Invoice utama berhasil di-update
+     * (termasuk setelah handleRecordUpdate selesai).
      * Di sini kita akan menyinkronkan data di tabel pivot.
      */
     protected function afterSave(): void
     {
-        // Ambil data terbaru dari form
+        // Ambil data terbaru dari form (setelah handleRecordUpdate mungkin memodifikasinya, meskipun idealnya tidak)
+        // atau lebih baik, ambil dari $this->data yang merupakan state terakhir form.
         $servicesData = $this->data['services'] ?? [];
         $itemsData = $this->data['items'] ?? [];
 
@@ -73,7 +131,7 @@ class EditInvoice extends EditRecord
         });
 
         $itemsToSync = collect($itemsData)->mapWithKeys(function ($item) {
-            return [$item['item_id'] => [
+            return [$item['item_id'] => [ // Pastikan ini adalah item_id dari form
                 'quantity' => $item['quantity'],
                 'price' => $item['price'],
                 'description' => $item['description'],
@@ -81,45 +139,7 @@ class EditInvoice extends EditRecord
         });
 
         // Gunakan sync() untuk mengupdate tabel pivot.
-        // Sync akan otomatis menambah, mengubah, dan menghapus record di tabel pivot sesuai data terakhir.
         $this->record->services()->sync($servicesToSync);
-        // $this->record->items()->sync($itemsToSync); // We will handle item syncing manually to adjust stock
-
-        // Adjust stock based on changes
-        $newItemsFromForm = collect($itemsData)->keyBy('item_id'); // item_id from form
-        $currentInvoiceItems = $this->record->items()->get()->keyBy('id'); // Item model id
-
-        // Iterate through items currently in the invoice (after potential form submission)
-        foreach ($newItemsFromForm as $formItemId => $formItemData) {
-            $itemModel = Item::find($formItemId);
-            if (!$itemModel) {
-                continue;
-            }
-
-            $newQuantity = (int)($formItemData['quantity'] ?? 0);
-            $originalQuantity = (int)($this->originalItemsQuantities[$formItemId] ?? 0); // Use item ID as key
-
-            if ($currentInvoiceItems->has($formItemId)) { // Item was already in invoice
-                $quantityDifference = $newQuantity - $originalQuantity;
-                $itemModel->stock -= $quantityDifference;
-            } else { // New item added to invoice
-                $itemModel->stock -= $newQuantity;
-            }
-            $itemModel->save();
-        }
-
-        // Check for items removed from the invoice
-        foreach ($this->originalItemsQuantities as $itemId => $originalQuantity) {
-            if (!$newItemsFromForm->has((string)$itemId) && $currentInvoiceItems->has($itemId)) { // Check if item was removed
-                $itemModel = Item::find($itemId);
-                if ($itemModel) {
-                    $itemModel->stock += (int)$originalQuantity; // Add back the stock
-                    $itemModel->save();
-                }
-            }
-        }
-
-        // Now sync the items with pivot data
-        $this->record->items()->sync($itemsToSync);
+        $this->record->items()->sync($itemsToSync); // Sync items after stock has been adjusted.
     }
 }
