@@ -179,10 +179,10 @@ class InvoiceResource extends Resource
                             ->numeric()
                             ->default(1)
                             ->required()
-                            ->live(debounce: 500)
+                            ->live(onBlur: true)
                             ->rules([
-                                function (Get $get, callable $set, Forms\Form $form) { // Added Forms\Form $form
-                                    return function (string $attribute, $value, \Closure $fail) use ($get, $form) {
+                                function (Get $get, callable $set, $record, $operation) {
+                                    return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
                                         $quantityInput = (int)$value;
                                         $itemId = $get('item_id');
 
@@ -201,10 +201,9 @@ class InvoiceResource extends Resource
                                             return;
                                         }
 
-                                        $currentInvoiceRecord = $form->getRecord();
+                                        $currentInvoiceRecord = $record;
                                         $originalQuantityOnInvoice = 0;
-                                        $isEditOperation = $currentInvoiceRecord && $currentInvoiceRecord->exists;
-
+                                        $isEditOperation = $operation === 'edit' && $currentInvoiceRecord instanceof Invoice;
                                         if ($isEditOperation) {
                                             // Get the original item quantity from the invoice being edited
                                             $originalItemOnInvoice = $currentInvoiceRecord->items()->where('item_id', $itemId)->first();
@@ -229,10 +228,16 @@ class InvoiceResource extends Resource
                                             $neededStock = $quantityInput;
                                         }
 
+                                        // jika stok yang dibutuhkan lebih dari 0 dan jika stok item tidak cukup lakukan validasi
                                         if ($neededStock > 0 && $item->stock < $neededStock) {
                                             $hasPotentialToSplit = false;
                                             if (!$item->is_convertible) {
                                                 $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
+                                            }
+
+                                            if ($hasPotentialToSplit) {
+                                                //lakukan validasi jika stok eceran tidak cukup untuk melakukan pecah stok
+                                                $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok' untuk mengatasi masalah ini.");
                                             }
 
                                             if (!$hasPotentialToSplit) {
@@ -266,7 +271,7 @@ class InvoiceResource extends Resource
                                 // Action ini hanya memicu modal.
                                 // Data diakses via $arguments & $component dalam konfigurasi modal.
                             })
-                            ->modalHeading(function(array $arguments, Forms\Components\Repeater $component) {
+                            ->modalHeading(function (array $arguments, Forms\Components\Repeater $component) {
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
@@ -310,12 +315,29 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
-                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.'),
+                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.')
+                                        ->rules([
+                                            function (Get $get, callable $set) {
+                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
+                                                    $sourceParentItemId = $get('source_parent_item_id');
+                                                    if (!$sourceParentItemId) {
+                                                        $fail("Item induk yang akan dipecah harus dipilih.");
+                                                        return;
+                                                    }
+
+                                                    $sourceParentItem = Item::find($sourceParentItemId);
+                                                    if ($value > $sourceParentItem->stock) {
+                                                        $fail("Jumlah unit induk yang akan dipecah melebihi stok yang tersedia.");
+                                                        return;
+                                                    }
+                                                };
+                                            },
+                                        ]),
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
                             ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
-                                $itemRepeaterState = $component->getItemState($arguments['item']); // Validated state
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']); // Validated state
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 $childItem = $childItemId ? Item::find($childItemId) : null;
 
@@ -337,7 +359,7 @@ class InvoiceResource extends Resource
                                 // Hitung generatedChildQuantity di luar transaksi agar bisa di-use dan untuk notifikasi
                                 $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
                                 if (!is_numeric($generatedChildQuantity) || $generatedChildQuantity < 0) {
-                                     Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
+                                    Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
                                     return;
                                 }
 
