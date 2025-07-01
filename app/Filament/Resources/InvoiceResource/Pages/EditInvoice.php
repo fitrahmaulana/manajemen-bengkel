@@ -12,9 +12,6 @@ class EditInvoice extends EditRecord
 {
     protected static string $resource = InvoiceResource::class;
 
-    // Property to store original item quantities, keyed by item ID
-    protected array $originalItemsQuantities = [];
-
     protected function getHeaderActions(): array
     {
         return [
@@ -32,11 +29,6 @@ class EditInvoice extends EditRecord
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $invoiceRecord = $this->getRecord();
-        // Store original quantities before form data is applied
-        foreach ($invoiceRecord->items as $item) {
-            $this->originalItemsQuantities[$item->id] = $item->pivot->quantity;
-        }
-
         // 1. Ambil data relasi services dan items dari record Invoice yang sedang diedit
         $services = $invoiceRecord->services->map(function ($service) {
             return [
@@ -76,7 +68,10 @@ class EditInvoice extends EditRecord
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
         $newItemsData = collect($data['items'] ?? [])->keyBy('item_id');
-        $originalItemsData = collect($this->originalItemsQuantities);
+        $originalItemsData = collect($record->items)
+            ->mapWithKeys(function ($item) {
+                return [$item->id => $item->pivot->quantity];
+            });
 
         // Items to add or update quantity
         foreach ($newItemsData as $newItemId => $newItemDetails) {
@@ -85,7 +80,6 @@ class EditInvoice extends EditRecord
 
             $newQuantity = (int)$newItemDetails['quantity'];
             $originalQuantity = (int)($originalItemsData->get($newItemId) ?? 0); // Default to 0 if item is new
-
             $quantityDifference = $newQuantity - $originalQuantity;
 
             // If quantityDifference is positive, stock decreases (more items sold)
@@ -119,6 +113,7 @@ class EditInvoice extends EditRecord
     {
         // Ambil data terbaru dari form (setelah handleRecordUpdate mungkin memodifikasinya, meskipun idealnya tidak)
         // atau lebih baik, ambil dari $this->data yang merupakan state terakhir form.
+
         $servicesData = $this->data['services'] ?? [];
         $itemsData = $this->data['items'] ?? [];
 
