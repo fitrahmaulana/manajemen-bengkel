@@ -30,4 +30,32 @@ class Invoice extends Model
     {
         return $this->belongsToMany(Item::class, 'invoice_item')->withPivot('quantity', 'price', 'description');
     }
+
+    /**
+     * Get the payments for the invoice.
+     */
+    public function payments()
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * Accessor for the total amount paid.
+     *
+     * @return float
+     */
+    public function getTotalPaidAmountAttribute(): float
+    {
+        return $this->payments()->sum('amount_paid');
+    }
+
+    /**
+     * Accessor for the balance due.
+     *
+     * @return float
+     */
+    public function getBalanceDueAttribute(): float
+    {
+        return $this->total_amount - $this->total_paid_amount;
+    }
 }

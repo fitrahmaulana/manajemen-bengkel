@@ -600,9 +600,51 @@ class InvoiceResource extends Resource
                                         ->currency('IDR')
                                         ->weight('bold')
                                         ->size('lg'),
+                                    Infolists\Components\TextEntry::make('total_paid_amount')
+                                        ->label('Total Dibayar')
+                                        ->currency('IDR')
+                                        ->state(fn ($record) => $record->total_paid_amount) // Use the accessor
+                                        ->weight('semibold'),
+                                    Infolists\Components\TextEntry::make('balance_due')
+                                        ->label('Sisa Tagihan')
+                                        ->currency('IDR')
+                                        ->state(fn ($record) => $record->balance_due) // Use the accessor
+                                        ->weight('bold')
+                                        ->color(fn ($record) => $record->balance_due > 0 ? 'warning' : 'success')
+                                        ->size('lg'),
                                 ]), // <-- Mendorong grup ini ke kanan
                             ]),
                     ]),
+
+                // === BAGIAN PEMBAYARAN ===
+                Infolists\Components\Section::make('Riwayat Pembayaran')
+                    ->schema([
+                        Infolists\Components\RepeatableEntry::make('payments')
+                            ->hiddenLabel()
+                            ->placeholder('Belum ada pembayaran.')
+                            ->schema([
+                                Infolists\Components\TextEntry::make('payment_date')
+                                    ->label('Tanggal Bayar')
+                                    ->date('d M Y')
+                                    ->badge(),
+                                Infolists\Components\TextEntry::make('amount_paid')
+                                    ->label('Jumlah Dibayar')
+                                    ->currency('IDR'),
+                                Infolists\Components\TextEntry::make('payment_method')
+                                    ->label('Metode Bayar')
+                                    ->badge(),
+                                Infolists\Components\TextEntry::make('reference_number')
+                                    ->label('No. Referensi')
+                                    ->placeholder('N/A'),
+                                Infolists\Components\TextEntry::make('notes')
+                                    ->label('Catatan')
+                                    ->columnSpanFull()
+                                    ->placeholder('Tidak ada catatan.'),
+                            ])
+                            ->columns(4), // Adjust columns as needed
+                    ])
+                    ->collapsible()
+                    ->collapsed(fn ($record) => $record->payments->isEmpty()),
             ]);
     }
 }
