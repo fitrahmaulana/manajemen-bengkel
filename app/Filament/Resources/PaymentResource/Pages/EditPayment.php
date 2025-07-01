@@ -24,7 +24,7 @@ class EditPayment extends EditRecord
                         $invoice->refresh();
                          // If the invoice was 'paid' but now has a balance, update its status
                         if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                            $invoice->status = 'sent'; // Or other appropriate status
+                            $invoice->status = 'partially_paid'; // Or other appropriate status
                             $invoice->save();
                              Notification::make()
                                 ->title('Invoice Status Updated')
@@ -64,9 +64,9 @@ class EditPayment extends EditRecord
                 }
             } else {
                 // If balance is now due, and status was 'paid', change it.
-                // Also, if it's not 'overdue', set to 'sent'.
-                if ($invoice->status === 'paid' || ($invoice->status !== 'overdue' && $invoice->status !== 'sent')) {
-                    $invoice->status = 'sent'; // Or 'partially_paid'
+                // Also, if it's not 'overdue', set to 'partially_paid'.
+                if ($invoice->status === 'paid' || ($invoice->status !== 'overdue' && $invoice->status !== 'partially_paid')) {
+                    $invoice->status = 'partially_paid'; // Or 'partially_paid'
                     $invoice->save();
                      Notification::make()
                         ->title('Invoice Status Updated')

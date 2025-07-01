@@ -20,7 +20,7 @@ return new class extends Migration
             $table->date('invoice_date');
             $table->date('due_date');
 
-            $table->string('status')->default('draft'); // Pilihan: draft, sent, paid, overdue
+            $table->string('status')->default('unpaid'); // Pilihan: draft, sent, paid, overdue
 
             $table->decimal('subtotal', 15, 0)->default(0);
             $table->string('discount_type')->nullable(); // Pilihan: 'percentage' atau 'fixed'

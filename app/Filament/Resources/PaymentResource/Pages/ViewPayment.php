@@ -21,7 +21,7 @@ class ViewPayment extends ViewRecord
                     if ($invoice) {
                         $invoice->refresh();
                         if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                            $invoice->status = 'sent';
+                            $invoice->status = 'partially_paid';
                             $invoice->save();
                             // Optionally send notification
                         }

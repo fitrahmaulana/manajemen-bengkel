@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
 use Filament\Actions;
 use Filament\Resources\Pages\ViewRecord;
 use Filament\Forms\Components\DatePicker;
@@ -20,7 +21,10 @@ class ViewInvoice extends ViewRecord
 {
     protected static string $resource = InvoiceResource::class;
 
-    // Infolist definition moved from InvoiceResource to here
+    protected $listeners = [
+        'refresh' => '$refresh',
+    ];    // Infolist definition moved from InvoiceResource to here
+
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -37,9 +41,16 @@ class ViewInvoice extends ViewRecord
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
-                                    Infolists\Components\TextEntry::make('status')->badge()->color(fn(string $state): string => match ($state) {
-                                        'draft' => 'gray',
-                                        'sent' => 'info',
+                                    Infolists\Components\TextEntry::make('status')
+                                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                                        'unpaid' => 'Belum Dibayar',
+                                        'partially_paid' => 'Sebagian Dibayar',
+                                        'paid' => 'Sudah Dibayar',
+                                        'overdue' => 'Terlambat',
+                                    })
+                                    ->badge()->color(fn(string $state): string => match ($state) {
+                                        'unpaid' => 'gray',
+                                        'partially_paid' => 'info',
                                         'paid' => 'success',
                                         'overdue' => 'danger',
                                     }),
@@ -88,7 +99,7 @@ class ViewInvoice extends ViewRecord
                 // === BAGIAN BAWAH: RINGKASAN BIAYA ===
                 Infolists\Components\Section::make('Ringkasan Biaya')
                     ->schema([
-                        Infolists\Components\Grid::make(2)
+                        Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('terms')
@@ -107,22 +118,23 @@ class ViewInvoice extends ViewRecord
                                         })
                                         ->currency(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null)
                                         ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null),
+
+                                ]),
+                                Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
-                                        ->currency('IDR')
-                                        ->weight('bold')
-                                        ->size('lg'),
+                                        ->currency('IDR'),
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
-                                        ->state(fn ($record) => $record->total_paid_amount)
+                                        ->state(fn($record) => $record->total_paid_amount)
                                         ->weight('semibold'),
                                     Infolists\Components\TextEntry::make('balance_due')
                                         ->label('Sisa Tagihan')
                                         ->currency('IDR')
-                                        ->state(fn ($record) => $record->balance_due)
+                                        ->state(fn($record) => $record->balance_due)
                                         ->weight('bold')
-                                        ->color(fn ($record) => $record->balance_due > 0 ? 'warning' : 'success')
+                                        ->color(fn($record) => $record->balance_due > 0 ? 'warning' : 'success')
                                         ->size('lg'),
                                 ]),
                             ]),
@@ -136,110 +148,76 @@ class ViewInvoice extends ViewRecord
     {
         return [
             Actions\Action::make('recordPayment')
-                ->label('Record Payment')
+                ->label('Catat Pembayaran')
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
-                ->visible(fn (Invoice $record): bool => $record->balance_due > 0)
+                ->visible(fn(Invoice $record): bool => $record->balance_due > 0)
                 ->modalHeading('Record Payment')
                 ->modalSubmitActionLabel('Save Payment')
                 ->form([
                     DatePicker::make('payment_date')
-                        ->label('Payment Date')
+                        ->label('Tanggal Pembayaran')
                         ->default(now())
                         ->required(),
                     TextInput::make('amount_paid')
-                        ->label('Amount Paid')
+                        ->label('Jumlah yang Dibayar')
                         ->numeric()
                         ->prefix('Rp.')
                         ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                         ->required()
                         ->minValue(1)
-                        ->maxValue(fn (ViewRecord $livewire) => $livewire->record->balance_due)
-                        ->rules([
-                            fn (ViewRecord $livewire) => function (string $attribute, $value, \Closure $fail) use ($livewire) {
-                                $amount = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$value);
-                                if ($amount <= 0) {
-                                    $fail("The amount paid must be greater than zero.");
-                                }
-                                if ($amount > $livewire->record->balance_due) {
-                                    $fail("The amount paid cannot exceed the balance due of Rp " . number_format($livewire->record->balance_due, 0, ',', '.'));
-                                }
-                            },
-                        ]),
+                        ->maxValue(fn(ViewRecord $livewire) => $livewire->record->balance_due)
+                        ->default(fn(ViewRecord $livewire) => $livewire->record->balance_due),
                     Select::make('payment_method')
-                        ->label('Payment Method')
+                        ->label('Metode Pembayaran')
                         ->options([
                             'cash' => 'Cash',
                             'transfer' => 'Bank Transfer',
                             'qris' => 'QRIS',
-                            'credit_card' => 'Credit Card',
-                            'debit_card' => 'Debit Card',
-                            'other' => 'Other',
                         ])
+                        ->default('cash')
                         ->required(),
-                    TextInput::make('reference_number')
-                        ->label('Reference Number (Optional)'),
                     Textarea::make('notes')
-                        ->label('Notes (Optional)')
+                        ->label('Catatan (Optional)')
                         ->rows(3),
                 ])
-                ->action(function (array $data, Invoice $record) {
+                ->action(function (array $data, Invoice $record, $livewire) {
                     try {
-                        // Ensure amount_paid is correctly parsed
                         $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$data['amount_paid']);
-
-                        if ($amountPaid <= 0) {
-                            throw ValidationException::withMessages(['amount_paid' => 'Amount paid must be greater than zero.']);
-                        }
-                        if ($amountPaid > $record->balance_due) {
-                             throw ValidationException::withMessages(['amount_paid' => 'Amount paid cannot exceed balance due.']);
-                        }
 
                         $record->payments()->create([
                             'payment_date' => $data['payment_date'],
                             'amount_paid' => $amountPaid,
                             'payment_method' => $data['payment_method'],
-                            'reference_number' => $data['reference_number'],
                             'notes' => $data['notes'],
                         ]);
-
-                        // Refresh the record to get updated balance_due
-                        $record->refresh();
 
                         if ($record->balance_due <= 0) {
                             $record->status = 'paid';
                             $record->save();
                             Notification::make()
-                                ->title('Payment Recorded & Invoice Paid')
-                                ->body('The payment has been recorded and the invoice is now fully paid.')
+                                ->title('Pembayaran Tercatat & Faktur Terbayar')
+                                ->body('Pembayaran telah tercatat dan faktur sekarang sudah sepenuhnya dibayar.')
                                 ->success()
                                 ->send();
                         } else {
                             // Optionally, add a 'partially_paid' status or just notify
-                             $record->status = 'sent'; // Or a new 'partially_paid' status
-                             $record->save();
+                            $record->status = 'partially_paid'; // Or a new 'partially_paid' status
+                            $record->save();
                             Notification::make()
-                                ->title('Payment Recorded')
-                                ->body('The payment has been successfully recorded. Balance due: Rp ' . number_format($record->balance_due, 0, ',', '.'))
+                                ->title('Pembayaran Tercatat')
+                                ->body('Pembayaran telah berhasil tercatat. Sisa saldo yang harus dibayar: Rp. ' . number_format($record->balance_due, 0, ',', '.'))
                                 ->success()
                                 ->send();
                         }
-                        // No need to explicitly refresh the page, Filament handles it with Livewire
-                    } catch (ValidationException $e) {
-                        Notification::make()
-                            ->title('Validation Error')
-                            ->body($e->getMessage())
-                            ->danger()
-                            ->send();
-                        // Re-throw to let Filament handle displaying errors in the modal
-                        throw $e;
                     } catch (\Exception $e) {
                         Notification::make()
-                            ->title('Error Recording Payment')
-                            ->body('An unexpected error occurred: ' . $e->getMessage())
+                            ->title('Kesalahan Mencatat Pembayaran')
+                            ->body('Terjadi kesalahan tak terduga: ' . $e->getMessage())
                             ->danger()
                             ->send();
                     }
+                    $livewire->dispatch('refresh');
                 }),
             Actions\EditAction::make(),
             Actions\DeleteAction::make(), // Will soft delete
@@ -247,7 +225,13 @@ class ViewInvoice extends ViewRecord
             Actions\RestoreAction::make(),
         ];
     }
-
+    public function getRelationManagers(): array
+    {
+        // Hanya tampilkan PaymentsRelationManager di halaman ini
+        return [
+            PaymentsRelationManager::class,
+        ];
+    }
     // Footer actions can be kept if needed, or removed if not.
     // For now, I will comment it out to focus on header actions.
     // public function getFooterActions(): array

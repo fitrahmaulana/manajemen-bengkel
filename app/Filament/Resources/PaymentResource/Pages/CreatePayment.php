@@ -35,9 +35,9 @@ class CreatePayment extends CreateRecord
                     ->success()
                     ->sendToDatabase(auth()->user()); // Optional: send to specific users
             } elseif ($invoice->status !== 'overdue' && $invoice->status !== 'paid') {
-                // If not fully paid, and not already overdue, set to 'sent' (or 'partially_paid')
+                // If not fully paid, and not already overdue, set to 'partially_paid' (or 'partially_paid')
                 // Avoid changing 'paid' status here if for some reason balance_due became > 0 by other means
-                $invoice->status = 'sent';
+                $invoice->status = 'partially_paid';
                 $invoice->save();
             }
         }

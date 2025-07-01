@@ -25,7 +25,6 @@ class Payment extends Model
      */
     protected $casts = [
         'payment_date' => 'date',
-        'amount_paid' => 'decimal:2',
     ];
 
     /**

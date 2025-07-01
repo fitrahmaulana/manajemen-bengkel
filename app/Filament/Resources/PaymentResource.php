@@ -111,9 +111,9 @@ class PaymentResource extends Resource
                         if ($invoice) {
                             $invoice->refresh();
                             // Check if the invoice status needs to be updated,
-                            // e.g., from 'paid' to 'sent' if balance is now positive
+                            // e.g., from 'paid' to 'partially_paid' if balance is now positive
                             if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                $invoice->status = 'sent'; // Or appropriate status
+                                $invoice->status = 'partially_paid'; // Or appropriate status
                                 $invoice->save();
                             }
                         }
@@ -128,7 +128,7 @@ class PaymentResource extends Resource
                                 if ($invoice) {
                                     $invoice->refresh();
                                     if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                        $invoice->status = 'sent';
+                                        $invoice->status = 'partially_paid';
                                         $invoice->save();
                                     }
                                 }
@@ -168,7 +168,7 @@ class PaymentResource extends Resource
                 $invoice->status = 'paid';
                 $invoice->save();
             } else if ($invoice->status !== 'overdue') { // Avoid overriding overdue
-                $invoice->status = 'sent'; // Or 'partially_paid' if you implement that
+                $invoice->status = 'partially_paid'; // Or 'partially_paid' if you implement that
                 $invoice->save();
             }
         }
@@ -187,7 +187,7 @@ class PaymentResource extends Resource
                 $invoice->status = 'paid';
                 $invoice->save();
             } else if ($invoice->status !== 'overdue') {
-                $invoice->status = 'sent'; // Or 'partially_paid'
+                $invoice->status = 'partially_paid'; // Or 'partially_paid'
                 $invoice->save();
             }
         }

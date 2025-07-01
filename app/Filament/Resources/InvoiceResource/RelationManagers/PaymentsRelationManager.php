@@ -14,8 +14,12 @@ use App\Models\Payment; // Added for afterDelete hook
 class PaymentsRelationManager extends RelationManager
 {
     protected static string $relationship = 'payments';
-
     protected static ?string $recordTitleAttribute = 'payment_date'; // Or something more descriptive
+    protected static ?string $title = 'Riwayat Pembayaran'; // Title for the relation manager
+
+    protected $listeners = [
+        'refresh' => '$refresh',
+    ];
 
     public function form(Form $form): Form
     {
@@ -32,49 +36,20 @@ class PaymentsRelationManager extends RelationManager
                     ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                     ->required()
                     ->live(onBlur: true) // Added live onBlur for dynamic validation
-                    ->rules([
-                        fn (RelationManager $livewire) => function (string $attribute, $value, \Closure $fail) use ($livewire) {
-                            $amount = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$value);
-                            /** @var Invoice $invoice */
-                            $invoice = $livewire->getOwnerRecord();
-                            if (!$invoice) {
-                                $fail("Invoice context not found.");
-                                return;
-                            }
-
-                            // For new payments in relation manager, max value is balance due
-                            // For editing, it could be different if they are adjusting an existing payment amount
-                            // but typically you'd want to prevent overpayment.
-                            // Let's assume for now that even edits shouldn't make the *total* paid exceed total_amount too much.
-                            // Or, more simply, a single payment shouldn't grossly exceed the original invoice total.
-                            // The original `ViewInvoice` action had a stricter rule for new payments.
-
-                            if ($amount <= 0) {
-                                $fail("The amount paid must be greater than zero.");
-                            }
-
-                            // If it's a new record (create context within relation manager)
-                            // For now, let's keep it simple: positive amount.
-                            // More complex validation (like not exceeding balance_due) can be added
-                            // if the existing modal on ViewInvoice isn't sufficient.
-                        },
-                    ]),
+                    ->minValue(1)
+                    ->default(fn(RelationManager $livewire) => $livewire->getOwnerRecord()->balance_due),
                 Forms\Components\Select::make('payment_method')
-                    ->label('Payment Method')
+                    ->label('Metode Pembayaran')
                     ->options([
                         'cash' => 'Cash',
                         'transfer' => 'Bank Transfer',
                         'qris' => 'QRIS',
-                        'credit_card' => 'Credit Card',
-                        'debit_card' => 'Debit Card',
-                        'other' => 'Other',
                     ])
+                    ->default('cash')
                     ->required(),
-                Forms\Components\TextInput::make('reference_number')
-                    ->label('Reference Number (Optional)'),
                 Forms\Components\Textarea::make('notes')
-                    ->label('Notes (Optional)')
-                    ->columnSpanFull(),
+                    ->label('Catatan (Optional)')
+                    ->rows(3),
             ]);
     }
 
@@ -85,19 +60,15 @@ class PaymentsRelationManager extends RelationManager
             ->columns([
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
-                    ->label('Payment Date')
+                    ->label('Tanggal Pembayaran')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amount_paid')
-                    ->label('Amount Paid')
+                    ->label('Jumlah yang Dibayar')
                     ->currency('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_method')
-                    ->label('Payment Method')
+                    ->label('Metode Pembayaran')
                     ->badge()
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('reference_number')
-                    ->label('Reference')
-                    ->placeholder('N/A')
                     ->searchable(),
             ])
             ->filters([
@@ -119,11 +90,11 @@ class PaymentsRelationManager extends RelationManager
                                 $invoice->status = 'paid';
                                 $invoice->save();
                             } else if ($invoice->status !== 'overdue' && $invoice->status !== 'paid') {
-                                $invoice->status = 'sent'; // Or a new 'partially_paid' status
+                                $invoice->status = 'partially_paid'; // Or a new 'partially_paid' status
                                 $invoice->save();
                             }
                             // This should trigger a refresh of dependent components on the page
-                            $livewire->dispatch('refresh'); // Generic event, might need specific targeting
+                            $livewire->dispatch('refresh');
                         }
                     }),
             ])
@@ -142,10 +113,10 @@ class PaymentsRelationManager extends RelationManager
                                 $invoice->status = 'paid';
                                 $invoice->save();
                             } else if ($invoice->status !== 'overdue' && $invoice->status !== 'paid') {
-                                $invoice->status = 'sent';
+                                $invoice->status = 'partially_paid';
                                 $invoice->save();
                             }
-                             $livewire->dispatch('refresh');
+                            $livewire->dispatch('refresh');
                         }
                     }),
                 Tables\Actions\DeleteAction::make()
@@ -159,19 +130,19 @@ class PaymentsRelationManager extends RelationManager
 
                             // Update invoice status if necessary
                             if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                $invoice->status = 'sent'; // Or appropriate status like 'partially_paid'
+                                $invoice->status = 'partially_paid'; // Or appropriate status like 'partially_paid'
                                 $invoice->save();
                             } else if ($invoice->balance_due <= 0 && $invoice->status !== 'paid') {
                                 // This case might occur if other payments cover the amount,
                                 // or if an overpayment was deleted.
                                 $invoice->status = 'paid';
                                 $invoice->save();
-                            } else if ($invoice->balance_due > 0 && $invoice->status === 'sent' && $invoice->payments()->doesntExist()){
-                                // If all payments are deleted and it was 'sent', maybe it should be 'draft' or 'sent'
-                                // For now, keep it simple: if balance > 0 and status was 'paid', revert to 'sent'.
-                                // If it was already 'sent' or 'draft' or 'overdue', its status might not need to change
+                            } else if ($invoice->balance_due > 0 && $invoice->status === 'partially_paid' && $invoice->payments()->doesntExist()) {
+                                // If all payments are deleted and it was 'partially_paid', maybe it should be 'unpaid' or 'partially_paid'
+                                // For now, keep it simple: if balance > 0 and status was 'paid', revert to 'partially_paid'.
+                                // If it was already 'partially_paid' or 'unpaid' or 'overdue', its status might not need to change
                                 // unless all payments are gone and it should revert to a more initial state.
-                                // Let's assume 'sent' is fine if balance > 0.
+                                // Let's assume 'partially_paid' is fine if balance > 0.
                             }
                             // Notify the parent page or specific components to refresh.
                             // Filament's default behavior might handle this, but an explicit event can ensure it.
@@ -188,11 +159,11 @@ class PaymentsRelationManager extends RelationManager
                             if ($invoice) {
                                 $invoice->refresh();
                                 if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                    $invoice->status = 'sent';
+                                    $invoice->status = 'partially_paid';
                                     $invoice->save();
                                 } else if ($invoice->balance_due <= 0 && $invoice->status !== 'paid') {
-                                     $invoice->status = 'paid';
-                                     $invoice->save();
+                                    $invoice->status = 'paid';
+                                    $invoice->save();
                                 }
                                 $livewire->dispatch('refresh');
                             }
@@ -206,6 +177,10 @@ class PaymentsRelationManager extends RelationManager
     // {
     //     return parent::getTableQuery()->orderBy('payment_date', 'desc');
     // }
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
 
     protected function canCreate(): bool
     {
@@ -219,41 +194,5 @@ class PaymentsRelationManager extends RelationManager
         // The form validation should handle if amount exceeds balance_due.
         // Or, like the modal, prevent if balance_due <= 0
         return $invoice->balance_due > 0;
-    }
-
-     /**
-     * This method is called after a payment record is created via the relation manager.
-     */
-    protected function afterCreate(): void
-    {
-        $invoice = $this->getOwnerRecord();
-        if ($invoice instanceof Invoice) {
-            $invoice->refresh();
-            if ($invoice->balance_due <= 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } elseif ($invoice->status !== 'overdue') {
-                $invoice->status = 'sent'; // Or 'partially_paid'
-                $invoice->save();
-            }
-        }
-    }
-
-    /**
-     * This method is called after a payment record is updated via the relation manager.
-     */
-    protected function afterSave(): void // Covers both create and update through table actions
-    {
-        $invoice = $this->getOwnerRecord();
-        if ($invoice instanceof Invoice) {
-            $invoice->refresh();
-            if ($invoice->balance_due <= 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } elseif ($invoice->status !== 'overdue') {
-                $invoice->status = 'sent'; // Or 'partially_paid'
-                $invoice->save();
-            }
-        }
     }
 }

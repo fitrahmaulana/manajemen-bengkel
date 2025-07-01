@@ -105,7 +105,7 @@ class InvoiceResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'sent' => 'Terkirim', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo',])->default('draft')->required(),
+                        Forms\Components\Select::make('status')->options(['unpaid' => 'unpaid', 'partially_paid' => 'Terkirim', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo',])->default('unpaid')->required(),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('invoice_date')->label('Tanggal Invoice')->default(now())->required(),
@@ -458,7 +458,18 @@ class InvoiceResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
-                Tables\Columns\TextColumn::make('status')->badge()->searchable(),
+                Tables\Columns\TextColumn::make('status')
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                        'unpaid' => 'Belum Dibayar',
+                        'partially_paid' => 'Sebagian Dibayar',
+                        'paid' => 'Sudah Dibayar',
+                        'overdue' => 'Terlambat',
+                    })->badge()->color(fn(string $state): string => match ($state) {
+                        'unpaid' => 'gray',
+                        'partially_paid' => 'info',
+                        'paid' => 'success',
+                        'overdue' => 'danger',
+                    })->searchable(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
             ])
@@ -490,7 +501,7 @@ class InvoiceResource extends Resource
     public static function getRelations(): array
     {
         return [
-            RelationManagers\PaymentsRelationManager::class,
+            //
         ];
     }
 
@@ -523,8 +534,8 @@ class InvoiceResource extends Resource
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
                                     Infolists\Components\TextEntry::make('status')->badge()->color(fn(string $state): string => match ($state) {
-                                        'draft' => 'gray',
-                                        'sent' => 'info',
+                                        'unpaid' => 'gray',
+                                        'partially_paid' => 'info',
                                         'paid' => 'success',
                                         'overdue' => 'danger',
                                     }),
@@ -604,14 +615,14 @@ class InvoiceResource extends Resource
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
-                                        ->state(fn ($record) => $record->total_paid_amount) // Use the accessor
+                                        ->state(fn($record) => $record->total_paid_amount) // Use the accessor
                                         ->weight('semibold'),
                                     Infolists\Components\TextEntry::make('balance_due')
                                         ->label('Sisa Tagihan')
                                         ->currency('IDR')
-                                        ->state(fn ($record) => $record->balance_due) // Use the accessor
+                                        ->state(fn($record) => $record->balance_due) // Use the accessor
                                         ->weight('bold')
-                                        ->color(fn ($record) => $record->balance_due > 0 ? 'warning' : 'success')
+                                        ->color(fn($record) => $record->balance_due > 0 ? 'warning' : 'success')
                                         ->size('lg'),
                                 ]), // <-- Mendorong grup ini ke kanan
                             ]),
@@ -621,6 +632,6 @@ class InvoiceResource extends Resource
                 // This section has been removed as payments will be handled by a Relation Manager
                 // on the ViewInvoice page.
             ]);
-            // ->components(...) call removed as it's not needed for this change.
+        // ->components(...) call removed as it's not needed for this change.
     }
 }
