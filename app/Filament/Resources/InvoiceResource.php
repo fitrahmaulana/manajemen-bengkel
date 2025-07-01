@@ -208,7 +208,7 @@ class InvoiceResource extends Resource
                                                 $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
                                             }
 
-                                            if (!$hasPotentialToSplit) {
+                                            if (!$hasPotentialToSplit && $item->stock > 0) {
                                                 $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
                                             }
                                         }
@@ -278,13 +278,7 @@ class InvoiceResource extends Resource
                                         ->minValue(1)
                                         ->required()
                                         ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
-                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.') // Helper text statis
-                                        ->rules([
-                                            'required',
-                                            'numeric',
-                                            'min:1',
-                                            // Rule yang membandingkan dengan stok induk dihapus dari sini untuk tes
-                                        ]),
+                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.'),
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')

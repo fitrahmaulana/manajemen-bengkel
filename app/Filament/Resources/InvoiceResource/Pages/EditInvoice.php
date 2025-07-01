@@ -19,8 +19,6 @@ class EditInvoice extends EditRecord
     {
         return [
             Actions\DeleteAction::make(),
-            Actions\ForceDeleteAction::make(), // Jika menggunakan soft delete
-            Actions\RestoreAction::make(),   // Jika menggunakan soft delete
         ];
     }
 
