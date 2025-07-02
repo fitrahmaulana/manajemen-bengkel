@@ -10,6 +10,7 @@ use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\Placeholder;
 use App\Models\Payment;
 use App\Models\Invoice;
 use Filament\Notifications\Notification;
@@ -42,18 +43,18 @@ class ViewInvoice extends ViewRecord
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
                                     Infolists\Components\TextEntry::make('status')
-                                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                                        'unpaid' => 'Belum Dibayar',
-                                        'partially_paid' => 'Sebagian Dibayar',
-                                        'paid' => 'Sudah Dibayar',
-                                        'overdue' => 'Terlambat',
-                                    })
-                                    ->badge()->color(fn(string $state): string => match ($state) {
-                                        'unpaid' => 'gray',
-                                        'partially_paid' => 'info',
-                                        'paid' => 'success',
-                                        'overdue' => 'danger',
-                                    }),
+                                        ->formatStateUsing(fn(string $state): string => match ($state) {
+                                            'unpaid' => 'Belum Dibayar',
+                                            'partially_paid' => 'Sebagian Dibayar',
+                                            'paid' => 'Lunas',
+                                            'overdue' => 'Terlambat',
+                                        })
+                                        ->badge()->color(fn(string $state): string => match ($state) {
+                                            'unpaid' => 'gray',
+                                            'partially_paid' => 'info',
+                                            'paid' => 'success',
+                                            'overdue' => 'danger',
+                                        }),
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_date')->label('Tanggal Invoice')->date('d M Y'),
@@ -114,10 +115,9 @@ class ViewInvoice extends ViewRecord
                                             if ($record->discount_type === 'percentage') {
                                                 return ($record->discount_value ?? 0) . '%';
                                             }
-                                            return $record->discount_value;
-                                        })
-                                        ->currency(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null)
-                                        ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null),
+                                            // For fixed discount, format as currency
+                                            return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
+                                        }),
 
                                 ]),
                                 Infolists\Components\Group::make()->schema([
@@ -134,8 +134,19 @@ class ViewInvoice extends ViewRecord
                                         ->currency('IDR')
                                         ->state(fn($record) => $record->balance_due)
                                         ->weight('bold')
-                                        ->color(fn($record) => $record->balance_due > 0 ? 'warning' : 'success')
-                                        ->size('lg'),
+                                        ->color('danger') // Red untuk urgent
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->icon('heroicon-o-exclamation-triangle'),
+                                    Infolists\Components\TextEntry::make('overpayment')
+                                        ->label('Kembalian')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->overpayment)
+                                        ->weight('bold')
+                                        ->color('success') // Green untuk positive
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->overpayment > 0)
+                                        ->icon('heroicon-o-banknotes'),
                                 ]),
                             ]),
                     ]),
@@ -152,8 +163,10 @@ class ViewInvoice extends ViewRecord
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
                 ->visible(fn(Invoice $record): bool => $record->balance_due > 0)
-                ->modalHeading('Record Payment')
-                ->modalSubmitActionLabel('Save Payment')
+                ->modalHeading('💰 Catat Pembayaran')
+                ->modalDescription('Masukkan detail pembayaran dari pelanggan')
+                ->modalSubmitActionLabel('💾 Simpan Pembayaran')
+                ->modalWidth('lg')
                 ->form([
                     DatePicker::make('payment_date')
                         ->label('Tanggal Pembayaran')
@@ -166,8 +179,28 @@ class ViewInvoice extends ViewRecord
                         ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                         ->required()
                         ->minValue(1)
-                        ->maxValue(fn(ViewRecord $livewire) => $livewire->record->balance_due)
-                        ->default(fn(ViewRecord $livewire) => $livewire->record->balance_due),
+                        ->default(fn(ViewRecord $livewire) => $livewire->record->balance_due)
+                        ->helperText(fn(ViewRecord $livewire) => 'Sisa tagihan: Rp. ' . number_format($livewire->record->balance_due, 0, ',', '.'))
+                        ->live(onBlur: true)
+                        ->afterStateUpdated(function ($state, $set, ViewRecord $livewire) {
+                            $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
+                            $balanceDue = $livewire->record->balance_due;
+
+                            if ($amountPaid > $balanceDue) {
+                                $overpayment = $amountPaid - $balanceDue;
+                                $set('overpayment_warning', '💰 Kembalian: Rp. ' . number_format($overpayment, 0, ',', '.'));
+                            } else {
+                                $set('overpayment_warning', null);
+                            }
+                        }),
+                    Placeholder::make('overpayment_warning')
+                        ->label('')
+                        ->content(fn($get) => $get('overpayment_warning'))
+                        ->visible(fn($get) => !empty($get('overpayment_warning')))
+                        ->extraAttributes([
+                            'class' => 'bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 font-bold text-lg',
+                            'style' => 'margin: 8px 0;'
+                        ]),
                     Select::make('payment_method')
                         ->label('Metode Pembayaran')
                         ->options([
@@ -192,22 +225,35 @@ class ViewInvoice extends ViewRecord
                             'notes' => $data['notes'],
                         ]);
 
-                        if ($record->balance_due <= 0) {
+                        // Refresh record to get updated calculations
+                        $record->refresh();
+
+                        if ($record->total_paid_amount >= $record->total_amount) {
+                            // POS Style: Overpayment = Lunas
                             $record->status = 'paid';
                             $record->save();
-                            Notification::make()
-                                ->title('Pembayaran Tercatat & Faktur Terbayar')
-                                ->body('Pembayaran telah tercatat dan faktur sekarang sudah sepenuhnya dibayar.')
-                                ->success()
-                                ->send();
+
+                            if ($record->overpayment > 0) {
+                                Notification::make()
+                                    ->title('✅ Transaksi Lunas')
+                                    ->body('Kembalikan uang: Rp. ' . number_format($record->overpayment, 0, ',', '.') . ' kepada pelanggan.')
+                                    ->success()
+                                    ->duration(10000) // 10 detik untuk ambil uang kembalian
+                                    ->send();
+                            } else {
+                                Notification::make()
+                                    ->title('✅ Transaksi Lunas')
+                                    ->body('Pembayaran pas, tidak ada kembalian.')
+                                    ->success()
+                                    ->send();
+                            }
                         } else {
-                            // Optionally, add a 'partially_paid' status or just notify
-                            $record->status = 'partially_paid'; // Or a new 'partially_paid' status
+                            $record->status = 'partially_paid';
                             $record->save();
                             Notification::make()
-                                ->title('Pembayaran Tercatat')
-                                ->body('Pembayaran telah berhasil tercatat. Sisa saldo yang harus dibayar: Rp. ' . number_format($record->balance_due, 0, ',', '.'))
-                                ->success()
+                                ->title('💰 Pembayaran Sebagian')
+                                ->body('Sisa tagihan: Rp. ' . number_format($record->balance_due, 0, ',', '.'))
+                                ->info()
                                 ->send();
                         }
                     } catch (\Exception $e) {
@@ -219,8 +265,8 @@ class ViewInvoice extends ViewRecord
                     }
                     $livewire->dispatch('refresh');
                 }),
-            Actions\EditAction::make(),
-            Actions\DeleteAction::make(), // Will soft delete
+            Actions\EditAction::make()->label('Edit Faktur')->icon('heroicon-o-pencil'),
+            Actions\DeleteAction::make()->label('Hapus Faktur')->icon('heroicon-o-trash'),
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make(),
         ];

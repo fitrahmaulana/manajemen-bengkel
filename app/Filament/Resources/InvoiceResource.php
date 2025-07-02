@@ -4,11 +4,12 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Filament\Resources\InvoiceResource\RelationManagers;
-use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager; // Added this line
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
 use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
+use App\Traits\InvoiceCalculationTrait; // Added trait for optimized calculations
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Group;
@@ -21,10 +22,10 @@ use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope; // Required for soft delete features
-use Filament\Tables\Filters\TrashedFilter; // Required for TrashedFilter
-use Filament\Tables\Actions\ForceDeleteBulkAction; // Required for bulk force delete
-use Filament\Tables\Actions\RestoreBulkAction; // Required for bulk restore
+use Illuminate\Database\Eloquent\SoftDeletingScope;
+use Filament\Tables\Filters\TrashedFilter;
+use Filament\Tables\Actions\ForceDeleteBulkAction;
+use Filament\Tables\Actions\RestoreBulkAction;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
@@ -34,6 +35,8 @@ use Filament\Forms\Components\Actions\Action;
 
 class InvoiceResource extends Resource
 {
+    use InvoiceCalculationTrait; // Use the optimized calculation trait
+
     protected static ?string $model = Invoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
@@ -47,47 +50,27 @@ class InvoiceResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // Fungsi kalkulasi tetap sama, tidak perlu diubah
-        $calculateTotals = function (Get $get, Set $set) {
-            $servicesData = $get('services') ?? [];
-            $itemsData = $get('items') ?? [];
+        // Use optimized calculation from trait with debouncing
+        $calculateTotals = self::createDebouncedCalculation();
 
-            $subtotal = 0;
-            // Calculate subtotal from services
-            foreach ($servicesData as $service) {
-                // Ensure price is treated as a float, accounting for currency mask with space
-                $price = isset($service['price']) ? (float)str_replace(['Rp. ', '.'], ['', ''], (string)$service['price']) : 0;
-                if (!empty($service['service_id'])) {
-                    // Assuming quantity is not masked, default to 1 if not set
-                    $subtotal += $price;
+        // Optimized price update functions
+        $updateServicePrice = function (Set $set, Get $get, $state) {
+            if ($state) {
+                $service = Service::find($state);
+                if ($service) {
+                    $set('price', $service->price);
                 }
             }
+        };
 
-            // Calculate subtotal from items
-            foreach ($itemsData as $item) {
-                // Ensure price and quantity are treated as floats/integers
-                $price = isset($item['price']) ? (float)str_replace(['Rp. ', '.'], ['', ''], (string)$item['price']) : 0;
-                $quantity = isset($item['quantity']) ? (int)$item['quantity'] : 1; // Assuming quantity is not masked
-                if (!empty($item['item_id'])) {
-                    $subtotal += $price * $quantity;
+        $updateItemData = function (Set $set, Get $get, $state) {
+            if ($state) {
+                $item = Item::find($state);
+                if ($item) {
+                    $set('price', $item->selling_price);
+                    $set('unit_name', $item->unit);
                 }
             }
-
-            // discount_value is also a masked input now
-            $discountInput = $get('discount_value') ?? '0';
-            $discountValue = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$discountInput);
-
-            $finalDiscount = 0;
-            if ($get('discount_type') === 'percentage' && $discountValue > 0) {
-                $finalDiscount = ($subtotal * $discountValue) / 100;
-            } else {
-                $finalDiscount = $discountValue; // This is the actual numeric value of discount
-            }
-
-            $total = $subtotal - $finalDiscount;
-
-            $set('subtotal', $subtotal);
-            $set('total_amount', $total);
         };
 
 
@@ -96,7 +79,13 @@ class InvoiceResource extends Resource
             Section::make()->schema([
                 Grid::make(3)->schema([
                     Group::make()->schema([
-                        Forms\Components\Select::make('customer_id')->relationship('customer', 'name')->label('Pelanggan')->searchable()->preload()->required()->live()
+                        Forms\Components\Select::make('customer_id')
+                            ->relationship('customer', 'name')
+                            ->label('Pelanggan')
+                            ->searchable()
+                            ->preload()
+                            ->required()
+                            ->live(onBlur: true) // Changed to onBlur to reduce server requests
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 // Reset vehicle_id when customer changes
                                 $set('vehicle_id', null);
@@ -105,7 +94,7 @@ class InvoiceResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['unpaid' => 'unpaid', 'partially_paid' => 'Terkirim', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo',])->default('unpaid')->required(),
+                        Forms\Components\Select::make('status')->options(['unpaid' => 'Belum Dibayar', 'partially_paid' => 'Sebagian Dibayar', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo',])->default('unpaid')->required(),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('invoice_date')->label('Tanggal Invoice')->default(now())->required(),
@@ -116,29 +105,30 @@ class InvoiceResource extends Resource
 
             // Bagian Repeater yang sekarang dibuat lebih lebar
             Section::make('Detail Pekerjaan & Barang')->schema([
-                // Repeater Jasa
+                // Repeater Jasa - Optimized untuk mengurangi lag
                 Forms\Components\Repeater::make('services')
-                    ->label('Jasa / Layanan')->schema([
+                    ->label('Jasa / Layanan')
+                    ->schema([
                         Forms\Components\Select::make('service_id')
                             ->label('Jasa')
                             ->options(Service::all()->pluck('name', 'id'))
                             ->searchable()
                             ->required()
-                            ->live()
-                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $service = Service::find($state);
-                                $set('price', $service?->price ?? 0);
-                            }),
+                            ->live(onBlur: true) // Changed to onBlur for better performance
+                            ->afterStateUpdated($updateServicePrice),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Jasa')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ') // Note the space
-                            ->live(debounce: 500)
-                            ->required(), // Made editable, so likely required
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1),
+                            ->prefix('Rp. ')
+                            ->live(debounce: 1000) // Added debounce untuk mencegah request berlebihan
+                            ->afterStateUpdated($calculateTotals)
+                            ->required(),
+                        Forms\Components\Textarea::make('description')
+                            ->label('Deskripsi')
+                            ->rows(1),
                     ])
                     ->columns(3)
-                    ->live()
+                    ->live(onBlur: true) // Changed to onBlur for the entire repeater
                     ->afterStateUpdated($calculateTotals),
 
                 // Repeater Barang
@@ -169,18 +159,15 @@ class InvoiceResource extends Resource
                             })
                             ->searchable()
                             ->required()
-                            ->live()
-                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                $item = Item::find($state);
-                                $set('price', $item?->selling_price ?? 0);
-                                $set('unit_name', $item?->unit ?? null);
-                            }),
+                            ->live(onBlur: true) // Changed to onBlur for better performance
+                            ->afterStateUpdated($updateItemData),
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
                             ->default(1)
                             ->required()
-                            ->live(onBlur: true)
+                            ->live(onBlur: true) // Changed to onBlur to reduce validation triggers
+                            ->afterStateUpdated($calculateTotals)
                             ->rules([
                                 function (Get $get, callable $set, $record, $operation) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
@@ -196,59 +183,12 @@ class InvoiceResource extends Resource
                                             return; // Item not selected yet
                                         }
 
-                                        $item = Item::find($itemId);
-                                        if (!$item) {
-                                            $fail("Item tidak valid.");
-                                            return;
-                                        }
+                                        // Use optimized validation from trait
+                                        $currentInvoice = ($operation === 'edit' && $record instanceof Invoice) ? $record : null;
+                                        $validation = self::validateStockAvailability($itemId, $quantityInput, $currentInvoice);
 
-                                        $currentInvoiceRecord = $record;
-                                        $originalQuantityOnInvoice = 0;
-                                        $isEditOperation = $operation === 'edit' && $currentInvoiceRecord instanceof Invoice;
-                                        if ($isEditOperation) {
-                                            // Get the original item quantity from the invoice being edited
-                                            $originalItemOnInvoice = $currentInvoiceRecord->items()->where('item_id', $itemId)->first();
-                                            if ($originalItemOnInvoice) {
-                                                $originalQuantityOnInvoice = $originalItemOnInvoice->pivot->quantity;
-                                            }
-                                        }
-
-                                        $neededStock = 0;
-                                        if ($isEditOperation) {
-                                            // For edits, only check stock for the *increase* in quantity
-                                            $quantityDifference = $quantityInput - $originalQuantityOnInvoice;
-                                            if ($quantityDifference > 0) {
-                                                $neededStock = $quantityDifference;
-                                            } else {
-                                                // Quantity decreased or stayed the same, no additional stock needed
-                                                return;
-                                            }
-                                        } else {
-                                            // For new items (on create page or new item in repeater on edit page)
-                                            // Check stock for the full quantity
-                                            $neededStock = $quantityInput;
-                                        }
-
-                                        // jika stok yang dibutuhkan lebih dari 0 dan jika stok item tidak cukup lakukan validasi
-                                        if ($neededStock > 0 && $item->stock < $neededStock) {
-                                            $hasPotentialToSplit = false;
-                                            if (!$item->is_convertible) {
-                                                $hasPotentialToSplit = $item->sourceParents()->where('stock', '>', 0)->exists();
-                                            }
-
-                                            if ($hasPotentialToSplit) {
-                                                //lakukan validasi jika stok eceran tidak cukup untuk melakukan pecah stok
-                                                $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok' untuk mengatasi masalah ini.");
-                                            }
-
-                                            if (!$hasPotentialToSplit) {
-                                                if ($isEditOperation) {
-                                                    $fail("Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit} (stok saat ini: {$item->stock} {$item->unit}, sudah ada {$originalQuantityOnInvoice} {$item->unit} di faktur ini).");
-                                                } else {
-                                                    $fail("Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantityInput} {$item->unit}) melebihi stok yang tersedia dan tidak ada opsi pecah stok.");
-                                                }
-                                            }
-                                            // If potential to split, validation passes here, relying on user to use split action
+                                        if (!$validation['valid']) {
+                                            $fail($validation['message']);
                                         }
                                     };
                                 },
@@ -257,8 +197,9 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ') // Note the space
-                            ->live(debounce: 500)
+                            ->prefix('Rp. ')
+                            ->live(debounce: 1000) // Added debounce to reduce server requests
+                            ->afterStateUpdated($calculateTotals)
                             ->required(),
                         Forms\Components\Hidden::make('unit_name'),
                         Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)
@@ -290,45 +231,51 @@ class InvoiceResource extends Resource
                                             ->content('Item eceran yang dipilih tidak ditemukan atau belum dipilih.'),
                                     ];
                                 }
-                                $quantityInForm = (int)($itemRepeaterState['quantity'] ?? 0);
-                                $quantityActuallyNeeded = max(0, $quantityInForm - $childItem->stock);
-
                                 return [
-                                    Forms\Components\Placeholder::make('info')
-                                        ->label('Informasi Kebutuhan')
-                                        ->content("Anda membutuhkan tambahan {$quantityActuallyNeeded} {$childItem->unit} untuk item {$childItem->name} (Kuantitas di form: {$quantityInForm}, Stok saat ini: {$childItem->stock} {$childItem->unit})."),
                                     Forms\Components\Select::make('source_parent_item_id')
-                                        ->label('Pilih Item Induk untuk Dipecah')
+                                        ->label('Pilih Item Induk')
                                         ->options(function () use ($childItem) {
                                             return $childItem->sourceParents()
                                                 ->where('stock', '>', 0)
                                                 ->get()
                                                 ->mapWithKeys(function ($parentItem) {
-                                                    $targetChildUnit = $parentItem->targetChild?->unit ?? 'eceran';
-                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock} {$parentItem->unit}, 1 {$parentItem->unit} = {$parentItem->conversion_value} {$targetChildUnit})"];
+                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock})"];
                                                 });
                                         })
                                         ->required()
-                                        ->live(),
+                                        ->live(onBlur: true)
+                                        ->helperText('Pilih item yang akan dipecah untuk menambah stok ' . $childItem->name),
                                     Forms\Components\TextInput::make('parent_quantity_to_split')
-                                        ->label('Jumlah Unit Induk yang Akan Dipecah')
+                                        ->label('Jumlah yang Dipecah')
                                         ->numeric()
                                         ->minValue(1)
                                         ->required()
-                                        ->live(onBlur: true) // Tetap live jika ingin ada interaksi lain nanti
-                                        ->helperText('Pastikan jumlah tidak melebihi stok item induk yang dipilih.')
+                                        ->live(onBlur: true)
+                                        ->helperText('Masukkan jumlah unit yang akan dipecah')
                                         ->rules([
                                             function (Get $get, callable $set) {
                                                 return function (string $attribute, $value, \Closure $fail) use ($get) {
                                                     $sourceParentItemId = $get('source_parent_item_id');
                                                     if (!$sourceParentItemId) {
-                                                        $fail("Item induk yang akan dipecah harus dipilih.");
+                                                        $fail("Item induk harus dipilih.");
                                                         return;
                                                     }
 
                                                     $sourceParentItem = Item::find($sourceParentItemId);
+                                                    if (!$sourceParentItem) {
+                                                        $fail("Item tidak valid.");
+                                                        return;
+                                                    }
+
                                                     if ($value > $sourceParentItem->stock) {
-                                                        $fail("Jumlah unit induk yang akan dipecah melebihi stok yang tersedia.");
+                                                        $fail("Stok tidak cukup. Tersedia: {$sourceParentItem->stock}");
+                                                        return;
+                                                    }
+
+                                                    // Quick validation
+                                                    $result = $value * $sourceParentItem->conversion_value;
+                                                    if ($result <= 0) {
+                                                        $fail("Error konversi. Hubungi admin.");
                                                         return;
                                                     }
                                                 };
@@ -338,31 +285,14 @@ class InvoiceResource extends Resource
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
                             ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
-                                $itemRepeaterState = $component->getRawItemState($arguments['item']); // Validated state
-                                $childItemId = $itemRepeaterState['item_id'] ?? null;
-                                $childItem = $childItemId ? Item::find($childItemId) : null;
+                                // No validation needed - already handled by form rules!
+                                // Direct business logic execution
 
-                                $sourceParentItemId = $data['source_parent_item_id'] ?? null; // Ambil dari data modal
-                                $sourceParentItem = $sourceParentItemId ? Item::find($sourceParentItemId) : null;
-                                $parentQuantityToSplit = (int)($data['parent_quantity_to_split'] ?? 0);
-
-                                if (!$childItem || !$sourceParentItem || $parentQuantityToSplit <= 0) {
-                                    Notification::make()->title('Error')->body('Data tidak valid untuk proses pecah stok. Pastikan item induk dan jumlah dipilih dengan benar.')->danger()->send();
-                                    return;
-                                }
-
-                                // Validasi stok induk dilakukan di sini, sebelum transaksi
-                                if ($parentQuantityToSplit > $sourceParentItem->stock) {
-                                    Notification::make()->title('Stok Induk Tidak Cukup')->body("Stok " . ($sourceParentItem->name) . " hanya " . ($sourceParentItem->stock) . " unit.")->danger()->send();
-                                    return;
-                                }
-
-                                // Hitung generatedChildQuantity di luar transaksi agar bisa di-use dan untuk notifikasi
+                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                                $childItem = Item::find($itemRepeaterState['item_id']);
+                                $sourceParentItem = Item::find($data['source_parent_item_id']);
+                                $parentQuantityToSplit = (int)$data['parent_quantity_to_split'];
                                 $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
-                                if (!is_numeric($generatedChildQuantity) || $generatedChildQuantity < 0) {
-                                    Notification::make()->title('Error Kalkulasi')->body('Gagal menghitung jumlah item hasil konversi. Periksa nilai konversi item induk.')->danger()->send();
-                                    return;
-                                }
 
                                 try {
                                     DB::transaction(function () use ($sourceParentItem, $childItem, $parentQuantityToSplit, $generatedChildQuantity) {
@@ -370,17 +300,22 @@ class InvoiceResource extends Resource
                                         $childItem->increment('stock', $generatedChildQuantity);
                                     });
 
-                                    // Notifikasi hanya dikirim sekali setelah transaksi berhasil
-                                    Notification::make()->title('Berhasil Pecah Stok')->success()
+                                    // Success notification
+                                    Notification::make()
+                                        ->title('Berhasil Pecah Stok')
                                         ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
+                                        ->success()
                                         ->send();
 
-                                    $currentState = $component->getState();
-                                    $component->state($currentState); // Ini akan memicu refresh
+                                    // Trigger form refresh to show updated stock
+                                    $component->state($component->getState());
 
                                 } catch (\Exception $e) {
-                                    // Notifikasi error jika transaksi gagal
-                                    Notification::make()->title('Gagal Pecah Stok')->body('Terjadi kesalahan internal saat memproses pecah stok: ' . $e->getMessage())->danger()->send();
+                                    Notification::make()
+                                        ->title('Gagal Pecah Stok')
+                                        ->body('Terjadi kesalahan: ' . $e->getMessage())
+                                        ->danger()
+                                        ->send();
                                 }
                             })
                             ->visible(function (array $arguments, Forms\Components\Repeater $component): bool {
@@ -402,7 +337,7 @@ class InvoiceResource extends Resource
                             }),
                     ])
                     ->columns(4) // Sesuaikan jumlah kolom jika perlu
-                    ->live()
+                    ->live(onBlur: true) // Changed to onBlur for better performance
                     ->afterStateUpdated($calculateTotals),
             ]),
 
@@ -427,13 +362,15 @@ class InvoiceResource extends Resource
                             Forms\Components\Select::make('discount_type')
                                 ->label('Tipe Diskon')
                                 ->options(['fixed' => 'Nominal (Rp)', 'percentage' => 'Persen (%)'])
-                                ->default('fixed')->live(debounce: 600),
+                                ->default('fixed')
+                                ->live(onBlur: true) // Changed to onBlur
+                                ->afterStateUpdated($calculateTotals),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix('Rp. ') // Note the space
-                                ->live(debounce: 600)
+                                ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->live(debounce: 1000) // Added debounce to reduce server load
                                 ->afterStateUpdated($calculateTotals),
                         ]),
 
@@ -462,7 +399,7 @@ class InvoiceResource extends Resource
                     ->formatStateUsing(fn(string $state): string => match ($state) {
                         'unpaid' => 'Belum Dibayar',
                         'partially_paid' => 'Sebagian Dibayar',
-                        'paid' => 'Sudah Dibayar',
+                        'paid' => 'Lunas',
                         'overdue' => 'Terlambat',
                     })->badge()->color(fn(string $state): string => match ($state) {
                         'unpaid' => 'gray',
@@ -513,125 +450,5 @@ class InvoiceResource extends Resource
             'edit' => Pages\EditInvoice::route('/{record}/edit'),
             'view' => Pages\ViewInvoice::route('/{record}'),
         ];
-    }
-
-    public static function infolist(Infolist $infolist): Infolist
-    {
-        return $infolist
-            ->schema([
-                // ActionGroup removed from here
-
-                // === BAGIAN ATAS: DETAIL PELANGGAN & FAKTUR ===
-                Infolists\Components\Section::make('Informasi Faktur')
-                    ->schema([
-                        Infolists\Components\Grid::make(3)
-                            ->schema([
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('customer.name')->label('Pelanggan'),
-                                    Infolists\Components\TextEntry::make('vehicle.license_plate')->label('No. Polisi'),
-                                    Infolists\Components\TextEntry::make('vehicle.brand')->label('Merk Kendaraan'),
-                                ]),
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
-                                    Infolists\Components\TextEntry::make('status')->badge()->color(fn(string $state): string => match ($state) {
-                                        'unpaid' => 'gray',
-                                        'partially_paid' => 'info',
-                                        'paid' => 'success',
-                                        'overdue' => 'danger',
-                                    }),
-                                ]),
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('invoice_date')->label('Tanggal Invoice')->date('d M Y'),
-                                    Infolists\Components\TextEntry::make('due_date')->label('Tanggal Jatuh Tempo')->date('d M Y'),
-                                ]),
-                            ]),
-                    ]),
-
-                // === BAGIAN TENGAH: DAFTAR JASA & BARANG ===
-                Infolists\Components\Section::make('Detail Jasa / Layanan')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('services')
-                            ->hiddenLabel()
-                            ->schema([
-                                Infolists\Components\TextEntry::make('name')->label('Nama Jasa')->weight('bold'),
-                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->currency('IDR'),
-                            ])->columns(3),
-                    ]),
-
-                Infolists\Components\Section::make('Detail Barang / Suku Cadang')
-                    ->schema([
-                        Infolists\Components\RepeatableEntry::make('items')
-                            ->hiddenLabel()
-                            ->schema([
-                                Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
-                                Infolists\Components\TextEntry::make('pivot.quantity')
-                                    ->label('Kuantitas')
-                                    ->formatStateUsing(function ($record) {
-                                        $unit = property_exists($record, 'unit') && $record->unit ? ' ' . $record->unit : '';
-                                        return ($record->pivot->quantity ?? '') . $unit;
-                                    }),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->currency('IDR'),
-                                // Menghitung subtotal per item
-                                Infolists\Components\TextEntry::make('sub_total_calculated') // Renamed key
-                                    ->label('Subtotal')
-                                    ->currency('IDR')
-                                    ->state(fn($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0)),
-                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
-
-                            ])->columns(5),
-                    ]),
-
-                // === BAGIAN BAWAH: RINGKASAN BIAYA ===
-                Infolists\Components\Section::make('Ringkasan Biaya')
-                    ->schema([
-                        Infolists\Components\Grid::make(2)
-                            ->schema([
-                                // Kolom Kiri: Syarat & Ketentuan
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('terms')
-                                        ->label('Syarat & Ketentuan')
-                                        ->placeholder('Tidak ada syarat & ketentuan.'),
-                                ]),
-                                // Kolom Kanan: Kalkulasi
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('subtotal')->currency('IDR'),
-                                    Infolists\Components\TextEntry::make('discount_value')
-                                        ->label('Diskon')
-                                        ->formatStateUsing(function ($record) {
-                                            if ($record->discount_type === 'percentage') {
-                                                return ($record->discount_value ?? 0) . '%';
-                                            }
-                                            // For fixed, rely on ->currency('IDR') by setting state
-                                            return $record->discount_value;
-                                        })
-                                        ->currency(fn($record) => $record->discount_type === 'fixed' ? 'IDR' : null) // Apply currency only if fixed
-                                        ->suffix(fn($record) => $record->discount_type === 'percentage' ? '%' : null), // Keep suffix for percentage
-                                    Infolists\Components\TextEntry::make('total_amount')
-                                        ->label('Total Akhir')
-                                        ->currency('IDR')
-                                        ->weight('bold')
-                                        ->size('lg'),
-                                    Infolists\Components\TextEntry::make('total_paid_amount')
-                                        ->label('Total Dibayar')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount) // Use the accessor
-                                        ->weight('semibold'),
-                                    Infolists\Components\TextEntry::make('balance_due')
-                                        ->label('Sisa Tagihan')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due) // Use the accessor
-                                        ->weight('bold')
-                                        ->color(fn($record) => $record->balance_due > 0 ? 'warning' : 'success')
-                                        ->size('lg'),
-                                ]), // <-- Mendorong grup ini ke kanan
-                            ]),
-                    ]),
-
-                // === BAGIAN PEMBAYARAN (REMOVED) ===
-                // This section has been removed as payments will be handled by a Relation Manager
-                // on the ViewInvoice page.
-            ]);
-        // ->components(...) call removed as it's not needed for this change.
     }
 }

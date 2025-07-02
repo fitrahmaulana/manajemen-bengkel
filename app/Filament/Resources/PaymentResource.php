@@ -36,29 +36,24 @@ class PaymentResource extends Resource
                     ->required()
                     ->columnSpanFull(),
                 Forms\Components\DatePicker::make('payment_date')
-                    ->label('Payment Date')
+                    ->label('Tanggal Pembayaran')
                     ->required(),
                 Forms\Components\TextInput::make('amount_paid')
-                    ->label('Amount Paid')
+                    ->label('Jumlah Dibayar')
                     ->numeric()
                     ->prefix('Rp.')
                     ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                     ->required(),
                 Forms\Components\Select::make('payment_method')
-                    ->label('Payment Method')
+                    ->label('Metode Pembayaran')
                     ->options([
                         'cash' => 'Cash',
                         'transfer' => 'Bank Transfer',
                         'qris' => 'QRIS',
-                        'credit_card' => 'Credit Card',
-                        'debit_card' => 'Debit Card',
-                        'other' => 'Other',
                     ])
                     ->required(),
-                Forms\Components\TextInput::make('reference_number')
-                    ->label('Reference Number'),
                 Forms\Components\Textarea::make('notes')
-                    ->label('Notes')
+                    ->label('Catatan (Opsional)')
                     ->columnSpanFull(),
             ]);
     }
@@ -73,18 +68,15 @@ class PaymentResource extends Resource
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
-                    ->label('Payment Date')
+                    ->label('Tanggal Pembayaran')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('amount_paid')
-                    ->label('Amount Paid')
+                    ->label('Jumlah Dibayar')
                     ->currency('IDR')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('payment_method')
-                    ->label('Payment Method')
+                    ->label('Metode Pembayaran')
                     ->badge()
-                    ->searchable(),
-                Tables\Columns\TextColumn::make('reference_number')
-                    ->label('Reference')
                     ->searchable(),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Created At')
@@ -105,17 +97,9 @@ class PaymentResource extends Resource
                 Tables\Actions\ViewAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->after(function (Payment $record) {
-                        // After deleting a payment, refresh the associated invoice
-                        // to recalculate balance and potentially update status.
                         $invoice = $record->invoice;
                         if ($invoice) {
-                            $invoice->refresh();
-                            // Check if the invoice status needs to be updated,
-                            // e.g., from 'paid' to 'partially_paid' if balance is now positive
-                            if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                $invoice->status = 'partially_paid'; // Or appropriate status
-                                $invoice->save();
-                            }
+                            self::updateInvoiceStatus($invoice);
                         }
                     }),
             ])
@@ -126,11 +110,7 @@ class PaymentResource extends Resource
                             $records->each(function (Payment $record) {
                                 $invoice = $record->invoice;
                                 if ($invoice) {
-                                    $invoice->refresh();
-                                    if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                                        $invoice->status = 'partially_paid';
-                                        $invoice->save();
-                                    }
+                                    self::updateInvoiceStatus($invoice);
                                 }
                             });
                         }),
@@ -157,39 +137,48 @@ class PaymentResource extends Resource
 
     /**
      * This method is called after a payment record is created.
-     * We will use it to update the invoice status if it becomes fully paid.
+     * We will use it to update the invoice status (POS Style).
      */
     public static function afterCreate(Payment $payment, array $data): void
     {
         $invoice = $payment->invoice;
         if ($invoice) {
-            $invoice->refresh(); // Recalculate balance_due
-            if ($invoice->balance_due <= 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } else if ($invoice->status !== 'overdue') { // Avoid overriding overdue
-                $invoice->status = 'partially_paid'; // Or 'partially_paid' if you implement that
-                $invoice->save();
-            }
+            self::updateInvoiceStatus($invoice);
         }
     }
 
     /**
      * This method is called after a payment record is updated.
-     * We will use it to update the invoice status.
+     * We will use it to update the invoice status (POS Style).
      */
     public static function afterSave(Payment $payment, array $data): void
     {
         $invoice = $payment->invoice;
         if ($invoice) {
-            $invoice->refresh();
-            if ($invoice->balance_due <= 0) {
-                $invoice->status = 'paid';
-                $invoice->save();
-            } else if ($invoice->status !== 'overdue') {
-                $invoice->status = 'partially_paid'; // Or 'partially_paid'
-                $invoice->save();
+            self::updateInvoiceStatus($invoice);
+        }
+    }
+
+    /**
+     * Update invoice status based on payment balance (POS Style)
+     */
+    private static function updateInvoiceStatus(Invoice $invoice): void
+    {
+        $invoice->refresh();
+
+        if ($invoice->total_paid_amount >= $invoice->total_amount) {
+            // POS Style: Any payment >= total = Lunas
+            $invoice->status = 'paid';
+        } else {
+            // If there are any payments, it's partially paid
+            if ($invoice->payments()->exists()) {
+                $invoice->status = 'partially_paid';
+            } else {
+                // No payments exist, set to unpaid status
+                $invoice->status = 'unpaid';
             }
         }
+
+        $invoice->save();
     }
 }

@@ -17,21 +17,25 @@ class EditPayment extends EditRecord
         return [
             Actions\DeleteAction::make()
                 ->after(function ($record) {
-                    // This 'after' hook for DeleteAction on the Edit page
-                    // is triggered after the payment record itself is deleted.
-                    $invoice = $record->invoice()->withTrashed()->first(); // Get invoice even if it's soft-deleted
+                    $invoice = $record->invoice()->withTrashed()->first();
                     if ($invoice) {
                         $invoice->refresh();
-                         // If the invoice was 'paid' but now has a balance, update its status
-                        if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
-                            $invoice->status = 'partially_paid'; // Or other appropriate status
-                            $invoice->save();
-                             Notification::make()
-                                ->title('Invoice Status Updated')
-                                ->body("Invoice {$invoice->invoice_number} status updated due to payment deletion.")
-                                ->info()
-                                ->sendToDatabase(auth()->user());
+
+                        // POS Style status update
+                        if ($invoice->total_paid_amount >= $invoice->total_amount) {
+                            $invoice->status = 'paid';
+                        } else if ($invoice->payments()->exists()) {
+                            $invoice->status = 'partially_paid';
+                        } else {
+                            $invoice->status = 'unpaid';
                         }
+                        $invoice->save();
+
+                        Notification::make()
+                            ->title('Status Invoice Diperbarui')
+                            ->body("Status invoice {$invoice->invoice_number} diperbarui setelah pembayaran dihapus.")
+                            ->info()
+                            ->send();
                     }
                 }),
             Actions\ViewAction::make(),
@@ -45,35 +49,41 @@ class EditPayment extends EditRecord
 
     protected function afterSave(): void
     {
-        // This hook is called after the payment record is saved (updated).
         $payment = $this->record;
         $invoice = $payment->invoice;
 
         if ($invoice) {
-            $invoice->refresh(); // Recalculate balance_due based on the updated payment
+            $invoice->refresh();
 
-            if ($invoice->balance_due <= 0) {
-                if ($invoice->status !== 'paid') {
-                    $invoice->status = 'paid';
-                    $invoice->save();
+            if ($invoice->total_paid_amount >= $invoice->total_amount) {
+                // POS Style: Any payment >= total = Lunas
+                $invoice->status = 'paid';
+                $invoice->save();
+
+                if ($invoice->overpayment > 0) {
                     Notification::make()
-                        ->title('Invoice Paid')
-                        ->body("Invoice {$invoice->invoice_number} has been fully paid.")
+                        ->title('✅ Invoice Lunas')
+                        ->body("Invoice {$invoice->invoice_number} lunas. Kembalian: Rp. " . number_format($invoice->overpayment, 0, ',', '.'))
                         ->success()
-                        ->sendToDatabase(auth()->user());
+                        ->send();
+                } else {
+                    Notification::make()
+                        ->title('✅ Invoice Lunas')
+                        ->body("Invoice {$invoice->invoice_number} telah lunas.")
+                        ->success()
+                        ->send();
                 }
+            } else if ($invoice->payments()->exists()) {
+                $invoice->status = 'partially_paid';
+                $invoice->save();
+                Notification::make()
+                    ->title('💰 Status Invoice Diperbarui')
+                    ->body("Invoice {$invoice->invoice_number} sebagian dibayar. Sisa: Rp. " . number_format($invoice->balance_due, 0, ',', '.'))
+                    ->info()
+                    ->send();
             } else {
-                // If balance is now due, and status was 'paid', change it.
-                // Also, if it's not 'overdue', set to 'partially_paid'.
-                if ($invoice->status === 'paid' || ($invoice->status !== 'overdue' && $invoice->status !== 'partially_paid')) {
-                    $invoice->status = 'partially_paid'; // Or 'partially_paid'
-                    $invoice->save();
-                     Notification::make()
-                        ->title('Invoice Status Updated')
-                        ->body("Invoice {$invoice->invoice_number} status updated due to payment modification.")
-                        ->info()
-                        ->sendToDatabase(auth()->user());
-                }
+                $invoice->status = 'unpaid';
+                $invoice->save();
             }
         }
     }

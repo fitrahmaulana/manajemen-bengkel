@@ -16,15 +16,19 @@ class ViewPayment extends ViewRecord
             Actions\EditAction::make(),
             Actions\DeleteAction::make()
              ->after(function ($record) {
-                    // This 'after' hook for DeleteAction on the View page
                     $invoice = $record->invoice()->withTrashed()->first();
                     if ($invoice) {
                         $invoice->refresh();
-                        if ($invoice->balance_due > 0 && $invoice->status === 'paid') {
+
+                        // POS Style status update
+                        if ($invoice->total_paid_amount >= $invoice->total_amount) {
+                            $invoice->status = 'paid';
+                        } else if ($invoice->payments()->exists()) {
                             $invoice->status = 'partially_paid';
-                            $invoice->save();
-                            // Optionally send notification
+                        } else {
+                            $invoice->status = 'unpaid';
                         }
+                        $invoice->save();
                     }
                 }),
         ];

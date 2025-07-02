@@ -5,6 +5,8 @@ namespace App\Providers;
 use App\Models\Invoice;
 use App\Observers\InvoiceObserver;
 use Illuminate\Support\ServiceProvider;
+use Filament\Support\Facades\FilamentAsset;
+use Filament\Support\Assets\Js;
 
 class AppServiceProvider extends ServiceProvider
 {

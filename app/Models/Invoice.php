@@ -58,4 +58,14 @@ class Invoice extends Model
     {
         return $this->total_amount - $this->total_paid_amount;
     }
+
+    /**
+     * Accessor for the overpayment amount.
+     *
+     * @return float
+     */
+    public function getOverpaymentAttribute(): float
+    {
+        return max(0, $this->total_paid_amount - $this->total_amount);
+    }
 }

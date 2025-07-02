@@ -26,18 +26,34 @@ class CreatePayment extends CreateRecord
         if ($invoice) {
             $invoice->refresh(); // Make sure totals are up-to-date
 
-            if ($invoice->balance_due <= 0) {
+            if ($invoice->total_paid_amount >= $invoice->total_amount) {
+                // POS Style: Any payment >= total = Lunas
                 $invoice->status = 'paid';
                 $invoice->save();
-                Notification::make()
-                    ->title('Invoice Paid')
-                    ->body("Invoice {$invoice->invoice_number} has been fully paid.")
-                    ->success()
-                    ->sendToDatabase(auth()->user()); // Optional: send to specific users
-            } elseif ($invoice->status !== 'overdue' && $invoice->status !== 'paid') {
-                // If not fully paid, and not already overdue, set to 'partially_paid' (or 'partially_paid')
-                // Avoid changing 'paid' status here if for some reason balance_due became > 0 by other means
+                
+                if ($invoice->overpayment > 0) {
+                    Notification::make()
+                        ->title('✅ Invoice Lunas')
+                        ->body("Invoice {$invoice->invoice_number} lunas. Kembalian: Rp. " . number_format($invoice->overpayment, 0, ',', '.'))
+                        ->success()
+                        ->send();
+                } else {
+                    Notification::make()
+                        ->title('✅ Invoice Lunas')
+                        ->body("Invoice {$invoice->invoice_number} telah lunas.")
+                        ->success()
+                        ->send();
+                }
+            } else if ($invoice->payments()->exists()) {
                 $invoice->status = 'partially_paid';
+                $invoice->save();
+                Notification::make()
+                    ->title('💰 Pembayaran Sebagian')
+                    ->body("Invoice {$invoice->invoice_number} sebagian dibayar. Sisa: Rp. " . number_format($invoice->balance_due, 0, ',', '.'))
+                    ->info()
+                    ->send();
+            } else {
+                $invoice->status = 'unpaid';
                 $invoice->save();
             }
         }
