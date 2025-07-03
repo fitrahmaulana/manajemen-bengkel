@@ -3,17 +3,17 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\InvoiceResource\Pages;
-use App\Filament\Resources\InvoiceResource\RelationManagers;
-use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
+use App\Forms\Components\CustomTableRepeater;
 use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
 use App\Traits\InvoiceCalculationTrait; // Added trait for optimized calculations
+use Awcodes\TableRepeater\Components\TableRepeater;
+use Awcodes\TableRepeater\Header;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Group;
-use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -26,12 +26,11 @@ use Illuminate\Database\Eloquent\SoftDeletingScope;
 use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Actions\ForceDeleteBulkAction;
 use Filament\Tables\Actions\RestoreBulkAction;
-use Filament\Infolists;
-use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
-use Filament\Forms\Components\Actions;
 use Filament\Forms\Components\Actions\Action;
+use Illuminate\Support\HtmlString;
+use Carbon\Carbon;
 
 class InvoiceResource extends Resource
 {
@@ -98,7 +97,10 @@ class InvoiceResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('invoice_date')->label('Tanggal Invoice')->default(now())->required(),
-                        Forms\Components\DatePicker::make('due_date')->label('Tanggal Jatuh Tempo')->default(now()->addDays(7))->required(),
+                        Forms\Components\DatePicker::make('due_date')
+                            ->label('Tanggal Jatuh Tempo')
+                            ->default(now()->addDays(7))
+                            ->required()
                     ]),
                 ]),
             ]),
@@ -106,16 +108,37 @@ class InvoiceResource extends Resource
             // Bagian Repeater yang sekarang dibuat lebih lebar
             Section::make('Detail Pekerjaan & Barang')->schema([
                 // Repeater Jasa - Optimized untuk mengurangi lag
-                Forms\Components\Repeater::make('services')
+                CustomTableRepeater::make('services')
+                    ->reorderAtStart()
+                    ->hiddenLabel()
+                    ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at']) //
+                    ->footerItem(
+                        fn(Get $get) => new HtmlString(
+                            'Total: Rp ' . number_format(collect($get('services'))->sum('price'), 0, ',', '.')
+                        )
+                    )
+
+                    ->headers([
+                        Header::make('Nama Jasa')->width('50%'),
+                        Header::make('Harga Jasa')->width('30%'),
+                        Header::make('Subtotal')->width('20%')->align('center'),
+                    ])
                     ->label('Jasa / Layanan')
                     ->schema([
-                        Forms\Components\Select::make('service_id')
-                            ->label('Jasa')
-                            ->options(Service::all()->pluck('name', 'id'))
-                            ->searchable()
-                            ->required()
-                            ->live(onBlur: true) // Changed to onBlur for better performance
-                            ->afterStateUpdated($updateServicePrice),
+                        // group
+                        Forms\Components\Group::make()->schema([
+                            Forms\Components\Select::make('service_id')
+                                ->hiddenLabel()
+                                ->options(Service::all()->pluck('name', 'id'))
+                                ->searchable()
+                                ->required()
+                                ->live(onBlur: true) // Changed to onBlur for better performance
+                                ->afterStateUpdated($updateServicePrice),
+                            Forms\Components\Textarea::make('description')
+                                ->hiddenLabel()
+                                ->placeholder('Masukkan deskripsi pekerjaan')
+                                ->rows(1),
+                        ]),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Jasa')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -123,17 +146,26 @@ class InvoiceResource extends Resource
                             ->live(debounce: 1000) // Added debounce untuk mencegah request berlebihan
                             ->afterStateUpdated($calculateTotals)
                             ->required(),
-                        Forms\Components\Textarea::make('description')
-                            ->label('Deskripsi')
-                            ->rows(1),
+                        Forms\Components\Placeholder::make('subtotal')
+                            ->hiddenLabel()
+                            ->extraAttributes(['class' => 'text-left md:text-center'])
+                            ->content(fn(Get $get) => 'Rp. ' . number_format($get('price') ?? 0, 0, ',', '.')),
                     ])
                     ->columns(3)
                     ->live(onBlur: true) // Changed to onBlur for the entire repeater
                     ->afterStateUpdated($calculateTotals),
 
                 // Repeater Barang
-                Forms\Components\Repeater::make('items')
-                    ->label('Barang / Suku Cadang')
+                CustomTableRepeater::make('items')
+                    ->headers([
+                        Header::make('Barang / Suku Cadang')->width('45%'),
+                        Header::make('Kuantitas')->width('15%'),
+                        Header::make('Harga Satuan')->width('20%'),
+                        Header::make('Total')->width('20%')->align('center'),
+                    ])
+                    ->hiddenLabel()
+                    ->reorderAtStart()
+                    ->cloneable()
                     ->itemLabel(function (array $state): ?string {
                         if (empty($state['item_id'])) {
                             return null;
@@ -146,21 +178,25 @@ class InvoiceResource extends Resource
                         return $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
                     })
                     ->schema([
-                        Forms\Components\Select::make('item_id')
-                            ->label('Barang')
-                            ->options(function () {
-                                return Item::query()
-                                    ->get()
-                                    ->mapWithKeys(function ($item) {
-                                        // Menampilkan SKU bukan Stok di opsi Select
-                                        $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
-                                        return [$item->id => $item->name . $skuInfo];
-                                    });
-                            })
-                            ->searchable()
-                            ->required()
-                            ->live(onBlur: true) // Changed to onBlur for better performance
-                            ->afterStateUpdated($updateItemData),
+                        Forms\Components\Group::make()->schema([
+                            Forms\Components\Select::make('item_id')
+                                ->label('Barang')
+                                ->hiddenLabel()
+                                ->options(function () {
+                                    return Item::query()
+                                        ->get()
+                                        ->mapWithKeys(function ($item) {
+                                            // Menampilkan SKU bukan Stok di opsi Select
+                                            $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
+                                            return [$item->id => $item->name . $skuInfo];
+                                        });
+                                })
+                                ->searchable()
+                                ->required()
+                                ->live() // Changed to onBlur for better performance
+                                ->afterStateUpdated($updateItemData),
+                            Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1)
+                        ]),
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
@@ -202,14 +238,22 @@ class InvoiceResource extends Resource
                             ->afterStateUpdated($calculateTotals)
                             ->required(),
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Textarea::make('description')->label('Deskripsi')->rows(1)
+                        Forms\Components\Placeholder::make('total')
+                            ->hiddenLabel()
+                            ->extraAttributes(['class' => 'text-left md:text-center'])
+                            ->content(fn(Get $get) => 'Rp. ' . number_format(($get('quantity') ?? 0) * ($get('price') ?? 0), 0, ',', '.')),
                     ])
+                    ->footerItem(
+                        fn(Get $get) => new HtmlString(
+                            'Total: Rp ' . number_format(collect($get('items'))->sum(fn($item) => ($item['quantity'] ?? 0) * ($item['price'] ?? 0)), 0, ',', '.')
+                        )
+                    )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
                             ->label('Pecah Stok')
                             ->icon('heroicon-o-arrows-up-down')
                             ->color('warning')
-                            ->action(function (array $arguments, Forms\Components\Repeater $component) {
+                            ->action(function () {
                                 // Action ini hanya memicu modal.
                                 // Data diakses via $arguments & $component dalam konfigurasi modal.
                             })
@@ -309,7 +353,6 @@ class InvoiceResource extends Resource
 
                                     // Trigger form refresh to show updated stock
                                     $component->state($component->getState());
-
                                 } catch (\Exception $e) {
                                     Notification::make()
                                         ->title('Gagal Pecah Stok')
@@ -317,9 +360,8 @@ class InvoiceResource extends Resource
                                         ->danger()
                                         ->send();
                                 }
-                            })
-                            ->visible(function (array $arguments, Forms\Components\Repeater $component): bool {
-                                $itemRepeaterState = $component->getRawItemState($arguments['item']);
+                            })->visible(function ($state): bool {
+                                $itemRepeaterState = $state ?? [];
                                 $itemId = $itemRepeaterState['item_id'] ?? null;
 
                                 if (!$itemId) return false;
@@ -334,7 +376,7 @@ class InvoiceResource extends Resource
                                     return false;
                                 }
                                 return $item->sourceParents()->where('stock', '>', 0)->exists();
-                            }),
+                            })
                     ])
                     ->columns(4) // Sesuaikan jumlah kolom jika perlu
                     ->live(onBlur: true) // Changed to onBlur for better performance
