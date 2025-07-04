@@ -18,6 +18,7 @@ return new class extends Migration
             $table->string('brand')->nullable(); // "Shell"
             $table->text('description')->nullable();
             $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
+            $table->boolean('has_variants')->default(false); // Apakah produk ini punya varian (items)
             $table->timestamps();
         });
 

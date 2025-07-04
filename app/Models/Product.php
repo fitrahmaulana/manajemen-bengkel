@@ -11,6 +11,11 @@ class Product extends Model
         'brand',
         'description',
         'type_item_id',
+        'has_variants',
+    ];
+
+    protected $casts = [
+        'has_variants' => 'boolean',
     ];
 
     public function typeItem()
@@ -23,3 +28,4 @@ class Product extends Model
         return $this->hasMany(Item::class);
     }
 }
+
