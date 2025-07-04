@@ -12,8 +12,9 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Infolists\Components\TextEntry;
-
+use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Facades\Artisan;
 
 class ProductResource extends Resource
 {
@@ -389,6 +390,22 @@ class ProductResource extends Resource
                     ->label('Buat Produk Baru')
                     ->url(route('filament.admin.resources.products.create'))
                     ->icon('heroicon-m-plus'),
+            ])
+            ->headerActions([
+                Tables\Actions\Action::make('create')
+                    ->label('Fix Missing Variants')
+                    ->icon('heroicon-m-plus')
+                    ->color('danger')
+                    ->action(
+                        function () {
+                            Artisan::call('fix:missing-variants');
+                            Notification::make()
+                                ->title('Proses Selesai')
+                                ->body('Berhasil memperbaiki varian yang hilang. Silakan periksa daftar produk Anda.')
+                                ->success()
+                                ->send();
+                        }
+                    ),
             ]);
     }
 
@@ -402,6 +419,4 @@ class ProductResource extends Resource
             'edit' => Pages\EditProduct::route('/{record}/edit'),
         ];
     }
-
-
 }

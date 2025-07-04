@@ -82,12 +82,13 @@ trait InvoiceCalculationTrait
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
 
+        //jika tidak ada pembayaran, statusnya unpaid atau overdue
         if ($totalPaid <= 0) {
             $status = $invoice->due_date < now() ? 'overdue' : 'unpaid';
-        } elseif ($totalPaid >= $totalAmount) {
+        } elseif ($totalPaid >= $totalAmount) { //jika sudah terbayar penuh
             $status = 'paid'; // POS style: overpayment is still "paid"
-        } else {
-            $status = 'partially_paid';
+        } else { //jika ada pembayaran tapi belum penuh
+            $status = $invoice->due_date < now() ? 'overdue' : 'partially_paid';
         }
 
         $invoice->update(['status' => $status]);

@@ -18,6 +18,14 @@ class ViewProduct extends ViewRecord
     {
         return [
             Actions\EditAction::make()->label('Ubah Produk')->icon('heroicon-o-pencil'),
+            Actions\DeleteAction::make()
+                ->label('Hapus Produk')
+                ->icon('heroicon-o-trash')
+                ->requiresConfirmation()
+                ->successNotificationTitle('Produk berhasil dihapus')
+                ->requiresConfirmation(fn($record) => $record->items->count() > 0)
+                ->modalDescription('Produk ini memiliki varian. Apakah Anda yakin ingin menghapusnya?')
+                ->successNotificationTitle('Produk dan semua variannya telah dihapus.'),
         ];
     }
 
@@ -56,7 +64,7 @@ class ViewProduct extends ViewRecord
                     ->schema([
                         TextEntry::make('items_count')
                             ->label('Jumlah Varian')
-                            ->getStateUsing(fn($record) => $record->items_count > 0 ? $record->items_count : '-'),
+                            ->getStateUsing(fn($record) => $record->items->count() > 0 ? $record->items->count() : '-'),
                         TextEntry::make('total_stock')
                             ->label('Total Stok')
                             ->getStateUsing(fn($record) => $record->items->sum('stock')),
