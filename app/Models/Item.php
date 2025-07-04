@@ -7,29 +7,33 @@ use Illuminate\Database\Eloquent\Model;
 class Item extends Model
 {
     protected $fillable = [
+        'product_id',
         'name',
         'sku',
-        'brand',
         'purchase_price',
         'selling_price',
         'stock',
         'unit',
-        'location',
-        'type_item_id',
-        'is_convertible',
         'target_child_item_id',
         'conversion_value',
     ];
 
+    /**
+     * Check if this item is convertible (has conversion settings)
+     */
+    public function getIsConvertibleAttribute(): bool
+    {
+        return $this->target_child_item_id !== null && $this->conversion_value > 0;
+    }
+
     protected $casts = [
         'stock' => 'integer',
-        'is_convertible' => 'boolean',
         'conversion_value' => 'decimal:2',
     ];
 
-    public function typeItem()
+    public function product()
     {
-        return $this->belongsTo(TypeItem::class);
+        return $this->belongsTo(Product::class);
     }
 
     public function invoices()

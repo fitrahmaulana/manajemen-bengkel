@@ -8,8 +8,13 @@ class TypeItem extends Model
 {
     protected $fillable = ['name', 'description'];
 
+    public function products()
+    {
+        return $this->hasMany(Product::class);
+    }
+
     public function items()
     {
-        return $this->hasMany(Item::class);
+        return $this->hasManyThrough(Item::class, Product::class);
     }
 }

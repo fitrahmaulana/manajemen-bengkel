@@ -11,11 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('items', function (Blueprint $table) {
-            if (!Schema::hasColumn('items', 'is_convertible')) {
-                $table->boolean('is_convertible')->default(false)->after('unit'); // Or choose a different position
-            }
-        });
+        // This migration is no longer needed due to schema restructuring
+        // The is_convertible functionality is now handled by the target_child_item_id field
     }
 
     /**
@@ -23,10 +20,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('items', function (Blueprint $table) {
-            if (Schema::hasColumn('items', 'is_convertible')) {
-                $table->dropColumn('is_convertible');
-            }
-        });
+        // This migration is no longer needed due to schema restructuring
     }
 };

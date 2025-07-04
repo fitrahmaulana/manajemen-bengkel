@@ -46,9 +46,9 @@ class TypeItemResource extends Resource
                     ->searchable(),
                 Tables\Columns\TextColumn::make('description')
                     ->searchable(),
-                Tables\Columns\TextColumn::make('items_count')
-                    ->counts('items')
-                    ->label('Total Items'),
+                Tables\Columns\TextColumn::make('products_count')
+                    ->counts('products')
+                    ->label('Total Produk'),
             ])
             ->filters([
                 //

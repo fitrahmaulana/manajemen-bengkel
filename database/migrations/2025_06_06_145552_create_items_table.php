@@ -11,21 +11,36 @@ return new class extends Migration
      */
     public function up(): void
     {
+        // Create products table first
+        Schema::create('products', function (Blueprint $table) {
+            $table->id();
+            $table->string('name'); // "Oli HX7" (nama umum produk)
+            $table->string('brand')->nullable(); // "Shell"
+            $table->text('description')->nullable();
+            $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
+            $table->timestamps();
+        });
+
+        // Create items table
         Schema::create('items', function (Blueprint $table) {
             $table->id();
-            $table->string('name'); // Nama Barang, misal: "Filter Oli Avanza"
-            $table->string('sku')->unique(); // Kode Barang/SKU, harus unik
-            $table->string('brand')->nullable(); // Merek, misal: "Toyota Genuine Part"
-            $table->decimal('purchase_price', 15, 0); // Harga Beli (modal)
-            $table->decimal('selling_price', 15, 0); // Harga Jual
-            $table->integer('stock')->default(0); // Jumlah Stok
-            $table->string('unit', 50)->default('Pcs'); // Satuan, misal: Pcs, Botol, Set
-            $table->string('location')->nullable(); // Lokasi penyimpanan, misal: "Rak A-01"
-            $table->foreignId('type_item_id')->nullable()->constrained()->onDelete('set null');
 
-            // New fields for single target child conversion
-            $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null')->comment('ID of the eceran item this parent converts to');
-            $table->decimal('conversion_value', 8, 2)->nullable()->comment('How many units of target_child_item_id are made from 1 unit of this item');
+            // Relasi ke product (untuk grouping varian)
+            $table->foreignId('product_id')->constrained()->onDelete('cascade');
+
+            // Info varian
+            $table->string('name'); // "1 Liter", "4 Liter", "Eceran"
+            $table->string('sku')->unique(); // "HX7-1L", "HX7-4L", "HX7-ECER"
+
+            // Harga & stok
+            $table->decimal('purchase_price', 15, 0);
+            $table->decimal('selling_price', 15, 0);
+            $table->integer('stock')->default(0);
+            $table->string('unit', 50)->default('Pcs'); // "Liter", "Botol", dll
+
+            // Konversi eceran/grosir
+            $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null');
+            $table->decimal('conversion_value', 8, 2)->nullable(); // 1 botol 4L = 4 liter eceran
 
             $table->timestamps();
         });
@@ -36,12 +51,10 @@ return new class extends Migration
      */
     public function down(): void
     {
-        // If rolling back, ensure to drop the foreign key if it was added, then the column.
-        // This down() method should ideally reverse what up() does.
-        // Given we are modifying an existing create_table, a full rollback would drop the table.
-        // If this migration was ever run with the old fields, then a more complex down()
-        // would be needed to restore them, or a separate rollback migration.
-        // For simplicity, assuming a fresh migrate:fresh scenario if this is modified.
+        // Drop items table first (due to foreign key constraint)
         Schema::dropIfExists('items');
+
+        // Then drop products table
+        Schema::dropIfExists('products');
     }
 };

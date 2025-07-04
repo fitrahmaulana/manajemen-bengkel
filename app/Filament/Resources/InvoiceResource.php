@@ -143,18 +143,20 @@ class InvoiceResource extends Resource
                         if (!$item) {
                             return 'Item tidak ditemukan';
                         }
-                        return $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
+                        return $item->product->name . ' ' . $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
                     })
                     ->schema([
                         Forms\Components\Select::make('item_id')
                             ->label('Barang')
                             ->options(function () {
                                 return Item::query()
+                                    ->with(['product'])
                                     ->get()
                                     ->mapWithKeys(function ($item) {
-                                        // Menampilkan SKU bukan Stok di opsi Select
+                                        // Menampilkan nama produk + varian + SKU
+                                        $displayName = $item->product->name . ' ' . $item->name;
                                         $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
-                                        return [$item->id => $item->name . $skuInfo];
+                                        return [$item->id => $displayName . $skuInfo];
                                     });
                             })
                             ->searchable()

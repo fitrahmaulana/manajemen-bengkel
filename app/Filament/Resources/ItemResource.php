@@ -46,25 +46,38 @@ class ItemResource extends Resource
             ->schema([
                 Forms\Components\Section::make('Informasi Dasar Barang')
                     ->schema([
-                        Forms\Components\TextInput::make('name')
-                            ->label('Nama Barang / Spare Part') // Label lebih umum
-                            ->helperText('Contoh: Oli Shell HX7 (Kemasan 4L), atau Oli Shell HX7 (Eceran)')
-                            ->required(),
-                        Forms\Components\Select::make('type_item_id')
-                            ->label('Tipe Barang')
-                            ->relationship('typeItem', 'name')
+                        Forms\Components\Select::make('product_id')
+                            ->label('Produk')
+                            ->relationship('product', 'name')
                             ->searchable()
-                            ->preload(),
-                        // Grid untuk menempatkan Kode & Merek berdampingan
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('sku')
-                                    ->label('Kode Barang (SKU)')
-                                    ->required()
-                                    ->unique(ignoreRecord: true), // Unik, tapi abaikan saat edit data yg sama
+                            ->preload()
+                            ->required()
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->label('Nama Produk')
+                                    ->required(),
                                 Forms\Components\TextInput::make('brand')
                                     ->label('Merek'),
-                            ]),
+                                Forms\Components\Textarea::make('description')
+                                    ->label('Deskripsi'),
+                                Forms\Components\Select::make('type_item_id')
+                                    ->label('Tipe Barang')
+                                    ->relationship('typeItem', 'name')
+                                    ->searchable()
+                                    ->preload(),
+                            ])
+                            ->createOptionUsing(function (array $data): int {
+                                return \App\Models\Product::create($data)->id;
+                            }),
+                        Forms\Components\TextInput::make('name')
+                            ->label('Nama Varian')
+                            ->helperText('Contoh: 1 Liter, 4 Liter, Eceran')
+                            ->required(),
+                        // Grid untuk menempatkan SKU
+                        Forms\Components\TextInput::make('sku')
+                            ->label('Kode Barang (SKU)')
+                            ->required()
+                            ->unique(ignoreRecord: true), // Unik, tapi abaikan saat edit data yg sama
                     ]),
 
                 Forms\Components\Section::make('Informasi Stok & Harga')
@@ -110,16 +123,10 @@ class ItemResource extends Resource
                     ->description('Gunakan fitur ini jika barang ini adalah kemasan besar yang bisa dipecah menjadi eceran.')
                     ->collapsible()
                     ->schema([
-                        Forms\Components\Toggle::make('is_convertible')
-                            ->label('Item Dapat Dikonversi (Induk)')
-                            ->helperText('Aktifkan jika item ini adalah item induk yang dapat dipecah menjadi item eceran.')
-                            ->default(false)
-                            ->live(), // Make it reactive to show/hide other fields
                         Forms\Components\Group::make()->schema([
                             Forms\Components\TextInput::make('conversion_value')
                                 ->label('Nilai Konversi')
                                 ->numeric()
-                                ->required(fn(Forms\Get $get): bool => $get('is_convertible')) // Hanya required jika toggle 'is_convertible' aktif
                                 ->helperText(
                                     fn(Forms\Get $get): string =>
                                     'Satu ' . ($get('unit') ?: 'unit') . ' barang ini akan menghasilkan berapa banyak satuan eceran?'
@@ -140,17 +147,23 @@ class ItemResource extends Resource
                                 ->relationship(
                                     name: 'targetChild',
                                     titleAttribute: 'name',
-                                    modifyQueryUsing: fn(Builder $query) => $query->where('is_convertible', false)
+                                    modifyQueryUsing: fn(Builder $query) => $query->whereNull('target_child_item_id')
                                 )
                                 ->searchable()
                                 ->preload()
                                 ->helperText('Pilih item eceran yang stoknya akan bertambah.')
                                 ->createOptionForm(fn(Forms\Get $get): array => [
                                     // Logika di dalam modal ini tidak berubah dan sekarang lebih andal
-                                    Forms\Components\TextInput::make('name')
-                                        ->label('Nama Item Eceran Baru')
+                                    Forms\Components\Select::make('product_id')
+                                        ->label('Produk')
+                                        ->default($get('product_id'))
+                                        ->relationship('product', 'name')
                                         ->required()
-                                        ->default($get('name') ? $get('name') . ' (Eceran)' : null),
+                                        ->disabled(), // Disabled karena harus sama dengan produk induk
+                                    Forms\Components\TextInput::make('name')
+                                        ->label('Nama Varian Eceran')
+                                        ->required()
+                                        ->default('Eceran'),
                                     Forms\Components\TextInput::make('sku')
                                         ->label('SKU Item Eceran Baru')
                                         ->required()
@@ -198,21 +211,16 @@ class ItemResource extends Resource
                                 ])
                                 ->createOptionUsing(function (array $data, Forms\Get $get): int {
                                     // Kode 'createOptionUsing' Anda sudah hampir benar.
-                                    // Kita hanya perlu memastikan type_item_id dari induk ikut terbawa.
+                                    // Kita hanya perlu memastikan product_id dari induk ikut terbawa.
 
                                     $eceranData = [
+                                        'product_id' => $get('product_id'),
                                         'name' => $data['name'],
                                         'sku' => $data['sku'],
                                         'unit' => $data['unit'],
                                         'selling_price' => $data['selling_price'],
                                         'purchase_price' => $data['purchase_price'],
                                         'stock' => 0,
-                                        'is_convertible' => false,
-                                        // Ambil type_item_id dari form utama (induknya)
-                                        'type_item_id' => $get('type_item_id'),
-                                        // Ambil data lain yang mungkin relevan dari induk
-                                        'brand' => $get('brand'),
-                                        'location' => $get('location'),
                                     ];
 
                                     $newItem = Item::create($eceranData);
@@ -220,11 +228,8 @@ class ItemResource extends Resource
                                 })
                                 ->live(), // Select juga dibuat reactive agar suffix di atas bisa update
 
-                        ])->visible(fn(Forms\Get $get) => $get('is_convertible')),
+                        ]),
                     ]),
-
-                Forms\Components\TextInput::make('location')
-                    ->label('Lokasi Penyimpanan'),
             ]);
     }
 
@@ -232,8 +237,12 @@ class ItemResource extends Resource
     {
         return $table
             ->columns([
+                Tables\Columns\TextColumn::make('product.name')
+                    ->label('Produk')
+                    ->searchable()
+                    ->sortable(),
                 Tables\Columns\TextColumn::make('name')
-                    ->label('Nama Barang')
+                    ->label('Varian')
                     ->searchable(), // Membuat kolom ini bisa dicari
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
@@ -246,7 +255,7 @@ class ItemResource extends Resource
                     ->badge() // Tampilkan dalam bentuk badge
                     ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success') // Stok <= 5 jadi kuning, sisanya hijau
                     ->sortable(),
-                Tables\Columns\TextColumn::make('brand')
+                Tables\Columns\TextColumn::make('product.brand')
                     ->label('Merek')
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true), // Kolom bisa disembunyikan
@@ -319,8 +328,7 @@ class ItemResource extends Resource
                     })
                     ->visible(
                         fn(Item $record): bool =>
-                        $record->is_convertible &&
-                            $record->target_child_item_id !== null &&
+                        $record->target_child_item_id !== null &&
                             $record->conversion_value > 0
                     ),
             ])
@@ -355,11 +363,11 @@ class ItemResource extends Resource
                 InfolistSection::make('Informasi Dasar Barang')
                     ->columns(2)
                     ->schema([
-                        TextEntry::make('name')->label('Nama Barang'),
-                        TextEntry::make('typeItem.name')->label('Tipe Barang'),
+                        TextEntry::make('product.name')->label('Produk'),
+                        TextEntry::make('name')->label('Varian'),
+                        TextEntry::make('product.typeItem.name')->label('Tipe Barang'),
                         TextEntry::make('sku')->label('Kode Barang (SKU)'),
-                        TextEntry::make('brand')->label('Merek'),
-                        TextEntry::make('location')->label('Lokasi Simpan'),
+                        TextEntry::make('product.brand')->label('Merek'),
                         // Contoh komponen canggih: Menampilkan status dengan ikon
                         IconEntry::make('is_convertible')
                             ->label('Status Konversi')
@@ -368,7 +376,8 @@ class ItemResource extends Resource
                             ->trueColor('success')
                             ->falseIcon('heroicon-o-cube')
                             ->falseColor('gray')
-                            ->helperText(fn($state) => $state ? 'Induk (dapat dipecah)' : 'Eceran/Satuan'),
+                            ->helperText(fn($state) => $state ? 'Induk (dapat dipecah)' : 'Eceran/Satuan')
+                            ->getStateUsing(fn($record) => $record->is_convertible), // Use accessor
                     ]),
 
                 InfolistSection::make('Informasi Stok & Harga')
