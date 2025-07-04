@@ -80,12 +80,18 @@ class ViewInvoice extends ViewRecord
                         Infolists\Components\RepeatableEntry::make('items')
                             ->hiddenLabel()
                             ->schema([
-                                Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')->columnSpan(2),
+                                Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')
+                                ->formatStateUsing(function ($record) {
+                                    // Menampilkan nama produk + varian + SKU
+                                    $displayName = $record->product->name . ' ' . $record->name;
+                                    return $displayName;
+                                })
+                                ->columnSpan(2),
                                 Infolists\Components\TextEntry::make('pivot.quantity')
                                     ->label('Kuantitas')
                                     ->formatStateUsing(function ($record) {
-                                        $unit = property_exists($record, 'unit') && $record->unit ? ' ' . $record->unit : '';
-                                        return ($record->pivot->quantity ?? '') . $unit;
+                                        $unit = $record->unit;
+                                        return ($record->pivot->quantity ?? ' ') . " $unit";
                                     }),
                                 Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->currency('IDR'),
                                 Infolists\Components\TextEntry::make('sub_total_calculated')

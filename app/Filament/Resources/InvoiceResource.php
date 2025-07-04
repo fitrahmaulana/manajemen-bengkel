@@ -114,7 +114,9 @@ class InvoiceResource extends Resource
                     ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at']) //
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: Rp ' . number_format(collect($get('services'))->sum('price'), 0, ',', '.')
+                            'Total: Rp ' . number_format(collect($get('services'))->sum(function($service) {
+                                return self::parseCurrencyValue($service['price'] ?? '0');
+                            }), 0, ',', '.')
                         )
                     )
 
@@ -149,7 +151,10 @@ class InvoiceResource extends Resource
                         Forms\Components\Placeholder::make('subtotal')
                             ->hiddenLabel()
                             ->extraAttributes(['class' => 'text-left md:text-center'])
-                            ->content(fn(Get $get) => 'Rp. ' . number_format($get('price') ?? 0, 0, ',', '.')),
+                            ->content(function (Get $get) {
+                                $price = self::parseCurrencyValue($get('price') ?? '0');
+                                return 'Rp. ' . number_format($price, 0, ',', '.');
+                            }),
                     ])
                     ->columns(3)
                     ->live(onBlur: true) // Changed to onBlur for the entire repeater
@@ -185,10 +190,10 @@ class InvoiceResource extends Resource
                                 ->options(function () {
                                     return Item::query()
                                         ->with(['product'])
-                                    ->get()
+                                        ->get()
                                         ->mapWithKeys(function ($item) {
                                             // Menampilkan nama produk + varian + SKU
-                                        $displayName = $item->product->name . ' ' . $item->name;
+                                            $displayName = $item->product->name . ' ' . $item->name;
                                             $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
                                             return [$item->id => $displayName . $skuInfo];
                                         });
@@ -243,11 +248,19 @@ class InvoiceResource extends Resource
                         Forms\Components\Placeholder::make('total')
                             ->hiddenLabel()
                             ->extraAttributes(['class' => 'text-left md:text-center'])
-                            ->content(fn(Get $get) => 'Rp. ' . number_format(($get('quantity') ?? 0) * ($get('price') ?? 0), 0, ',', '.')),
+                            ->content(function (Get $get) {
+                                $quantity = (int)($get('quantity') ?? 0);
+                                $price = self::parseCurrencyValue($get('price') ?? '0');
+                                return 'Rp. ' . number_format($quantity * $price, 0, ',', '.');
+                            }),
                     ])
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: Rp ' . number_format(collect($get('items'))->sum(fn($item) => ($item['quantity'] ?? 0) * ($item['price'] ?? 0)), 0, ',', '.')
+                            'Total: Rp ' . number_format(collect($get('items'))->sum(function($item) {
+                                $quantity = (int)($item['quantity'] ?? 0);
+                                $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                return $quantity * $price;
+                            }), 0, ',', '.')
                         )
                     )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item

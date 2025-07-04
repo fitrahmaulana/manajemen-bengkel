@@ -144,11 +144,20 @@ class ItemResource extends Resource
                             // 2. BARU PILIH TARGETNYA
                             Forms\Components\Select::make('target_child_item_id')
                                 ->label('Hasil Pecahan Stok Menjadi Item:')
+                                // Menggunakan relasi 'targetChild' untuk memilih item eceran tapi pake nama produk juga contoh product.name + targetchild.name
+                                // Jadi lebih jelas bagi user
+                                // Misal: "Oli HX7 1L - Eceran"
                                 ->relationship(
                                     name: 'targetChild',
                                     titleAttribute: 'name',
                                     modifyQueryUsing: fn(Builder $query) => $query->whereNull('target_child_item_id')
                                 )
+                                ->getOptionLabelFromRecordUsing(function ($record) {
+                                    // Gabungkan nama produk dan nama varian eceran
+                                    $productName = $record->product?->name ?? '';
+                                    $variantName = $record->name ?? '';
+                                    return trim("{$productName} - {$variantName}");
+                                })
                                 ->searchable()
                                 ->preload()
                                 ->helperText('Pilih item eceran yang stoknya akan bertambah.')
