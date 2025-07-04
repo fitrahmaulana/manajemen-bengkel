@@ -3,7 +3,9 @@
 namespace App\Providers;
 
 use App\Models\Invoice;
+use App\Models\Product;
 use App\Observers\InvoiceObserver;
+use App\Observers\ProductObserver;
 use Illuminate\Support\ServiceProvider;
 use Filament\Support\Facades\FilamentAsset;
 use Filament\Support\Assets\Js;
@@ -24,5 +26,6 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Invoice::observe(InvoiceObserver::class);
+        Product::observe(ProductObserver::class);
     }
 }

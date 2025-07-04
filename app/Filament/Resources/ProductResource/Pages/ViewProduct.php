@@ -5,6 +5,9 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Filament\Resources\ProductResource\RelationManagers\ItemsRelationManager;
 use Filament\Actions;
+use Filament\Infolists\Infolist;
+use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Resources\Pages\ViewRecord;
 
 class ViewProduct extends ViewRecord
@@ -14,23 +17,53 @@ class ViewProduct extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
-            Actions\Action::make('addVariant')
-                ->label('Tambah Varian')
-                ->icon('heroicon-o-plus')
-                ->color('success')
-                ->url(fn($record) => route('filament.admin.resources.items.create', ['product_id' => $record->id]))
-                ->tooltip('Tambah varian baru untuk produk ini'),
+            Actions\EditAction::make()->label('Ubah Produk')->icon('heroicon-o-pencil'),
         ];
     }
 
-    // getRelation
-      public function getRelationManagers(): array
+    public function getRelationManagers(): array
     {
-        return [
-            ItemsRelationManager::class,
-        ];
+        // Hanya tampilkan ItemsRelationManager jika produk memiliki varian
+        if ($this->record->has_variants) {
+            return [
+                ItemsRelationManager::class,
+            ];
+        }
+
+        return [];
     }
 
+    public function infolist(Infolist $infolist): Infolist
+    {
+        return $infolist
+            ->schema([
+                InfolistSection::make('Informasi Produk')
+                    ->columns(2)
+                    ->schema([
+                        TextEntry::make('name')->label('Nama Produk'),
+                        TextEntry::make('brand')->label('Merek'),
+                        TextEntry::make('typeItem.name')->label('Kategori'),
+                        TextEntry::make('has_variants')
+                            ->label('Jenis Produk')
+                            ->getStateUsing(fn($record) => $record->has_variants ? 'Memiliki Varian' : 'Produk Tunggal'),
+                        TextEntry::make('description')
+                            ->label('Deskripsi')
+                            ->columnSpanFull(),
+                    ]),
 
+                InfolistSection::make('Statistik')
+                    ->columns(3)
+                    ->schema([
+                        TextEntry::make('items_count')
+                            ->label('Jumlah Varian')
+                            ->getStateUsing(fn($record) => $record->items_count > 0 ? $record->items_count : '-'),
+                        TextEntry::make('total_stock')
+                            ->label('Total Stok')
+                            ->getStateUsing(fn($record) => $record->items->sum('stock')),
+                        TextEntry::make('average_price')
+                            ->label('Rata-rata Harga')
+                            ->getStateUsing(fn($record) => 'Rp ' . number_format($record->items->avg('selling_price'), 0, ',', '.')),
+                    ]),
+            ]);
+    }
 }

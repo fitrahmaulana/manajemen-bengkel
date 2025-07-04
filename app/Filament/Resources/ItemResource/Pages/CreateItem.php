@@ -22,11 +22,6 @@ class CreateItem extends CreateRecord
 
     protected function getRedirectUrl(): string
     {
-        // Redirect ke ProductResource setelah create jika dari sana
-        if (request()->has('product_id')) {
-            return route('filament.admin.resources.products.view', ['record' => request()->get('product_id')]);
-        }
-
         return $this->getResource()::getUrl('view', [
             'record' => $this->getRecord(),
         ]);

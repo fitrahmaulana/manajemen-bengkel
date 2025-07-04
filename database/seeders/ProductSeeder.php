@@ -26,7 +26,7 @@ class ProductSeeder extends Seeder
 
         $oliHX7Variants = [
             [
-                'name' => 'Oli Shell HX7 10W-40 - 1 Liter',
+                'name' => '1 Liter',
                 'sku' => 'SHL-HX7-10W40-1L',
                 'unit' => 'Botol',
                 'purchase_price' => 75000,
@@ -34,7 +34,7 @@ class ProductSeeder extends Seeder
                 'stock' => 25,
             ],
             [
-                'name' => 'Oli Shell HX7 10W-40 - 4 Liter',
+                'name' => '4 Liter',
                 'sku' => 'SHL-HX7-10W40-4L',
                 'unit' => 'Galon',
                 'purchase_price' => 285000,
@@ -66,7 +66,7 @@ class ProductSeeder extends Seeder
 
         $oliGTXVariants = [
             [
-                'name' => 'Oli Castrol GTX 20W-50 - 1 Liter',
+                'name' => '1 Liter',
                 'sku' => 'CST-GTX-20W50-1L',
                 'unit' => 'Botol',
                 'purchase_price' => 65000,
@@ -74,7 +74,7 @@ class ProductSeeder extends Seeder
                 'stock' => 20,
             ],
             [
-                'name' => 'Oli Castrol GTX 20W-50 - 4 Liter',
+                'name' => '4 Liter',
                 'sku' => 'CST-GTX-20W50-4L',
                 'unit' => 'Galon',
                 'purchase_price' => 245000,
@@ -106,7 +106,7 @@ class ProductSeeder extends Seeder
 
         $busiNGKVariants = [
             [
-                'name' => 'Busi NGK G-Power BPR6ES',
+                'name' => 'BPR6ES',
                 'sku' => 'NGK-GP-BPR6ES',
                 'unit' => 'Pcs',
                 'purchase_price' => 45000,
@@ -114,7 +114,7 @@ class ProductSeeder extends Seeder
                 'stock' => 30,
             ],
             [
-                'name' => 'Busi NGK G-Power BPR7ES',
+                'name' => 'BPR7ES',
                 'sku' => 'NGK-GP-BPR7ES',
                 'unit' => 'Pcs',
                 'purchase_price' => 45000,
@@ -122,7 +122,7 @@ class ProductSeeder extends Seeder
                 'stock' => 25,
             ],
             [
-                'name' => 'Busi NGK G-Power BPR8ES',
+                'name' => 'BPR8ES',
                 'sku' => 'NGK-GP-BPR8ES',
                 'unit' => 'Pcs',
                 'purchase_price' => 45000,
@@ -154,7 +154,7 @@ class ProductSeeder extends Seeder
 
         $filterDensoVariants = [
             [
-                'name' => 'Filter Udara Denso - Toyota Avanza',
+                'name' => 'Toyota Avanza',
                 'sku' => 'DNS-FA-AVANZA',
                 'unit' => 'Pcs',
                 'purchase_price' => 85000,
@@ -162,7 +162,7 @@ class ProductSeeder extends Seeder
                 'stock' => 15,
             ],
             [
-                'name' => 'Filter Udara Denso - Honda Civic',
+                'name' => 'Honda Civic',
                 'sku' => 'DNS-FA-CIVIC',
                 'unit' => 'Pcs',
                 'purchase_price' => 95000,
@@ -170,7 +170,7 @@ class ProductSeeder extends Seeder
                 'stock' => 12,
             ],
             [
-                'name' => 'Filter Udara Denso - Suzuki Ertiga',
+                'name' => 'Suzuki Ertiga',
                 'sku' => 'DNS-FA-ERTIGA',
                 'unit' => 'Pcs',
                 'purchase_price' => 90000,
@@ -202,7 +202,7 @@ class ProductSeeder extends Seeder
 
         $kampasRemVariants = [
             [
-                'name' => 'Kampas Rem Bendix Toyota Avanza - Depan',
+                'name' => 'Depan',
                 'sku' => 'BDX-BR-AVANZA-F',
                 'unit' => 'Set',
                 'purchase_price' => 185000,
@@ -210,7 +210,7 @@ class ProductSeeder extends Seeder
                 'stock' => 18,
             ],
             [
-                'name' => 'Kampas Rem Bendix Toyota Avanza - Belakang',
+                'name' => 'Belakang',
                 'sku' => 'BDX-BR-AVANZA-R',
                 'unit' => 'Set',
                 'purchase_price' => 155000,
@@ -242,7 +242,7 @@ class ProductSeeder extends Seeder
 
         Item::create([
             'product_id' => $akiGS->id,
-            'name' => 'Aki GS Astra NS40ZL',
+            'name' => 'standard',
             'sku' => 'GSA-AKI-NS40ZL',
             'unit' => 'Pcs',
             'purchase_price' => 650000,
@@ -252,7 +252,7 @@ class ProductSeeder extends Seeder
 
         // 7. Ban Bridgestone - Produk TANPA varian
         $banBridgestone = Product::create([
-            'name' => 'Ban Bridgestone Turanza T005',
+            'name' => 'Ban Bridgestone Turanza T005 185/65R15',
             'brand' => 'Bridgestone',
             'description' => 'Ban premium dengan teknologi terdepan untuk kenyamanan berkendara',
             'type_item_id' => $sparePartType->id,
@@ -261,7 +261,7 @@ class ProductSeeder extends Seeder
 
         Item::create([
             'product_id' => $banBridgestone->id,
-            'name' => 'Ban Bridgestone Turanza T005 185/65R15',
+            'name' => 'Standard',
             'sku' => 'BRS-T005-185/65R15',
             'unit' => 'Pcs',
             'purchase_price' => 850000,
@@ -280,7 +280,7 @@ class ProductSeeder extends Seeder
 
         $timingBeltVariants = [
             [
-                'name' => 'Timing Belt Gates - Toyota Avanza',
+                'name' => 'Toyota Avanza',
                 'sku' => 'GTS-TB-AVANZA',
                 'unit' => 'Set',
                 'purchase_price' => 385000,
@@ -288,7 +288,7 @@ class ProductSeeder extends Seeder
                 'stock' => 12,
             ],
             [
-                'name' => 'Timing Belt Gates - Honda Civic',
+                'name' => 'Honda Civic',
                 'sku' => 'GTS-TB-CIVIC',
                 'unit' => 'Set',
                 'purchase_price' => 425000,
@@ -296,7 +296,7 @@ class ProductSeeder extends Seeder
                 'stock' => 8,
             ],
             [
-                'name' => 'Timing Belt Gates - Suzuki Ertiga',
+                'name' => 'Suzuki Ertiga',
                 'sku' => 'GTS-TB-ERTIGA',
                 'unit' => 'Set',
                 'purchase_price' => 395000,
@@ -327,8 +327,8 @@ class ProductSeeder extends Seeder
         ]);
 
         Item::create([
-            'product_id' => $coolantPrestone->id,
-            'name' => 'Coolant Prestone Universal 1L',
+            'product_id' => $coolantPrestone->id . ' 1L',
+            'name' => 'standard',
             'sku' => 'PRS-COOL-1L',
             'unit' => 'Botol',
             'purchase_price' => 75000,
@@ -347,7 +347,7 @@ class ProductSeeder extends Seeder
 
         $minyakRemVariants = [
             [
-                'name' => 'Minyak Rem Bosch DOT 3',
+                'name' => 'DOT 3',
                 'sku' => 'BSH-BR-DOT3',
                 'unit' => 'Botol',
                 'purchase_price' => 45000,
@@ -355,7 +355,7 @@ class ProductSeeder extends Seeder
                 'stock' => 20,
             ],
             [
-                'name' => 'Minyak Rem Bosch DOT 4',
+                'name' => 'DOT 4',
                 'sku' => 'BSH-BR-DOT4',
                 'unit' => 'Botol',
                 'purchase_price' => 55000,

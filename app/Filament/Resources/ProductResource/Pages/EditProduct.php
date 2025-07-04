@@ -11,6 +11,14 @@ class EditProduct extends EditRecord
 {
     protected static string $resource = ProductResource::class;
 
+    protected function getRedirectUrl(): string
+    {
+        // Redirect ke halaman detail produk setelah edit
+        return $this->getResource()::getUrl('view', [
+            'record' => $this->getRecord(),
+        ]);
+    }
+
     protected function mutateFormDataBeforeFill(array $data): array
     {
         $product = $this->record;
