@@ -242,7 +242,7 @@ class ProductSeeder extends Seeder
 
         Item::create([
             'product_id' => $akiGS->id,
-            'name' => 'standard',
+            'name' => '',
             'sku' => 'GSA-AKI-NS40ZL',
             'unit' => 'Pcs',
             'purchase_price' => 650000,
@@ -261,7 +261,7 @@ class ProductSeeder extends Seeder
 
         Item::create([
             'product_id' => $banBridgestone->id,
-            'name' => 'Standard',
+            'name' => '',
             'sku' => 'BRS-T005-185/65R15',
             'unit' => 'Pcs',
             'purchase_price' => 850000,
@@ -327,8 +327,8 @@ class ProductSeeder extends Seeder
         ]);
 
         Item::create([
-            'product_id' => $coolantPrestone->id . ' 1L',
-            'name' => 'standard',
+            'product_id' => $coolantPrestone->id,
+            'name' => '',
             'sku' => 'PRS-COOL-1L',
             'unit' => 'Botol',
             'purchase_price' => 75000,

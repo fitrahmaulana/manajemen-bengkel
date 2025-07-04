@@ -135,9 +135,10 @@ class ProductResource extends Resource
         return $table
             ->query(
                 \App\Models\Item::query()
+                    ->join('products', 'items.product_id', '=', 'products.id')
+                    ->join('type_items', 'products.type_item_id', '=', 'type_items.id')
                     ->with(['product', 'product.typeItem'])
-                    ->whereHas('product') // Pastikan produk ada
-                    ->whereHas('product.typeItem') // Pastikan type item ada
+                    ->select('items.*') // Pastikan kita hanya select kolom dari items untuk menghindari konflik
             )
             ->heading('Daftar Varian Produk')
             ->description('Semua varian produk dalam satu tampilan untuk memudahkan kasir melihat harga dan stok. Jika produk memiliki varian tapi tidak muncul, pastikan sudah menambahkan varian di halaman detail produk.')
@@ -145,7 +146,7 @@ class ProductResource extends Resource
                 Tables\Columns\TextColumn::make('product_name_with_variant')
                     ->label('Nama Produk')
                     ->searchable(['products.name', 'products.brand', 'items.name'])
-                    ->sortable()
+                    ->sortable(['products.name'])
                     ->weight('bold')
                     ->getStateUsing(function ($record) {
                         $productName = $record->product->name;
@@ -164,7 +165,7 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('sku')
                     ->label('SKU')
-                    ->searchable()
+                    ->searchable(['items.sku'])
                     ->copyable()
                     ->copyMessage('SKU berhasil disalin')
                     ->fontFamily('mono')
@@ -173,8 +174,8 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('product.typeItem.name')
                     ->label('Kategori')
-                    ->searchable()
-                    ->sortable()
+                    ->searchable(['type_items.name'])
+                    ->sortable(['type_items.name'])
                     ->badge()
                     ->color('success')
                     ->formatStateUsing(fn($state) => $state ?: 'Tidak Ada Kategori')
@@ -182,15 +183,15 @@ class ProductResource extends Resource
 
                 Tables\Columns\TextColumn::make('selling_price')
                     ->label('Harga Jual')
-                    ->money('IDR')
-                    ->sortable()
+                    ->currency('IDR')
+                    ->sortable(['items.selling_price'])
                     ->weight('bold')
                     ->color('success'),
 
                 Tables\Columns\TextColumn::make('stock')
                     ->label('Stok')
                     ->alignCenter()
-                    ->sortable()
+                    ->sortable(['items.stock'])
                     ->badge()
                     ->color(fn($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
                     ->formatStateUsing(fn($state, $record) => $state . ' ' . $record->unit),
@@ -262,21 +263,21 @@ class ProductResource extends Resource
                     ])
                     ->query(function ($query, array $data) {
                         if ($data['stock_type'] === 'available') {
-                            $query->where('stock', '>', 20);
+                            $query->where('items.stock', '>', 20);
                         } elseif ($data['stock_type'] === 'low_stock') {
-                            $query->where('stock', '>', 0)->where('stock', '<=', 20);
+                            $query->where('items.stock', '>', 0)->where('items.stock', '<=', 20);
                         } elseif ($data['stock_type'] === 'out_of_stock') {
-                            $query->where('stock', '<=', 0);
+                            $query->where('items.stock', '<=', 0);
                         }
                     }),
 
                 Tables\Filters\Filter::make('convertible')
                     ->label('Bisa Dipecah')
-                    ->query(fn($query) => $query->where('target_child_item_id', '!=', null)),
+                    ->query(fn($query) => $query->where('items.target_child_item_id', '!=', null)),
 
                 Tables\Filters\Filter::make('missing_variants')
                     ->label('Belum Ada Varian')
-                    ->query(fn($query) => $query->where('name', 'Belum Ada Varian'))
+                    ->query(fn($query) => $query->where('items.name', 'Belum Ada Varian'))
                     ->toggle(),
             ])
             ->actions([
