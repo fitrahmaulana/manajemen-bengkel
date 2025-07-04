@@ -11,28 +11,20 @@ class ItemTypeSeeder extends Seeder
     {
         $types = [
             [
-                'name' => 'Oli & Pelumas',
-                'description' => 'Berbagai jenis oli mesin, oli transmisi, dan pelumas lainnya'
+                'name' => 'Spare Parts',
+                'description' => 'Suku cadang kendaraan seperti kampas rem, filter, busi, dll'
             ],
             [
-                'name' => 'Suku Cadang Mesin',
-                'description' => 'Komponen-komponen mesin seperti piston, ring, bearing, dll'
+                'name' => 'Oli & Cairan',
+                'description' => 'Berbagai jenis oli mesin, oli transmisi, cairan rem, coolant, dll'
             ],
             [
-                'name' => 'Suku Cadang Elektrik',
-                'description' => 'Komponen kelistrikan seperti aki, alternator, starter, dll'
+                'name' => 'Ban & Velg',
+                'description' => 'Ban mobil, velg racing, ban dalam, dll'
             ],
             [
-                'name' => 'Filter',
-                'description' => 'Filter oli, filter udara, filter bahan bakar, dll'
-            ],
-            [
-                'name' => 'Rem & Kopling',
-                'description' => 'Komponen sistem rem dan kopling seperti kampas rem, master rem, dll'
-            ],
-            [
-                'name' => 'Perlengkapan',
-                'description' => 'Perlengkapan tambahan seperti wiper, lampu, kaca spion, dll'
+                'name' => 'Aksesoris',
+                'description' => 'Aksesoris kendaraan seperti karpet, cover, parfum mobil, dll'
             ],
         ];
 
