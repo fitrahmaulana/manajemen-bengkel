@@ -4,12 +4,16 @@ namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
 use App\Models\Item;
+use App\Models\Product;
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
+use Illuminate\Database\Eloquent\Model;
 
 class CreateProduct extends CreateRecord
 {
     protected static string $resource = ProductResource::class;
+
+    protected array $standardData = [];
 
     protected function getRedirectUrl(): string
     {
@@ -19,10 +23,16 @@ class CreateProduct extends CreateRecord
         ]);
     }
 
-    protected function mutateFormDataBeforeSave(array $data): array
+    protected function mutateFormDataBeforeCreate(array $data): array
     {
-        // Simpan data form original untuk Observer via session
-        session(['product_form_data' => $data]);
+        // Simpan data standard untuk digunakan nanti
+        $this->standardData = [
+            'standard_sku' => $data['standard_sku'] ?? null,
+            'standard_unit' => $data['standard_unit'] ?? 'Pcs',
+            'standard_purchase_price' => $data['standard_purchase_price'] ?? 0,
+            'standard_selling_price' => $data['standard_selling_price'] ?? 0,
+            'standard_stock' => $data['standard_stock'] ?? 0,
+        ];
 
         // Remove form fields yang tidak ada di tabel products
         unset($data['standard_sku']);
@@ -34,10 +44,70 @@ class CreateProduct extends CreateRecord
         return $data;
     }
 
+    protected function handleRecordCreation(array $data): Model
+    {
+        // Buat product terlebih dahulu
+        $product = Product::create($data);
+
+        // Langsung buat item berdasarkan jenis product
+        if (!$product->has_variants) {
+            // Produk standard - gunakan data dari standardData
+            $this->createDefaultItem($product);
+        } else {
+            // Produk dengan varian - buat placeholder
+            $this->createPlaceholderItem($product);
+        }
+
+        return $product;
+    }
+
     protected function afterCreate(): void
     {
-        // Observer sudah handle pembuatan item default
-        // Cleanup session data jika masih ada
-        session()->forget('product_form_data');
+        // Tidak perlu lagi karena sudah ditangani di handleRecordCreation
+    }
+
+    /**
+     * Create default item for non-variant product
+     */
+    private function createDefaultItem($product): void
+    {
+        Item::create([
+            'product_id' => $product->id,
+            'name' => '', // Empty string untuk produk standard
+            'sku' => $this->standardData['standard_sku'] ?? $this->generateDefaultSKU($product),
+            'unit' => $this->standardData['standard_unit'] ?? 'Pcs',
+            'purchase_price' => $this->standardData['standard_purchase_price'] ?? 0,
+            'selling_price' => $this->standardData['standard_selling_price'] ?? 0,
+            'stock' => $this->standardData['standard_stock'] ?? 0,
+            'target_child_item_id' => null,
+            'conversion_value' => null,
+        ]);
+    }
+
+    /**
+     * Create placeholder item for variant product without variants
+     */
+    private function createPlaceholderItem($product): void
+    {
+        Item::create([
+            'product_id' => $product->id,
+            'name' => 'Belum Ada Varian',
+            'sku' => $this->generateDefaultSKU($product) . '-TEMP',
+            'unit' => 'Pcs',
+            'purchase_price' => 0,
+            'selling_price' => 0,
+            'stock' => 0,
+            'target_child_item_id' => null,
+            'conversion_value' => null,
+        ]);
+    }
+
+    /**
+     * Generate default SKU if not provided
+     */
+    private function generateDefaultSKU($product): string
+    {
+        $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
+        return $productCode . '-STD';
     }
 }

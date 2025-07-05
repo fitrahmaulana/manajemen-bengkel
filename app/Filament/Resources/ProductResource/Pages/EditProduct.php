@@ -6,6 +6,7 @@ use App\Filament\Resources\ProductResource;
 use App\Models\Item;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
+use Illuminate\Database\Eloquent\Model;
 
 class EditProduct extends EditRecord
 {
@@ -45,7 +46,7 @@ class EditProduct extends EditRecord
 
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        // Simpan data form original untuk afterSave
+        // Simpan data form original untuk handleRecordUpdate
         $this->originalFormData = $data;
 
         // Remove form fields yang tidak ada di tabel products
@@ -58,10 +59,20 @@ class EditProduct extends EditRecord
         return $data;
     }
 
-    protected function afterSave(): void
+    protected function handleRecordUpdate(Model $record, array $data): Model
+    {
+        // Update product terlebih dahulu
+        $record->update($data);
+
+        // Kemudian handle items berdasarkan perubahan
+        $this->handleItemsAfterProductUpdate($record);
+
+        return $record;
+    }
+
+    private function handleItemsAfterProductUpdate($product): void
     {
         $data = $this->originalFormData; // Gunakan data form original
-        $product = $this->record;
 
         // Auto-generate product code untuk SKU
         $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
@@ -81,12 +92,14 @@ class EditProduct extends EditRecord
 
             Item::create([
                 'product_id' => $product->id,
-                'name' => $product->name,
+                'name' => '', // Empty string untuk produk standard
                 'sku' => $sku,
                 'unit' => $data['standard_unit'] ?? 'Pcs',
                 'purchase_price' => $data['standard_purchase_price'] ?? 0,
                 'selling_price' => $data['standard_selling_price'] ?? 0,
                 'stock' => $data['standard_stock'] ?? 0,
+                'target_child_item_id' => null,
+                'conversion_value' => null,
             ]);
         }
     }
