@@ -56,4 +56,25 @@ class Item extends Model
     {
         return $this->hasMany(Item::class, 'target_child_item_id');
     }
+
+    /**
+     * Get the display name for this item (product name + variant if applicable)
+     */
+    public function getDisplayNameAttribute(): string
+    {
+        if (!$this->product) {
+            return 'Unknown Product';
+        }
+
+        $productName = $this->product->name;
+        $variantName = $this->name;
+
+        // Jika produk tanpa varian (name kosong atau null), tampilkan hanya nama produk
+        if (empty($variantName) || is_null($variantName)) {
+            return $productName;
+        }
+
+        // Jika produk dengan varian, tampilkan nama produk + varian
+        return $productName . ' ' . $variantName;
+    }
 }

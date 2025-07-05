@@ -24,8 +24,21 @@ class ViewInvoice extends ViewRecord
 
     protected $listeners = [
         'refresh' => '$refresh',
-    ];    // Infolist definition moved from InvoiceResource to here
+    ];
 
+    // Override the record retrieval to include necessary relations
+    public function getRecord(): \Illuminate\Database\Eloquent\Model
+    {
+        return parent::getRecord()->load([
+            'customer',
+            'vehicle',
+            'services',
+            'items.product', // This is the key addition - eager load product relation
+            'payments'
+        ]);
+    }
+
+    // Infolist definition moved from InvoiceResource to here
     public function infolist(Infolist $infolist): Infolist
     {
         return $infolist
@@ -80,12 +93,9 @@ class ViewInvoice extends ViewRecord
                         Infolists\Components\RepeatableEntry::make('items')
                             ->hiddenLabel()
                             ->schema([
-                                Infolists\Components\TextEntry::make('name')->label('Nama Barang')->weight('bold')
-                                ->formatStateUsing(function ($record) {
-                                    // Menampilkan nama produk + varian + SKU
-                                    $displayName = $record->product->name . ' ' . $record->name;
-                                    return $displayName;
-                                })
+                                Infolists\Components\TextEntry::make('display_name')
+                                    ->label('Nama Barang')
+                                    ->weight('bold')
                                 ->columnSpan(2),
                                 Infolists\Components\TextEntry::make('pivot.quantity')
                                     ->label('Kuantitas')

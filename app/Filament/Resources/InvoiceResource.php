@@ -180,7 +180,20 @@ class InvoiceResource extends Resource
                         if (!$item) {
                             return 'Item tidak ditemukan';
                         }
-                        return $item->product->name . ' ' . $item->name . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
+
+                        // Menampilkan nama produk + varian (jika ada) + info stok
+                        $productName = $item->product->name;
+                        $variantName = $item->name;
+
+                        // Untuk produk tanpa varian (name kosong), tampilkan hanya nama produk
+                        if (empty($variantName)) {
+                            $displayName = $productName;
+                        } else {
+                            // Untuk produk dengan varian, tampilkan nama produk + varian
+                            $displayName = $productName . ' ' . $variantName;
+                        }
+
+                        return $displayName . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
                     })
                     ->schema([
                         Forms\Components\Group::make()->schema([
@@ -192,8 +205,18 @@ class InvoiceResource extends Resource
                                         ->with(['product'])
                                         ->get()
                                         ->mapWithKeys(function ($item) {
-                                            // Menampilkan nama produk + varian + SKU
-                                            $displayName = $item->product->name . ' ' . $item->name;
+                                            // Menampilkan nama produk + varian (jika ada) + SKU
+                                            $productName = $item->product->name;
+                                            $variantName = $item->name;
+
+                                            // Untuk produk tanpa varian (name kosong), tampilkan hanya nama produk
+                                            if (empty($variantName)) {
+                                                $displayName = $productName;
+                                            } else {
+                                                // Untuk produk dengan varian, tampilkan nama produk + varian
+                                                $displayName = $productName . ' ' . $variantName;
+                                            }
+
                                             $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
                                             return [$item->id => $displayName . $skuInfo];
                                         });
