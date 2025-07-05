@@ -272,6 +272,12 @@ class ViewInvoice extends ViewRecord
                     $livewire->dispatch('refresh');
                 }),
             Actions\EditAction::make()->label('Edit Faktur')->icon('heroicon-o-pencil'),
+            Actions\Action::make('printInvoice')
+                ->label('Cetak Faktur')
+                ->icon('heroicon-o-printer')
+                ->color('info')
+                ->url(fn (Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
+                ->openUrlInNewTab(),
             Actions\DeleteAction::make()->label('Hapus Faktur')->icon('heroicon-o-trash'),
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make(),

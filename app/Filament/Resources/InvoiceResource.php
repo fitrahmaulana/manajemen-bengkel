@@ -506,6 +506,15 @@ class InvoiceResource extends Resource
             'create' => Pages\CreateInvoice::route('/create'),
             'edit' => Pages\EditInvoice::route('/{record}/edit'),
             'view' => Pages\ViewInvoice::route('/{record}'),
+            // Removed the print route from here as it's a web route now
         ];
+    }
+
+    // Method to handle printing the invoice
+    public function printInvoice(Invoice $record)
+    {
+        // Eager load relationships to prevent N+1 queries in the Blade view
+        $record->load(['customer', 'vehicle', 'services', 'items.product']);
+        return view('filament.resources.invoices.print', ['invoice' => $record]);
     }
 }
