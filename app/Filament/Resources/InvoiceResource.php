@@ -488,6 +488,7 @@ class InvoiceResource extends Resource
                         'overdue' => 'danger',
                     })->searchable(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
+                Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
                 Tables\Columns\TextColumn::make('due_date')->label('Jatuh Tempo')->date('d M Y')->sortable(),
             ])
             ->filters([
