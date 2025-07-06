@@ -14,10 +14,12 @@ use Filament\Forms\Components\Placeholder;
 use Filament\Forms\Components\Hidden;
 use App\Models\Payment;
 use App\Models\Invoice;
+use Filament\Forms\Components\ToggleButtons;
 use Filament\Notifications\Notification;
 use Illuminate\Validation\ValidationException;
 use Filament\Infolists\Infolist; // Added for infolist method
 use Filament\Infolists; // Added for components namespace
+use Filament\Support\Enums\MaxWidth;
 
 class ViewInvoice extends ViewRecord
 {
@@ -97,7 +99,7 @@ class ViewInvoice extends ViewRecord
                                 Infolists\Components\TextEntry::make('display_name')
                                     ->label('Nama Barang')
                                     ->weight('bold')
-                                ->columnSpan(2),
+                                    ->columnSpan(2),
                                 Infolists\Components\TextEntry::make('pivot.quantity')
                                     ->label('Kuantitas')
                                     ->formatStateUsing(function ($record) {
@@ -180,12 +182,12 @@ class ViewInvoice extends ViewRecord
                 ->icon('heroicon-o-currency-dollar')
                 ->color('success')
                 ->visible(fn(Invoice $record): bool => $record->balance_due > 0)
-                ->modalHeading('💰 Kalkulator Pembayaran & Kembalian')
+                ->modalHeading('Pembayaran & Kembalian')
                 ->modalDescription('Masukkan jumlah uang yang diterima. Kembalian akan dihitung otomatis.')
                 ->modalSubmitActionLabel('💾 Catat Pembayaran')
-                ->modalWidth('lg')
+                ->modalWidth(MaxWidth::Large) // Set modal width to Large
                 ->form([
-                    DatePicker::make('payment_date')
+                    Hidden::make('payment_date')
                         ->label('Tanggal Pembayaran')
                         ->default(now())
                         ->required(),
@@ -195,7 +197,7 @@ class ViewInvoice extends ViewRecord
                         ->label('Total Tagihan')
                         ->content(fn(ViewRecord $livewire) => '🧾 Rp. ' . number_format($livewire->record->balance_due, 0, ',', '.'))
                         ->extraAttributes([
-                            'class' => 'bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-700 font-bold text-xl',
+                            'class' => 'border border-200 rounded-lg p-3 font-bold ',
                             'style' => 'margin: 8px 0;'
                         ]),
 
@@ -206,7 +208,6 @@ class ViewInvoice extends ViewRecord
                         ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                         ->required()
                         ->minValue(1)
-                        ->default(fn(ViewRecord $livewire) => $livewire->record->balance_due)
                         ->helperText('Masukkan jumlah uang tunai yang diterima dari pelanggan')
                         ->live(debounce: 300) // Real-time calculation dengan debounce
                         ->afterStateUpdated(function ($state, $set, ViewRecord $livewire) {
@@ -226,66 +227,87 @@ class ViewInvoice extends ViewRecord
                             }
                         }),
 
+                    ToggleButtons::make('quick_payment_options')
+                        ->label('Pilihan Cepat Pembayaran')
+                        ->helperText('Klik salah satu tombol untuk mengisi jumlah bayar secara otomatis.')
+                        ->live() // Wajib agar bisa berinteraksi dengan field lain
+                        ->afterStateUpdated(fn($state, $set) => $set('amount_paid', $state)) // Mengisi field 'amount_paid'
+                        ->options(function (ViewRecord $livewire): array {
+                            $totalBill = $livewire->record->balance_due;
+                            if (!$totalBill) {
+                                return [];
+                            }
+
+                            $options = [];
+                            $suggestions = [];
+
+                            // 1. Opsi Uang Pas
+                            $options[(string)$totalBill] = '💰 Uang Pas';
+
+                            // 2. Daftar pembulatan umum
+                            $roundingBases = [10000, 20000, 50000, 100000];
+
+                            foreach ($roundingBases as $base) {
+                                // Jangan tampilkan saran yang lebih kecil dari tagihan
+                                if ($base < $totalBill) {
+                                    $suggestion = ceil($totalBill / $base) * $base;
+
+                                    if ($suggestion <= $totalBill) {
+                                        $suggestion += $base;
+                                    }
+
+                                    // Batasi saran agar tidak terlalu jauh (misal: tagihan 12rb, jangan sarankan 100rb)
+                                    if ($suggestion < $totalBill * 2.5 && $suggestion < 1000000) {
+                                        $suggestions[] = $suggestion;
+                                    }
+                                }
+                            }
+
+                            // Tambahkan juga pembulatan ke 100rb terdekat jika tagihan besar
+                            if ($totalBill > 50000) {
+                                $suggestions[] = ceil($totalBill / 100000) * 100000;
+                            }
+
+                            // 3. Saring hasil dan ambil 3 terbaik
+                            $uniqueSuggestions = array_unique($suggestions);
+                            sort($uniqueSuggestions);
+
+                            $finalSuggestions = array_slice($uniqueSuggestions, 0, 3);
+
+                            foreach ($finalSuggestions as $s) {
+                                if ($s != $totalBill) {
+                                    $options[(string)$s] = '💵 Rp. ' . number_format($s, 0, ',', '.');
+                                }
+                            }
+
+                            return $options;
+                        })
+                        ->columns(4), // Atur jumlah kolom tombol
+
                     // Kalkulator Kembalian - Real-time
                     Placeholder::make('kembalian_calculator')
                         ->label('Kembalian')
                         ->content(function ($get, ViewRecord $livewire) {
                             $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
                             $balanceDue = $livewire->record->balance_due;
-                            $change = max(0, $amountPaid - $balanceDue);
-
-                            if ($change > 0) {
-                                return '💰 Rp. ' . number_format($change, 0, ',', '.');
-                            } else {
-                                return '💰 Rp. 0';
-                            }
-                        })
-                        ->extraAttributes([
-                            'class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-2xl text-center',
-                            'style' => 'margin: 12px 0;'
-                        ]),
-
-                    // Status pembayaran untuk memberikan feedback visual
-                    Placeholder::make('payment_status_display')
-                        ->label('')
-                        ->content(function ($get, ViewRecord $livewire) {
-                            $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
-                            $balanceDue = $livewire->record->balance_due;
-
-                            if ($amountPaid > $balanceDue) {
-                                $overpayment = $amountPaid - $balanceDue;
-                                return '✅ Pembayaran berlebih - Kembalikan: Rp. ' . number_format($overpayment, 0, ',', '.');
-                            } elseif ($amountPaid == $balanceDue) {
-                                return '✅ Pembayaran pas - Tidak ada kembalian';
-                            } elseif ($amountPaid > 0) {
-                                $remaining = $balanceDue - $amountPaid;
-                                return '⚠️ Pembayaran kurang - Sisa: Rp. ' . number_format($remaining, 0, ',', '.');
-                            } else {
-                                return '⏳ Menunggu input jumlah pembayaran...';
-                            }
+                            $change = $amountPaid - $balanceDue;
+                            return '💵 Rp. ' . number_format($change, 0, ',', '.');
                         })
                         ->extraAttributes(function ($get, ViewRecord $livewire) {
                             $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
                             $balanceDue = $livewire->record->balance_due;
 
-                            if ($amountPaid > $balanceDue) {
-                                // Overpayment - green
-                                return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-3 text-green-700 font-semibold text-lg'];
-                            } elseif ($amountPaid == $balanceDue) {
-                                // Exact payment - blue
-                                return ['class' => 'bg-blue-50 border border-blue-200 rounded-lg p-3 text-blue-700 font-semibold text-lg'];
-                            } elseif ($amountPaid > 0) {
-                                // Underpayment - yellow
-                                return ['class' => 'bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-yellow-700 font-semibold text-lg'];
+                            if ($amountPaid >= $balanceDue && $amountPaid > 0) {
+                                // Overpayment or exact payment - green
+                                return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
+                            } elseif ($amountPaid > 0 && $amountPaid < $balanceDue) {
+                                // Underpayment - red
+                                return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                             } else {
                                 // Waiting for input - gray
-                                return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 font-semibold text-lg'];
+                                return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                             }
                         }),
-
-                    // Hidden fields untuk menyimpan state
-                    Hidden::make('change_amount'),
-                    Hidden::make('payment_status'),
 
                     Select::make('payment_method')
                         ->label('Metode Pembayaran')
@@ -375,7 +397,6 @@ class ViewInvoice extends ViewRecord
                             ->body('Jumlah: Rp. ' . number_format($amountPaid, 0, ',', '.') . ' via ' . strtoupper($data['payment_method']))
                             ->success()
                             ->send();
-
                     } catch (\Exception $e) {
                         Notification::make()
                             ->title('❌ Kesalahan Mencatat Pembayaran')
@@ -392,7 +413,7 @@ class ViewInvoice extends ViewRecord
                 ->label('Cetak Faktur')
                 ->icon('heroicon-o-printer')
                 ->color('info')
-                ->url(fn (Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
+                ->url(fn(Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
                 ->openUrlInNewTab(),
             Actions\DeleteAction::make()->label('Hapus Faktur')->icon('heroicon-o-trash'),
             Actions\ForceDeleteAction::make(),
