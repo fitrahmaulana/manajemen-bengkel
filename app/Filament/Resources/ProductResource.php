@@ -38,15 +38,8 @@ class ProductResource extends Resource
                             ->placeholder('Contoh: Oli Mesin Castrol GTX')
                             ->required()
                             ->helperText('Nama umum produk (tanpa spesifikasi ukuran)')
-                            ->live(onBlur: true)
-                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
-                                // Auto-generate SKU untuk produk standard
-                                if ($state && !$get('has_variants') && !$get('standard_sku')) {
-                                    $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $state), 0, 6));
-                                    $sku = $productCode . '-STD';
-                                    $set('standard_sku', $sku);
-                                }
-                            }),
+                            ->live(onBlur: true),
+                            // Removed afterStateUpdated that set 'standard_sku' as the field is removed
 
                         Forms\Components\TextInput::make('brand')
                             ->label('Merek')
@@ -73,341 +66,100 @@ class ProductResource extends Resource
                         Forms\Components\Checkbox::make('has_variants')
                             ->label('Produk ini memiliki varian')
                             ->helperText('Centang jika produk memiliki beberapa varian. Detail produk akan disembunyikan dan varian akan dikelola melalui tab "Daftar Varian".')
-                            ->live(),
+                            ->live()
+                            ->helperText('Jika dicentang, varian dikelola di tab "Daftar Varian". Jika tidak, produk ini dianggap sebagai item tunggal yang juga dikelola di "Daftar Varian".'),
                     ]),
 
-                // Form untuk produk tanpa varian (standard)
-                Forms\Components\Section::make('Detail Produk')
-                    ->description('Isi detail harga dan stok untuk produk standard')
+                Forms\Components\Section::make('Pengelolaan Varian/Item')
+                    ->description('Semua detail varian atau item tunggal (termasuk SKU, harga, dan stok) dikelola melalui tab "Daftar Varian" di halaman detail/edit produk setelah produk ini disimpan.')
                     ->schema([
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('standard_sku')
-                                    ->label('Kode Barang')
-                                    ->placeholder('Akan otomatis terisi')
-                                    ->helperText('Kode unik untuk produk ini'),
-                                Forms\Components\Select::make('standard_unit')
-                                    ->label('Satuan')
-                                    ->options([
-                                        'Pcs' => 'Pcs',
-                                        'Botol' => 'Botol',
-                                        'Galon' => 'Galon',
-                                        'Liter' => 'Liter',
-                                        'Ml' => 'Ml',
-                                        'Set' => 'Set',
-                                        'Drum' => 'Drum',
-                                    ])
-                                    ->default('Pcs'),
-                            ]),
-                        Forms\Components\Grid::make(2)
-                            ->schema([
-                                Forms\Components\TextInput::make('standard_purchase_price')
-                                    ->label('Harga Beli')
-                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                    ->prefix('Rp'),
-                                Forms\Components\TextInput::make('standard_selling_price')
-                                    ->label('Harga Jual')
-                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                    ->prefix('Rp'),
-                            ]),
-                        Forms\Components\TextInput::make('standard_stock')
-                            ->label('Stok')
-                            ->numeric()
-                            ->default(0),
-                    ])
-                    ->visible(fn(Forms\Get $get): bool => !$get('has_variants')),
-
-                // Info untuk produk dengan varian
-                Forms\Components\Section::make('Informasi Varian')
-                    ->description('Varian produk akan dikelola melalui tab "Daftar Varian" setelah produk disimpan')
-                    ->schema([
-                        Forms\Components\Placeholder::make('variant_info')
+                        Forms\Components\Placeholder::make('manage_items_info')
                             ->label('')
-                            ->content('Setelah menyimpan produk, Anda dapat menambah dan mengelola varian melalui tab "Daftar Varian" di halaman detail produk.')
-                            ->columnSpanFull(),
+                            ->content('Navigasi ke tab "Daftar Varian" untuk menambahkan atau mengubah detail item/varian.'),
                     ])
-                    ->visible(fn(Forms\Get $get): bool => $get('has_variants')),
             ]);
     }
 
     public static function table(Table $table): Table
     {
         return $table
-            ->query(
-                \App\Models\Item::query()
-                    ->join('products', 'items.product_id', '=', 'products.id')
-                    ->join('type_items', 'products.type_item_id', '=', 'type_items.id')
-                    ->with(['product', 'product.typeItem'])
-                    ->select('items.*') // Pastikan kita hanya select kolom dari items untuk menghindari konflik
-            )
-            ->heading('Daftar Varian Produk')
-            ->description('Semua varian produk dalam satu tampilan untuk memudahkan kasir melihat harga dan stok. Jika produk memiliki varian tapi tidak muncul, pastikan sudah menambahkan varian di halaman detail produk.')
+            ->query(Product::query()) // Changed to Product Query
+            ->heading('Daftar Produk')
+            ->description('Pengelolaan produk induk. Varian untuk setiap produk dapat dikelola di halaman detail produk.')
             ->columns([
-                Tables\Columns\TextColumn::make('product_name_with_variant')
+                Tables\Columns\TextColumn::make('name')
                     ->label('Nama Produk')
-                    ->searchable(['products.name', 'products.brand', 'items.name'])
-                    ->sortable(['products.name'])
+                    ->searchable()
+                    ->sortable()
                     ->weight('bold')
-                    ->getStateUsing(function ($record) {
-                        $productName = $record->product->name;
-                        $variant = $record->name;
-
-                        if ($variant && $variant !== 'Belum Ada Varian') {
-                            return $productName . ' - ' . $variant;
-                        } elseif ($variant === 'Belum Ada Varian') {
-                            return $productName . ' (⚠️ Belum Ada Varian)';
-                        }
-
-                        return $productName;
-                    })
-                    ->description(fn($record) => $record->product->brand ? "Merek: {$record->product->brand}" : null)
-                    ->color(fn($record) => $record->name === 'Belum Ada Varian' ? 'warning' : null),
-
-                Tables\Columns\TextColumn::make('sku')
-                    ->label('SKU')
-                    ->searchable(['items.sku'])
-                    ->copyable()
-                    ->copyMessage('SKU berhasil disalin')
-                    ->fontFamily('mono')
-                    ->badge(fn($record) => str_ends_with($record->sku, '-TEMP'))
-                    ->color(fn($record) => str_ends_with($record->sku, '-TEMP') ? 'warning' : 'gray'),
-
-                Tables\Columns\TextColumn::make('product.typeItem.name')
+                    ->description(fn(Product $record): string => $record->brand ? "Merek: {$record->brand}" : ''),
+                Tables\Columns\TextColumn::make('typeItem.name')
                     ->label('Kategori')
-                    ->searchable(['type_items.name'])
-                    ->sortable(['type_items.name'])
+                    ->searchable()
+                    ->sortable()
                     ->badge()
-                    ->color('success')
-                    ->formatStateUsing(fn($state) => $state ?: 'Tidak Ada Kategori')
-                    ->color(fn($state) => $state ? 'success' : 'danger'),
-
-                Tables\Columns\TextColumn::make('selling_price')
-                    ->label('Harga Jual')
-                    ->currency('IDR')
-                    ->sortable(['items.selling_price'])
-                    ->weight('bold')
                     ->color('success'),
-
-                Tables\Columns\TextColumn::make('stock')
-                    ->label('Stok')
-                    ->alignCenter()
-                    ->sortable(['items.stock'])
-                    ->badge()
-                    ->color(fn($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
-                    ->formatStateUsing(fn($state, $record) => $state . ' ' . $record->unit),
-
-                Tables\Columns\IconColumn::make('is_convertible')
-                    ->label('Bisa Dipecah')
+                Tables\Columns\IconColumn::make('has_variants')
+                    ->label('Memiliki Varian')
                     ->boolean()
-                    ->alignCenter()
-                    ->toggleable()
                     ->trueIcon('heroicon-o-check-circle')
-                    ->falseIcon('heroicon-o-x-circle')
-                    ->trueColor('success')
-                    ->falseColor('gray'),
+                    ->falseIcon('heroicon-o-x-circle'),
+                Tables\Columns\TextColumn::make('items_count')
+                    ->counts('items') // Show number of variants
+                    ->label('Jumlah Varian')
+                    ->sortable(),
+                Tables\Columns\TextColumn::make('description')
+                    ->label('Deskripsi')
+                    ->searchable()
+                    ->toggleable(isToggledHiddenByDefault: true)
+                    ->limit(50)
+                    ->tooltip(fn (Product $record): ?string => $record->description),
+                Tables\Columns\TextColumn::make('created_at')
+                    ->label('Tanggal Dibuat')
+                    ->dateTime()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
             ])
-            ->groups([
-                Tables\Grouping\Group::make('product.typeItem.name')
-                    ->label('Kategori')
-                    ->collapsible(),
-                Tables\Grouping\Group::make('product.name')
-                    ->label('Produk')
-                    ->collapsible(),
-            ])
-            ->defaultGroup('product.typeItem.name')
             ->filters([
-                Tables\Filters\SelectFilter::make('product.type_item_id')
+                Tables\Filters\SelectFilter::make('type_item_id')
                     ->label('Kategori')
-                    ->relationship('product.typeItem', 'name'),
-
-                Tables\Filters\SelectFilter::make('product_id')
-                    ->label('Produk')
-                    ->relationship('product', 'name')
+                    ->relationship('typeItem', 'name')
                     ->searchable()
                     ->preload(),
-
-                Tables\Filters\Filter::make('has_variants')
-                    ->label('Jenis Produk')
-                    ->form([
-                        Forms\Components\Select::make('variant_type')
-                            ->label('Jenis')
-                            ->options([
-                                'with_variants' => 'Dengan Varian',
-                                'without_variants' => 'Tanpa Varian',
-                            ])
-                            ->placeholder('Semua Jenis'),
-                    ])
-                    ->query(function ($query, array $data) {
-                        if ($data['variant_type'] === 'with_variants') {
-                            $query->whereHas('product', function ($q) {
-                                $q->where('has_variants', true);
-                            });
-                        } elseif ($data['variant_type'] === 'without_variants') {
-                            $query->whereHas('product', function ($q) {
-                                $q->where('has_variants', false);
-                            });
-                        }
-                    }),
-
-                Tables\Filters\Filter::make('stock_status')
-                    ->label('Status Stok')
-                    ->form([
-                        Forms\Components\Select::make('stock_type')
-                            ->label('Status')
-                            ->options([
-                                'available' => 'Tersedia (>20)',
-                                'low_stock' => 'Stok Menipis (1-20)',
-                                'out_of_stock' => 'Habis (0)',
-                            ])
-                            ->placeholder('Semua Status'),
-                    ])
-                    ->query(function ($query, array $data) {
-                        if ($data['stock_type'] === 'available') {
-                            $query->where('items.stock', '>', 20);
-                        } elseif ($data['stock_type'] === 'low_stock') {
-                            $query->where('items.stock', '>', 0)->where('items.stock', '<=', 20);
-                        } elseif ($data['stock_type'] === 'out_of_stock') {
-                            $query->where('items.stock', '<=', 0);
-                        }
-                    }),
-
-                Tables\Filters\Filter::make('convertible')
-                    ->label('Bisa Dipecah')
-                    ->query(fn($query) => $query->where('items.target_child_item_id', '!=', null)),
-
-                Tables\Filters\Filter::make('missing_variants')
-                    ->label('Belum Ada Varian')
-                    ->query(fn($query) => $query->where('items.name', 'Belum Ada Varian'))
-                    ->toggle(),
+                Tables\Filters\TernaryFilter::make('has_variants')
+                    ->label('Memiliki Varian')
+                    ->boolean()
+                    ->trueLabel('Ya')
+                    ->falseLabel('Tidak')
+                    ->native(false),
             ])
             ->actions([
-                Tables\Actions\Action::make('addVariants')
-                    ->label('Tambah Varian')
-                    ->icon('heroicon-o-plus')
-                    ->color('warning')
-                    ->visible(fn($record) => $record->name === 'Belum Ada Varian')
-                    ->url(fn($record) => static::getUrl('view', ['record' => $record->product_id]) . '#items')
-                    ->tooltip('Produk ini memiliki varian tapi belum ada varian yang ditambahkan'),
-
-                Tables\Actions\Action::make('viewItem')
-                    ->label('Detail Varian')
-                    ->icon('heroicon-o-eye')
-                    ->color('info')
-                    ->visible(fn($record) => $record->name !== 'Belum Ada Varian')
-                    ->infolist([
-                        InfolistSection::make('Informasi Varian')
-                            ->schema([
-                                TextEntry::make('product_name_with_variant')
-                                    ->label('Nama Produk')
-                                    ->getStateUsing(function ($record) {
-                                        $productName = $record->product->name;
-                                        $variant = $record->name;
-
-                                        if ($variant) {
-                                            return $productName . ' - ' . $variant;
-                                        }
-
-                                        return $productName;
-                                    }),
-                                TextEntry::make('sku')
-                                    ->label('SKU'),
-                                TextEntry::make('product.typeItem.name')
-                                    ->label('Kategori'),
-                                TextEntry::make('purchase_price')
-                                    ->label('Harga Beli')
-                                    ->money('IDR'),
-                                TextEntry::make('selling_price')
-                                    ->label('Harga Jual')
-                                    ->money('IDR'),
-                                TextEntry::make('stock')
-                                    ->label('Stok')
-                                    ->formatStateUsing(fn($state, $record) => $state . ' ' . $record->unit),
-                                TextEntry::make('is_convertible')
-                                    ->label('Bisa Dipecah')
-                                    ->formatStateUsing(fn($state) => $state ? 'Ya' : 'Tidak'),
-                            ])
-                            ->columns(2),
-                    ])
-                    ->modalSubmitAction(false)
-                    ->modalCancelActionLabel('Tutup'),
-
-                Tables\Actions\Action::make('viewProduct')
-                    ->label('Detail Produk')
-                    ->icon('heroicon-o-document-text')
-                    ->color('warning')
-                    ->url(fn($record) => static::getUrl('view', ['record' => $record->product_id]))
-                    ->openUrlInNewTab(),
-
-                Tables\Actions\Action::make('editProduct')
-                    ->label('Edit Produk')
-                    ->icon('heroicon-o-pencil')
-                    ->color('primary')
-                    ->url(fn($record) => static::getUrl('edit', ['record' => $record->product_id]))
-                    ->openUrlInNewTab(),
+                Tables\Actions\ViewAction::make(),
+                Tables\Actions\EditAction::make(),
+                Tables\Actions\DeleteAction::make(), // Added DeleteAction for individual records
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\BulkAction::make('updateStock')
-                        ->label('Update Stok')
-                        ->icon('heroicon-o-clipboard-document-list')
-                        ->form([
-                            Forms\Components\Select::make('action')
-                                ->label('Aksi')
-                                ->options([
-                                    'set' => 'Set Stok Menjadi',
-                                    'add' => 'Tambah Stok',
-                                    'subtract' => 'Kurangi Stok',
-                                ])
-                                ->required()
-                                ->live(),
-                            Forms\Components\TextInput::make('quantity')
-                                ->label('Jumlah')
-                                ->numeric()
-                                ->required(),
-                        ])
-                        ->action(function (array $data, Collection $records) {
-                            foreach ($records as $record) {
-                                $newStock = match ($data['action']) {
-                                    'set' => $data['quantity'],
-                                    'add' => $record->stock + $data['quantity'],
-                                    'subtract' => max(0, $record->stock - $data['quantity']),
-                                };
-                                $record->update(['stock' => $newStock]);
-                            }
-                        })
-                        ->deselectRecordsAfterCompletion(),
-
                     Tables\Actions\DeleteBulkAction::make(),
                 ]),
             ])
-            ->recordUrl(null)
-            ->emptyStateHeading('Belum ada varian produk')
-            ->emptyStateDescription('Tambahkan produk dan varian untuk bengkel Anda. Jika produk memiliki varian, pastikan untuk menambahkan varian melalui tab "Daftar Varian" di halaman detail produk.')
+            ->emptyStateHeading('Belum ada produk')
+            ->emptyStateDescription('Tambahkan produk untuk bengkel Anda.')
             ->emptyStateIcon('heroicon-o-cube-transparent')
             ->emptyStateActions([
-                Tables\Actions\Action::make('create')
-                    ->label('Buat Produk Baru')
-                    ->url(route('filament.admin.resources.products.create'))
-                    ->icon('heroicon-m-plus'),
+                Tables\Actions\CreateAction::make(), // Changed to standard CreateAction
             ])
             ->headerActions([
-                Tables\Actions\Action::make('create')
-                    ->label('Fix Missing Variants')
-                    ->icon('heroicon-m-plus')
-                    ->color('danger')
-                    ->action(
-                        function () {
-                            Artisan::call('fix:missing-variants');
-                            Notification::make()
-                                ->title('Proses Selesai')
-                                ->body('Berhasil memperbaiki varian yang hilang. Silakan periksa daftar produk Anda.')
-                                ->success()
-                                ->send();
-                        }
-                    ),
+                 Tables\Actions\CreateAction::make(), // Added standard CreateAction to header
             ]);
     }
 
+    public static function getRelations(): array
+    {
+        return [
+            ProductResource\RelationManagers\ItemsRelationManager::class,
+        ];
+    }
 
     public static function getPages(): array
     {

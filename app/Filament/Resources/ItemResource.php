@@ -3,7 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ItemResource\Pages;
-use App\Filament\Resources\ProductResource\RelationManagers\ItemsRelationManager;
+// use App\Filament\Resources\ProductResource\RelationManagers\ItemsRelationManager; // No longer directly needed here
 use App\Models\Item;
 use Dom\Text;
 use Filament\Forms;
@@ -47,7 +47,7 @@ class ItemResource extends Resource
                     ->description('Masukkan detail barang yang akan ditambahkan ke inventory')
                     ->schema([
                         Forms\Components\Select::make('product_id')
-                            ->hiddenOn(ItemsRelationManager::class)
+                            // ->hiddenOn(ItemsRelationManager::class) // This is no longer relevant as RM has its own form
                             ->label('Nama Barang')
                             ->placeholder('Cari atau buat barang baru')
                             ->relationship('product', 'name')

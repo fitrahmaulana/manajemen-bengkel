@@ -1,121 +1,37 @@
-# PRODUCT RESOURCE REFACTOR - MENAMPILKAN VARIAN PRODUK
+# PRODUCT RESOURCE REFACTOR - Conventional Structure
 
-## Tujuan
-Mengubah tampilan tabel ProductResource agar menampilkan semua varian produk (Item) sebagai baris terpisah, sehingga kasir dapat dengan mudah melihat semua produk dan variannya dalam satu tampilan.
+## Tujuan Awal (Historis)
+Dokumen ini awalnya mendeskripsikan refactor `ProductResource` untuk menampilkan semua varian produk (`Item`) sebagai baris terpisah dalam tabel utama `ProductResource`. Tujuannya adalah agar kasir dapat dengan mudah melihat semua produk dan variannya dalam satu tampilan.
 
-## Perubahan yang Dilakukan
+## Perubahan Struktur (Saat Ini)
+Berdasarkan feedback bahwa pendekatan awal (menampilkan `Item` di tabel `ProductResource`) tidak konvensional dan membingungkan, struktur telah diubah kembali ke pendekatan yang lebih standar di Filament:
 
-### 1. Query Tabel
-- **Sebelum**: Menggunakan `Product::query()` yang menampilkan hanya produk induk
-- **Sesudah**: Menggunakan `Item::query()` yang menampilkan semua varian sebagai baris terpisah
-- **Dengan**: Eager loading untuk relasi `product` dan `product.typeItem`
+1.  **`ProductResource` Utama:**
+    *   Sekarang menampilkan daftar `Product` (produk induk) pada tabel utamanya.
+    *   Kolom-kolom tabel fokus pada informasi produk induk seperti nama produk, merek, kategori, dan apakah produk tersebut memiliki varian.
+    *   Formulir untuk membuat/mengedit `Product` kini hanya berisi field untuk informasi produk induk (`name`, `brand`, `description`, `type_item_id`, `has_variants`).
 
-### 2. Kolom Tabel
-Menampilkan kolom-kolom berikut:
+2.  **`ItemsRelationManager`:**
+    *   Sebuah `RelationManager` baru bernama `ItemsRelationManager` telah ditambahkan (atau dikonfigurasi ulang jika sudah ada) di dalam `ProductResource`.
+    *   Relation manager ini muncul di halaman lihat/edit `Product`.
+    *   Bertanggung jawab untuk menampilkan, membuat, dan mengedit `Item` (varian) yang terkait dengan produk induk tersebut.
+    *   Jika produk induk ditandai `has_variants = false` (item tunggal), relation manager ini akan mengelola satu `Item` saja. Jika `has_variants = true`, bisa ada banyak `Item`.
+    *   Formulir dan tabel di dalam relation manager ini fokus pada detail `Item` seperti spesifikasi/ukuran varian, SKU, harga beli/jual, dan stok.
 
-#### Kolom Utama (Selalu Terlihat)
-- **Nama Produk**: Dari `product.name` dengan deskripsi merek
-- **Varian**: Dari `name` Item (menampilkan "Standard" jika kosong)
-- **SKU**: Kode unik varian yang bisa disalin
-- **Kategori**: Dari `product.typeItem.name` dengan badge hijau
-- **Harga Jual**: Formatted dalam rupiah dengan warna hijau
-- **Stok**: Dengan badge warna (hijau >20, kuning 1-20, merah 0)
-- **Bisa Dipecah**: Icon check/x untuk konversi item
+3.  **`ItemResource` Global:**
+    *   `ItemResource` (`app/Filament/Resources/ItemResource.php`) tetap ada dan berfungsi sebagai resource global untuk melihat dan mengelola *semua* `Item` dalam sistem, terlepas dari produk induknya. Ini bisa digunakan untuk manajemen inventaris secara keseluruhan.
 
-#### Kolom Tambahan (Dapat Disembunyikan)
-- **Harga Beli**: Untuk analisis margin
-- **Margin Profit**: Persentase keuntungan dengan badge berwarna
-- **Satuan**: Unit barang
-- **Tanggal Dibuat**: Timestamp pembuatan
+## Alasan Perubahan ke Struktur Saat Ini
+*   **Konvensi:** Mengikuti praktik standar Filament, di mana sebuah resource (`ProductResource`) mengelola model utamanya (`Product`), dan relasi dikelola melalui `RelationManager`.
+*   **Kejelasan:** Mengurangi kebingungan bagi developer dengan struktur yang lebih intuitif.
+*   **Modularitas:** Pemisahan yang lebih jelas antara manajemen produk induk dan manajemen varian/item-nya.
 
-### 3. Fitur Tabel
-
-#### Grouping
-- **Default**: Dikelompokkan berdasarkan kategori (`product.typeItem.name`)
-- **Alternatif**: Bisa dikelompokkan berdasarkan produk (`product.name`)
-
-#### Filter
-- **Kategori**: Filter berdasarkan jenis produk
-- **Produk**: Filter berdasarkan produk induk tertentu
-- **Jenis Produk**: Filter produk dengan/tanpa varian
-- **Status Stok**: Filter berdasarkan jumlah stok (tersedia/menipis/habis)
-- **Bisa Dipecah**: Filter item yang bisa dikonversi
-
-#### Search
-- **Nama Produk**: Search di nama dan merek produk
-- **Varian**: Search di nama varian
-- **SKU**: Search di kode barang
-- **Kategori**: Search di nama kategori
-
-#### Sorting
-Semua kolom utama dapat di-sort (nama produk, varian, kategori, harga, stok)
-
-### 4. Actions
-
-#### Row Actions
-- **Detail Varian**: Modal dengan informasi lengkap varian
-- **Detail Produk**: Link ke halaman detail produk induk
-- **Edit Produk**: Link ke halaman edit produk induk
-
-#### Bulk Actions
-- **Update Stok**: Mengubah stok multiple item sekaligus
-  - Set stok menjadi nilai tertentu
-  - Tambah stok
-  - Kurangi stok
-- **Delete**: Hapus multiple item terpilih
-
-### 5. User Experience
-
-#### Untuk Kasir
-- Melihat semua produk dan varian dalam satu tampilan
-- Harga jual langsung terlihat dengan format rupiah
-- Status stok dengan kode warna yang jelas
-- SKU yang mudah disalin untuk input transaksi
-- Filter cepat berdasarkan kategori dan stok
-
-#### Untuk Admin
-- Grouping berdasarkan kategori untuk organisasi yang lebih baik
-- Bulk actions untuk update stok massal
-- Filter advanced untuk analisis produk
-- Link cepat ke detail/edit produk
-
-## Keunggulan Pendekatan Ini
-
-### 1. Filament Native
-- Menggunakan 100% komponen bawaan Filament
-- Tidak ada custom blade atau JavaScript
-- Kompatibel dengan semua fitur Filament (search, sort, filter, etc.)
-
-### 2. Performance
-- Eager loading untuk menghindari N+1 queries
-- Query optimized untuk tabel besar
-- Efficient filtering dan sorting
-
-### 3. User-Friendly
-- Tampilan yang familiar untuk kasir
-- Informasi penting langsung terlihat
-- Tidak perlu navigasi ke halaman lain untuk melihat varian
-
-### 4. Maintenance
-- Kode yang bersih dan mudah dipelihara
-- Mengikuti best practices Filament
-- Mudah untuk ditambahkan fitur baru
-
-## Contoh Tampilan
-
-```
-Nama Produk      | Varian    | SKU      | Kategori | Harga Jual | Stok
-Oli Castrol GTX  | Standard  | OIL-001  | Oli      | Rp 75.000  | 25 Liter
-Oli Castrol GTX  | 1 Liter   | OIL-002  | Oli      | Rp 25.000  | 50 Botol
-Oli Castrol GTX  | 5 Liter   | OIL-003  | Oli      | Rp 120.000 | 10 Galon
-Filter Oli       | Standard  | FLT-001  | Filter   | Rp 35.000  | 0 Pcs
-```
+## User Experience Kasir
+*   Untuk melihat semua varian dari sebuah produk, kasir sekarang perlu:
+    1.  Mencari produk induk di tabel `ProductResource`.
+    2.  Masuk ke halaman lihat/edit produk tersebut.
+    3.  Melihat dan berinteraksi dengan varian/item di tab "Varian / Item Produk" (`ItemsRelationManager`).
+*   Jika kasir memerlukan tampilan flat semua item yang bisa dijual (seperti pada pendekatan lama), mereka bisa menggunakan `ItemResource` global, meskipun ini mungkin menampilkan lebih banyak detail inventaris daripada yang dibutuhkan kasir. Tampilan ini bisa disesuaikan lebih lanjut jika perlu.
 
 ## Kesimpulan
-
-Dengan perubahan ini:
-- Kasir dapat dengan mudah melihat semua produk dan varian dalam satu tampilan
-- Tidak perlu membuka halaman detail atau ekspansi untuk melihat varian
-- Semua fitur menggunakan komponen native Filament
-- Performa tetap optimal dengan query yang efisien
-- User experience yang lebih baik untuk operasional bengkel
+Perubahan ini mengembalikan `ProductResource` ke struktur yang lebih konvensional dan diharapkan lebih mudah dipahami dan dipelihara, sambil tetap menyediakan cara untuk mengelola produk dan varian/item-nya secara terstruktur.
