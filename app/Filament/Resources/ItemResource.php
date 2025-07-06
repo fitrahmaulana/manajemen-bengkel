@@ -27,10 +27,10 @@ class ItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
     protected static ?string $navigationGroup = 'Master Data';
-    protected static ?string $navigationLabel = 'Kelola Varian';
+    protected static ?string $navigationLabel = 'Varian Barang';
     protected static ?string $modelLabel = 'Varian';
-    protected static ?string $pluralModelLabel = 'Kelola Varian';
-    protected static ?int $navigationSort = 3;
+    protected static ?string $pluralModelLabel = 'Daftar Varian';
+    protected static ?int $navigationSort = 2;
 
     public static function roundUpToNearestHundred($number)
     {
