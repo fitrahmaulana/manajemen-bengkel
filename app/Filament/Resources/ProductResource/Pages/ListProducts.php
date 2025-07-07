@@ -13,7 +13,13 @@ class ListProducts extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()->label('Tambah Produk')
+                ->icon('heroicon-o-plus')
+                ->color('primary')
+                ->tooltip('Tambah produk baru')
+                ->modalHeading('Tambah Produk Baru')
+                ->modalSubmitActionLabel('Simpan Produk')
+                ->successNotificationTitle('Produk berhasil ditambahkan'),
         ];
     }
 }

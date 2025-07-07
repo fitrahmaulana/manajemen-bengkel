@@ -13,7 +13,14 @@ class ListCustomers extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Tambah Pelanggan')
+                ->icon('heroicon-o-plus')
+                ->color('primary')
+                ->tooltip('Tambah pelanggan baru')
+                ->modalHeading('Tambah Pelanggan Baru')
+                ->modalSubmitActionLabel('Simpan Pelanggan')
+                ->successNotificationTitle('Pelanggan berhasil ditambahkan'),
         ];
     }
 }

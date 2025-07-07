@@ -13,7 +13,14 @@ class ListVehicles extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Tambah Kendaraan')
+                ->icon('heroicon-o-plus')
+                ->color('primary')
+                ->tooltip('Tambah kendaraan baru')
+                ->modalHeading('Tambah Kendaraan Baru')
+                ->modalSubmitActionLabel('Simpan Kendaraan')
+                ->successNotificationTitle('Kendaraan berhasil ditambahkan'),
         ];
     }
 }

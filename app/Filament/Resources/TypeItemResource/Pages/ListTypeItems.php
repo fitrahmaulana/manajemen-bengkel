@@ -13,7 +13,14 @@ class ListTypeItems extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Tambah Kategori')
+                ->icon('heroicon-o-plus')
+                ->color('primary')
+                ->tooltip('Tambah kategori baru')
+                ->modalHeading('Tambah Kategori Baru')
+                ->modalSubmitActionLabel('Simpan Kategori')
+                ->successNotificationTitle('Kategori berhasil ditambahkan'),
         ];
     }
 }

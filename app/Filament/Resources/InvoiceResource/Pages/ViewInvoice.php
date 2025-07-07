@@ -415,9 +415,44 @@ class ViewInvoice extends ViewRecord
                 ->color('info')
                 ->url(fn(Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
                 ->openUrlInNewTab(),
-            Actions\DeleteAction::make()->label('Hapus Faktur')->icon('heroicon-o-trash'),
+            Actions\DeleteAction::make()
+                ->label('Hapus Faktur')
+                ->icon('heroicon-o-trash')
+                ->before(function (Invoice $record) {
+                    // Restore stock before deleting invoice
+                    foreach ($record->items as $itemPivot) {
+                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                        if ($itemModel) {
+                            $quantityToRestore = $itemPivot->pivot->quantity;
+                            $itemModel->stock += $quantityToRestore;
+                            $itemModel->save();
+                        }
+                    }
+                }),
             Actions\ForceDeleteAction::make(),
-            Actions\RestoreAction::make(),
+            Actions\RestoreAction::make()
+                ->after(function (Invoice $record) {
+                    // Re-decrement stock for items on the restored invoice
+                    foreach ($record->items as $itemPivot) {
+                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                        if ($itemModel) {
+                            $quantityToDecrement = $itemPivot->pivot->quantity;
+
+                            // Check if stock would go negative
+                            if ($itemModel->stock >= $quantityToDecrement) {
+                                $itemModel->stock -= $quantityToDecrement;
+                                $itemModel->save();
+                            } else {
+                                // Handle negative stock scenario
+                                Notification::make()
+                                    ->title('⚠️ Stock Tidak Mencukupi')
+                                    ->body("Item {$itemModel->name} tidak memiliki stock yang cukup untuk di-restore.")
+                                    ->warning()
+                                    ->send();
+                            }
+                        }
+                    }
+                }),
         ];
     }
     public function getRelationManagers(): array

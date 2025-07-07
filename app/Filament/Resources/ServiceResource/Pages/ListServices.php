@@ -13,7 +13,14 @@ class ListServices extends ListRecords
     protected function getHeaderActions(): array
     {
         return [
-            Actions\CreateAction::make(),
+            Actions\CreateAction::make()
+                ->label('Tambah Layanan')
+                ->icon('heroicon-o-plus')
+                ->color('primary')
+                ->tooltip('Tambah layanan baru')
+                ->modalHeading('Tambah Layanan Baru')
+                ->modalSubmitActionLabel('Simpan Layanan')
+                ->successNotificationTitle('Layanan berhasil ditambahkan'),
         ];
     }
 }

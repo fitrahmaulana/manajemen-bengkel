@@ -20,6 +20,17 @@ class EditInvoice extends EditRecord
     {
         return [
             Actions\DeleteAction::make()
+                ->before(function () {
+                    // Restore stock before deleting invoice
+                    foreach ($this->record->items as $itemPivot) {
+                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                        if ($itemModel) {
+                            $quantityToRestore = $itemPivot->pivot->quantity;
+                            $itemModel->stock += $quantityToRestore;
+                            $itemModel->save();
+                        }
+                    }
+                })
                 ->after(function () {
                     // Update invoice status after deletion if needed
                     // Note: This is for soft delete, hard delete would not need this
@@ -27,6 +38,26 @@ class EditInvoice extends EditRecord
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make()
                 ->after(function () {
+                    // Re-decrement stock for items on the restored invoice
+                    foreach ($this->record->items as $itemPivot) {
+                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                        if ($itemModel) {
+                            $quantityToDecrement = $itemPivot->pivot->quantity;
+
+                            // Check if stock would go negative
+                            if ($itemModel->stock >= $quantityToDecrement) {
+                                $itemModel->stock -= $quantityToDecrement;
+                                $itemModel->save();
+                            } else {
+                                // Handle negative stock scenario
+                                \Filament\Notifications\Notification::make()
+                                    ->title('⚠️ Stock Tidak Mencukupi')
+                                    ->body("Item {$itemModel->name} tidak memiliki stock yang cukup untuk di-restore.")
+                                    ->warning()
+                                    ->send();
+                            }
+                        }
+                    }
                     // Update invoice status after restoration
                     self::updateInvoiceStatus($this->record);
                 }),

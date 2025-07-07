@@ -148,9 +148,6 @@ class ProductResource extends Resource
             ->emptyStateIcon('heroicon-o-cube-transparent')
             ->emptyStateActions([
                 Tables\Actions\CreateAction::make(), // Changed to standard CreateAction
-            ])
-            ->headerActions([
-                 Tables\Actions\CreateAction::make(), // Added standard CreateAction to header
             ]);
     }
 
