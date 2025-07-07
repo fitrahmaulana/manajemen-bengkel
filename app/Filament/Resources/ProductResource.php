@@ -38,8 +38,15 @@ class ProductResource extends Resource
                             ->placeholder('Contoh: Oli Mesin Castrol GTX')
                             ->required()
                             ->helperText('Nama umum produk (tanpa spesifikasi ukuran)')
-                            ->live(onBlur: true),
-                            // Removed afterStateUpdated that set 'standard_sku' as the field is removed
+                            ->live(onBlur: true)
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
+                                // Auto-generate SKU untuk produk standard
+                                if ($state && !$get('has_variants') && !$get('standard_sku')) {
+                                    $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $state), 0, 6));
+                                    $sku = $productCode . '-STD';
+                                    $set('standard_sku', $sku);
+                                }
+                            }),
 
                         Forms\Components\TextInput::make('brand')
                             ->label('Merek')
@@ -66,17 +73,60 @@ class ProductResource extends Resource
                         Forms\Components\Checkbox::make('has_variants')
                             ->label('Produk ini memiliki varian')
                             ->helperText('Centang jika produk memiliki beberapa varian. Detail produk akan disembunyikan dan varian akan dikelola melalui tab "Daftar Varian".')
-                            ->live()
-                            ->helperText('Jika dicentang, varian dikelola di tab "Daftar Varian". Jika tidak, produk ini dianggap sebagai item tunggal yang juga dikelola di "Daftar Varian".'),
+                            ->live(),
                     ]),
 
-                Forms\Components\Section::make('Pengelolaan Varian/Item')
-                    ->description('Semua detail varian atau item tunggal (termasuk SKU, harga, dan stok) dikelola melalui tab "Daftar Varian" di halaman detail/edit produk setelah produk ini disimpan.')
+                // Form untuk produk tanpa varian (standard)
+                Forms\Components\Section::make('Detail Produk')
+                    ->description('Isi detail harga dan stok untuk produk standard')
                     ->schema([
-                        Forms\Components\Placeholder::make('manage_items_info')
-                            ->label('')
-                            ->content('Navigasi ke tab "Daftar Varian" untuk menambahkan atau mengubah detail item/varian.'),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('standard_sku')
+                                    ->label('Kode Barang')
+                                    ->placeholder('Akan otomatis terisi')
+                                    ->helperText('Kode unik untuk produk ini'),
+                                Forms\Components\Select::make('standard_unit')
+                                    ->label('Satuan')
+                                    ->options([
+                                        'Pcs' => 'Pcs',
+                                        'Botol' => 'Botol',
+                                        'Galon' => 'Galon',
+                                        'Liter' => 'Liter',
+                                        'Ml' => 'Ml',
+                                        'Set' => 'Set',
+                                        'Drum' => 'Drum',
+                                    ])
+                                    ->default('Pcs'),
+                            ]),
+                        Forms\Components\Grid::make(2)
+                            ->schema([
+                                Forms\Components\TextInput::make('standard_purchase_price')
+                                    ->label('Harga Beli')
+                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                    ->prefix('Rp'),
+                                Forms\Components\TextInput::make('standard_selling_price')
+                                    ->label('Harga Jual')
+                                    ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                                    ->prefix('Rp'),
+                            ]),
+                        Forms\Components\TextInput::make('standard_stock')
+                            ->label('Stok')
+                            ->numeric()
+                            ->default(0),
                     ])
+                    ->visible(fn(Forms\Get $get): bool => !$get('has_variants')),
+
+                // Info untuk produk dengan varian
+                Forms\Components\Section::make('Informasi Varian')
+                    ->description('Varian produk akan dikelola melalui tab "Daftar Varian" setelah produk disimpan')
+                    ->schema([
+                        Forms\Components\Placeholder::make('variant_info')
+                            ->label('')
+                            ->content('Setelah menyimpan produk, Anda dapat menambah dan mengelola varian melalui tab "Daftar Varian" di halaman detail produk.')
+                            ->columnSpanFull(),
+                    ])
+                    ->visible(fn(Forms\Get $get): bool => $get('has_variants')),
             ]);
     }
 
@@ -113,7 +163,7 @@ class ProductResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->limit(50)
-                    ->tooltip(fn (Product $record): ?string => $record->description),
+                    ->tooltip(fn(Product $record): ?string => $record->description),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Tanggal Dibuat')
                     ->dateTime()

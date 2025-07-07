@@ -40,6 +40,7 @@ return new class extends Migration
             $table->string('unit', 50)->default('Pcs'); // "Liter", "Botol", dll
 
             // Konversi eceran/grosir
+            $table->boolean('is_convertible')->default(false); // Apakah bisa dipecah ke eceran
             $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null');
             $table->decimal('conversion_value', 8, 2)->nullable(); // 1 botol 4L = 4 liter eceran
 

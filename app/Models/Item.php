@@ -14,21 +14,15 @@ class Item extends Model
         'selling_price',
         'stock',
         'unit',
+        'is_convertible',
         'target_child_item_id',
         'conversion_value',
     ];
 
-    /**
-     * Check if this item is convertible (has conversion settings)
-     */
-    public function getIsConvertibleAttribute(): bool
-    {
-        return $this->target_child_item_id !== null && $this->conversion_value > 0;
-    }
-
     protected $casts = [
         'stock' => 'integer',
         'conversion_value' => 'decimal:2',
+        'is_convertible' => 'boolean',
     ];
 
     public function product()

@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\ItemResource\Pages;
+use App\Filament\Resources\ProductResource\RelationManagers\ItemsRelationManager;
 // use App\Filament\Resources\ProductResource\RelationManagers\ItemsRelationManager; // No longer directly needed here
 use App\Models\Item;
 use Dom\Text;
@@ -43,79 +44,26 @@ class ItemResource extends Resource
     public static function form(Form $form): Form
     {
         return $form
-            ->schema([                Forms\Components\Section::make('Informasi Barang')
+            ->schema([
+                Forms\Components\Section::make('Informasi Barang')
                     ->description('Masukkan detail barang yang akan ditambahkan ke inventory')
                     ->schema([
                         Forms\Components\Select::make('product_id')
                             // ->hiddenOn(ItemsRelationManager::class) // This is no longer relevant as RM has its own form
                             ->label('Nama Barang')
-                            ->placeholder('Cari atau buat barang baru')
+                            ->placeholder('Cari Barang')
                             ->relationship('product', 'name')
+                            ->hiddenOn(ItemsRelationManager::class)
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->helperText('Contoh: Oli Mesin, Filter Udara, Busi, dll.')
-                            ->default(fn() => request()->get('product_id')) // Pre-fill dari URL parameter
-                            ->live() // Reactive untuk auto-generate SKU
-                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
-                                // Auto-generate SKU ketika produk dipilih
-                                if ($state && !$get('sku')) {
-                                    $product = \App\Models\Product::find($state);
-                                    $productName = $product ? $product->name : '';
-                                    $variantName = $get('name') ?: 'STD';
-
-                                    if ($productName) {
-                                        $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $productName), 0, 6));
-                                        $variantCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $variantName), 0, 3));
-                                        $sku = $productCode . '-' . $variantCode;
-                                        $set('sku', $sku);
-                                    }
-                                }
-                            })                            ->createOptionForm([
-                                Forms\Components\TextInput::make('name')
-                                    ->label('Nama Barang')
-                                    ->placeholder('Contoh: Oli Mesin Castrol GTX')
-                                    ->required(),
-                                Forms\Components\TextInput::make('brand')
-                                    ->label('Merek')
-                                    ->placeholder('Contoh: Castrol, Shell, Mobil 1'),
-                                Forms\Components\Textarea::make('description')
-                                    ->label('Deskripsi')
-                                    ->placeholder('Deskripsi singkat barang ini'),
-                                Forms\Components\Select::make('type_item_id')
-                                    ->label('Kategori Barang')
-                                    ->relationship('typeItem', 'name')
-                                    ->searchable()
-                                    ->preload(),
-                            ])
-                            ->createOptionUsing(function (array $data): int {
-                                return \App\Models\Product::create($data)->id;
-                            }),
+                            ->helperText('Contoh: Oli Mesin, Filter Udara, Busi, dll.'),
                         Forms\Components\TextInput::make('name')
                             ->label('Spesifikasi / Ukuran')
-                            ->placeholder('Contoh: 1 Liter, 5W-30, atau kosongkan jika tidak ada')
-                            ->helperText('Isi jika barang memiliki ukuran/spesifikasi khusus (1L, 4L, SAE 20W-50, dll)')
-                            ->live() // Reactive untuk auto-generate SKU
-                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
-                                // Auto-generate SKU ketika varian berubah
-                                $productId = $get('product_id');
-                                if ($productId && !$get('sku')) {
-                                    $product = \App\Models\Product::find($productId);
-                                    $productName = $product ? $product->name : '';
-                                    $variantName = $state ?: 'STD';
-
-                                    if ($productName) {
-                                        $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $productName), 0, 6));
-                                        $variantCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $variantName), 0, 3));
-                                        $sku = $productCode . '-' . $variantCode;
-                                        $set('sku', $sku);
-                                    }
-                                }
-                            }),
+                            ->helperText('Isi jika barang memiliki ukuran/spesifikasi khusus (1L, 4L, SAE 20W-50, dll)'),
                         Forms\Components\TextInput::make('sku')
                             ->label('Kode Barang')
-                            ->placeholder('Akan otomatis terisi')
-                            ->helperText('Kode unik untuk identifikasi barang (otomatis dibuat)')
+                            ->helperText('Kode unik untuk identifikasi barang')
                             ->required()
                             ->unique(ignoreRecord: true),
                     ]),
@@ -170,15 +118,10 @@ class ItemResource extends Resource
                 // Checkbox untuk mengaktifkan konversi stok
                 Forms\Components\Section::make('Pengaturan Tambahan')
                     ->schema([
-                        Forms\Components\Checkbox::make('enable_conversion')
+                        Forms\Components\Checkbox::make('is_convertible')
                             ->label('Barang ini bisa dipecah ke eceran')
                             ->helperText('Centang jika barang kemasan besar bisa dipecah (contoh: 1 Galon = 4 Liter)')
                             ->live()
-                            ->dehydrated(false) // Tidak disimpan ke database
-                            ->afterStateHydrated(function (Forms\Set $set, Forms\Get $get, $state) {
-                                // Set checkbox berdasarkan apakah sudah ada conversion_value
-                                $set('enable_conversion', !empty($get('conversion_value')));
-                            })
                             ->afterStateUpdated(function (Forms\Set $set, $state) {
                                 if (!$state) {
                                     // Reset conversion fields when disabled
@@ -307,7 +250,7 @@ class ItemResource extends Resource
                                 ->live(),
                         ]),
                     ])
-                    ->visible(fn(Forms\Get $get): bool => $get('enable_conversion') === true),
+                    ->visible(fn(Forms\Get $get): bool => $get('is_convertible') === true),
             ]);
     }
 
@@ -322,8 +265,8 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Spesifikasi')
                     ->searchable()
-                    ->formatStateUsing(fn (?string $state): string => $state === 'Standard' || empty($state) ? '-' : $state)
-                    ->description(fn ($record): string => ($record->name === 'Standard' || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
+                    ->formatStateUsing(fn(?string $state): string => $state === 'Standard' || empty($state) ? '-' : $state)
+                    ->description(fn($record): string => ($record->name === 'Standard' || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
                     ->searchable(),
@@ -448,8 +391,8 @@ class ItemResource extends Resource
                         TextEntry::make('product.name')->label('Nama Barang'),
                         TextEntry::make('name')
                             ->label('Spesifikasi')
-                            ->formatStateUsing(fn (?string $state): string => ($state === 'Standard' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
-                            ->color(fn (?string $state): string => ($state === 'Standard' || empty($state)) ? 'gray' : 'primary'),
+                            ->formatStateUsing(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
+                            ->color(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'gray' : 'primary'),
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
                         TextEntry::make('product.brand')->label('Merek'),

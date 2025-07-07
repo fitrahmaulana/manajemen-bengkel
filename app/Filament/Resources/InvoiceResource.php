@@ -370,7 +370,7 @@ class InvoiceResource extends Resource
                             })->visible(function ($state): bool {
                                 $itemRepeaterState = $state ?? [];
                                 $itemId = $itemRepeaterState['item_id'] ?? null;
-
+                                dd($itemId, $itemRepeaterState);
                                 if (!$itemId) return false;
 
                                 $item = Item::find($itemId);
