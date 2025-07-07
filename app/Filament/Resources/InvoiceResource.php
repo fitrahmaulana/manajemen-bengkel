@@ -9,7 +9,6 @@ use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
 use App\Traits\InvoiceCalculationTrait; // Added trait for optimized calculations
-use Awcodes\TableRepeater\Components\TableRepeater;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
@@ -30,7 +29,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Components\Actions\Action;
 use Illuminate\Support\HtmlString;
-use Carbon\Carbon;
 
 class InvoiceResource extends Resource
 {
@@ -49,9 +47,6 @@ class InvoiceResource extends Resource
 
     public static function form(Form $form): Form
     {
-        // Use optimized calculation from trait with debouncing
-        $calculateTotals = self::createDebouncedCalculation();
-
         // Optimized price update functions
         $updateServicePrice = function (Set $set, Get $get, $state) {
             if ($state) {
@@ -84,7 +79,7 @@ class InvoiceResource extends Resource
                             ->searchable()
                             ->preload()
                             ->required()
-                            ->live(onBlur: true) // Changed to onBlur to reduce server requests
+                            ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 // Reset vehicle_id when customer changes
                                 $set('vehicle_id', null);
@@ -114,9 +109,9 @@ class InvoiceResource extends Resource
                     ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at']) //
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: Rp ' . number_format(collect($get('services'))->sum(function($service) {
+                            'Total: ' . self::formatCurrency(collect($get('services'))->sum(function ($service) {
                                 return self::parseCurrencyValue($service['price'] ?? '0');
-                            }), 0, ',', '.')
+                            }))
                         )
                     )
 
@@ -134,7 +129,7 @@ class InvoiceResource extends Resource
                                 ->options(Service::all()->pluck('name', 'id'))
                                 ->searchable()
                                 ->required()
-                                ->live(onBlur: true) // Changed to onBlur for better performance
+                                ->live()
                                 ->afterStateUpdated($updateServicePrice),
                             Forms\Components\Textarea::make('description')
                                 ->hiddenLabel()
@@ -145,20 +140,18 @@ class InvoiceResource extends Resource
                             ->label('Harga Jasa')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                             ->prefix('Rp. ')
-                            ->live(debounce: 1000) // Added debounce untuk mencegah request berlebihan
-                            ->afterStateUpdated($calculateTotals)
+                            ->live()
                             ->required(),
-                        Forms\Components\Placeholder::make('subtotal')
+                        Forms\Components\Placeholder::make('subtotal_service')
                             ->hiddenLabel()
+                            ->dehydrated(false) // Tidak disimpan ke database
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
-                                return 'Rp. ' . number_format($price, 0, ',', '.');
+                                return self::formatCurrency($price);
                             }),
                     ])
-                    ->columns(3)
-                    ->live(onBlur: true) // Changed to onBlur for the entire repeater
-                    ->afterStateUpdated($calculateTotals),
+                    ->columns(3),
 
                 // Repeater Barang
                 CustomTableRepeater::make('items')
@@ -171,30 +164,6 @@ class InvoiceResource extends Resource
                     ->hiddenLabel()
                     ->reorderAtStart()
                     ->cloneable()
-                    ->itemLabel(function (array $state): ?string {
-                        if (empty($state['item_id'])) {
-                            return null;
-                        }
-                        // Ambil data item terbaru dari database untuk memastikan stok akurat
-                        $item = Item::find($state['item_id']);
-                        if (!$item) {
-                            return 'Item tidak ditemukan';
-                        }
-
-                        // Menampilkan nama produk + varian (jika ada) + info stok
-                        $productName = $item->product->name;
-                        $variantName = $item->name;
-
-                        // Untuk produk tanpa varian (name kosong), tampilkan hanya nama produk
-                        if (empty($variantName)) {
-                            $displayName = $productName;
-                        } else {
-                            // Untuk produk dengan varian, tampilkan nama produk + varian
-                            $displayName = $productName . ' ' . $variantName;
-                        }
-
-                        return $displayName . ' (Stok: ' . $item->stock . ' ' . $item->unit . ')';
-                    })
                     ->schema([
                         Forms\Components\Group::make()->schema([
                             Forms\Components\Select::make('item_id')
@@ -223,7 +192,7 @@ class InvoiceResource extends Resource
                                 })
                                 ->searchable()
                                 ->required()
-                                ->live() // Changed to onBlur for better performance
+                                ->live()
                                 ->afterStateUpdated($updateItemData),
                             Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1)
                         ]),
@@ -232,8 +201,7 @@ class InvoiceResource extends Resource
                             ->numeric()
                             ->default(1)
                             ->required()
-                            ->live(onBlur: true) // Changed to onBlur to reduce validation triggers
-                            ->afterStateUpdated($calculateTotals)
+                            ->live()
                             ->rules([
                                 function (Get $get, callable $set, $record, $operation) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
@@ -264,26 +232,27 @@ class InvoiceResource extends Resource
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                             ->prefix('Rp. ')
-                            ->live(debounce: 1000) // Added debounce to reduce server requests
-                            ->afterStateUpdated($calculateTotals)
+                            ->live()
                             ->required(),
                         Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Placeholder::make('total')
+                        Forms\Components\Placeholder::make('subtotal_item')
                             ->hiddenLabel()
+                            ->dehydrated(false) // Tidak disimpan ke database
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
                                 $quantity = (int)($get('quantity') ?? 0);
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
-                                return 'Rp. ' . number_format($quantity * $price, 0, ',', '.');
+                                $total = $quantity * $price;
+                                return self::formatCurrency($total);
                             }),
                     ])
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: Rp ' . number_format(collect($get('items'))->sum(function($item) {
+                            'Total: ' . self::formatCurrency(collect($get('items'))->sum(function ($item) {
                                 $quantity = (int)($item['quantity'] ?? 0);
                                 $price = self::parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
-                            }), 0, ',', '.')
+                            }))
                         )
                     )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
@@ -417,8 +386,7 @@ class InvoiceResource extends Resource
                             })
                     ])
                     ->columns(4) // Sesuaikan jumlah kolom jika perlu
-                    ->live(onBlur: true) // Changed to onBlur for better performance
-                    ->afterStateUpdated($calculateTotals),
+
             ]),
 
             // Bagian bawah untuk ringkasan biaya, ditata di sebelah kanan
@@ -430,11 +398,24 @@ class InvoiceResource extends Resource
 
                     // Grup untuk ringkasan biaya
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('subtotal')
+                        Forms\Components\Placeholder::make('subtotal')
                             ->label('Subtotal')
-                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ') // Note the space
-                            ->readOnly()
+                            ->content(function (Get $get) {
+                                // Hitung total dari services
+                                $servicesTotal = collect($get('services'))->sum(function ($service) {
+                                    return self::parseCurrencyValue($service['price'] ?? '0');
+                                });
+
+                                // Hitung total dari items
+                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                    $quantity = (int)($item['quantity'] ?? 0);
+                                    $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                    return $quantity * $price;
+                                });
+
+                                $subtotal = $servicesTotal + $itemsTotal;
+                                return self::formatCurrency($subtotal);
+                            })
                             ->helperText('Total sebelum diskon & pajak.'),
 
                         // Grup untuk Diskon dengan pilihan Tipe
@@ -443,24 +424,47 @@ class InvoiceResource extends Resource
                                 ->label('Tipe Diskon')
                                 ->options(['fixed' => 'Nominal (Rp)', 'percentage' => 'Persen (%)'])
                                 ->default('fixed')
-                                ->live(onBlur: true) // Changed to onBlur
-                                ->afterStateUpdated($calculateTotals),
+                                ->live(), // Changed to onBlur
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                                 ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
-                                ->live(debounce: 1000) // Added debounce to reduce server load
-                                ->afterStateUpdated($calculateTotals),
+                                ->live(), // Added debounce to reduce server load
                         ]),
 
 
                         // Total Akhir
-                        Forms\Components\TextInput::make('total_amount')
+                        Forms\Components\Placeholder::make('total_amount')
                             ->label('Total Akhir')
-                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ') // Note the space
-                            ->readOnly(),
+                            ->content(function (Get $get) {
+                                // Hitung subtotal
+                                $servicesTotal = collect($get('services'))->sum(function ($service) {
+                                    return self::parseCurrencyValue($service['price'] ?? '0');
+                                });
+
+                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                    $quantity = (int)($item['quantity'] ?? 0);
+                                    $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                    return $quantity * $price;
+                                });
+
+                                $subtotal = $servicesTotal + $itemsTotal;
+
+                                // Hitung diskon
+                                $discountType = $get('discount_type') ?? 'fixed';
+                                $discountValue = self::parseCurrencyValue($get('discount_value') ?? '0');
+
+                                $discountAmount = 0;
+                                if ($discountType === 'percentage') {
+                                    $discountAmount = ($subtotal * $discountValue) / 100;
+                                } else {
+                                    $discountAmount = $discountValue;
+                                }
+
+                                $totalAmount = $subtotal - $discountAmount;
+                                return self::formatCurrency($totalAmount);
+                            }),
                     ]),
                 ]),
             ]),
