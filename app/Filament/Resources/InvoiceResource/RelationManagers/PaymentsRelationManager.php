@@ -33,52 +33,47 @@ class PaymentsRelationManager extends RelationManager
         return PaymentResource::table($table)
             ->recordTitleAttribute('payment_date')
             ->headerActions([
-                Tables\Actions\CreateAction::make(),
+                Tables\Actions\CreateAction::make()
+                    ->mutateFormDataUsing(function (array $data): array {
+                        // Otomatis set invoice_id dari parent record
+                        $data['invoice_id'] = $this->getOwnerRecord()->id;
+
+                        // Pastikan payment_date ada jika tidak diisi
+                        if (!isset($data['payment_date']) || empty($data['payment_date'])) {
+                            $data['payment_date'] = now()->toDateString();
+                        }
+
+                        return $data;
+                    })
+                    ->after(function ($record, RelationManager $livewire) {
+                        // Gunakan method yang sudah ada di PaymentResource
+                        PaymentResource::handleAfterPaymentAction($record);
+                        $livewire->dispatch('refresh');
+                    }),
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\EditAction::make(),
+                Tables\Actions\EditAction::make()
+                    ->after(function ($record, RelationManager $livewire) {
+                        // Gunakan method yang sudah ada di PaymentResource
+                        PaymentResource::handleAfterPaymentAction($record);
+                        $livewire->dispatch('refresh');
+                    }),
                 Tables\Actions\DeleteAction::make()
-                    ->after(function (RelationManager $livewire) {
-                        // Since we're in relation manager, we can directly access the owner invoice
-                        $invoice = $livewire->getOwnerRecord();
-                        if ($invoice) {
-                            $invoice->refresh();
-
-                            // Update status berdasarkan total pembayaran
-                            if ($invoice->total_paid_amount >= $invoice->total_amount) {
-                                $invoice->status = 'paid';
-                            } else if ($invoice->payments()->exists()) {
-                                $invoice->status = 'partially_paid';
-                            } else {
-                                $invoice->status = 'unpaid';
-                            }
-                            $invoice->save();
-                        }
-
+                    ->after(function ($record, RelationManager $livewire) {
+                        // Gunakan method yang sudah ada di PaymentResource
+                        PaymentResource::handleAfterPaymentAction($record);
                         $livewire->dispatch('refresh');
                     }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
-                        ->after(function (RelationManager $livewire) {
-                            // Since we're in relation manager, we can directly access the owner invoice
-                            $invoice = $livewire->getOwnerRecord();
-                            if ($invoice) {
-                                $invoice->refresh();
-
-                                // Update status berdasarkan total pembayaran
-                                if ($invoice->total_paid_amount >= $invoice->total_amount) {
-                                    $invoice->status = 'paid';
-                                } else if ($invoice->payments()->exists()) {
-                                    $invoice->status = 'partially_paid';
-                                } else {
-                                    $invoice->status = 'unpaid';
-                                }
-                                $invoice->save();
+                        ->after(function ($records, RelationManager $livewire) {
+                            // Update status invoice untuk setiap record yang dihapus
+                            foreach ($records as $record) {
+                                PaymentResource::handleAfterPaymentAction($record);
                             }
-
                             $livewire->dispatch('refresh');
                         }),
                 ]),

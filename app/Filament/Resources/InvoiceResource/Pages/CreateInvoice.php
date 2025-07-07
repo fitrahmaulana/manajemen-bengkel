@@ -17,6 +17,48 @@ class CreateInvoice extends CreateRecord
     protected static string $resource = InvoiceResource::class;
 
     /**
+     * Hook ini dijalankan SEBELUM data disimpan ke database.
+     * Menghitung subtotal dan total_amount berdasarkan services dan items.
+     */
+    protected function mutateFormDataBeforeCreate(array $data): array
+    {
+        $services = $data['services'] ?? [];
+        $items = $data['items'] ?? [];
+
+        // 1. Hitung subtotal dari services
+        $servicesTotal = collect($services)->sum(function ($service) {
+            return self::parseCurrencyValue($service['price'] ?? '0');
+        });
+
+        // 2. Hitung subtotal dari items
+        $itemsTotal = collect($items)->sum(function ($item) {
+            $quantity = (int)($item['quantity'] ?? 0);
+            $price = self::parseCurrencyValue($item['price'] ?? '0');
+            return $quantity * $price;
+        });
+
+        // 3. Hitung subtotal
+        $subtotal = $servicesTotal + $itemsTotal;
+        $data['subtotal'] = $subtotal;
+
+        // 4. Hitung diskon
+        $discountType = $data['discount_type'] ?? 'fixed';
+        $discountValue = self::parseCurrencyValue($data['discount_value'] ?? '0');
+
+        if ($discountType === 'percentage') {
+            $discountAmount = ($subtotal * $discountValue) / 100;
+        } else {
+            $discountAmount = $discountValue;
+        }
+
+        // 5. Hitung total akhir
+        $totalAmount = $subtotal - $discountAmount;
+        $data['total_amount'] = $totalAmount;
+
+        return $data;
+    }
+
+    /**
      * Hook ini dijalankan SETELAH record Invoice utama berhasil dibuat.
      * Optimized untuk menangani relasi dan stock adjustment dalam satu transaksi.
      */
@@ -69,7 +111,6 @@ class CreateInvoice extends CreateRecord
                 ->body('Faktur dan stock telah berhasil diperbarui.')
                 ->success()
                 ->send();
-
         } catch (\Exception $e) {
             // Rollback akan otomatis terjadi karena DB::transaction
             Notification::make()

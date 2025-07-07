@@ -16,6 +16,48 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
+    /**
+     * Hook ini dijalankan SEBELUM data disimpan ke database saat update.
+     * Menghitung subtotal dan total_amount berdasarkan services dan items.
+     */
+    protected function mutateFormDataBeforeSave(array $data): array
+    {
+        $services = $data['services'] ?? [];
+        $items = $data['items'] ?? [];
+
+        // 1. Hitung subtotal dari services
+        $servicesTotal = collect($services)->sum(function ($service) {
+            return self::parseCurrencyValue($service['price'] ?? '0');
+        });
+
+        // 2. Hitung subtotal dari items
+        $itemsTotal = collect($items)->sum(function ($item) {
+            $quantity = (int)($item['quantity'] ?? 0);
+            $price = self::parseCurrencyValue($item['price'] ?? '0');
+            return $quantity * $price;
+        });
+
+        // 3. Hitung subtotal
+        $subtotal = $servicesTotal + $itemsTotal;
+        $data['subtotal'] = $subtotal;
+
+        // 4. Hitung diskon
+        $discountType = $data['discount_type'] ?? 'fixed';
+        $discountValue = self::parseCurrencyValue($data['discount_value'] ?? '0');
+
+        if ($discountType === 'percentage') {
+            $discountAmount = ($subtotal * $discountValue) / 100;
+        } else {
+            $discountAmount = $discountValue;
+        }
+
+        // 5. Hitung total akhir
+        $totalAmount = $subtotal - $discountAmount;
+        $data['total_amount'] = $totalAmount;
+
+        return $data;
+    }
+
     protected function getHeaderActions(): array
     {
         return [
@@ -105,6 +147,7 @@ class EditInvoice extends EditRecord
      */
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
+
         try {
             return DB::transaction(function () use ($record, $data) {
                 // 1. Calculate and apply stock adjustments first

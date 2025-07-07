@@ -406,14 +406,10 @@ class InvoiceResource extends Resource
 
                     // Grup untuk ringkasan biaya
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('subtotal')
+                        Forms\Components\Placeholder::make('subtotal')
                             ->label('Subtotal')
-                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ')
-                            ->readOnly()
-                            ->live()
-                            ->extraAttributes(['class' => 'font-semibold text-lg bg-gray-100 border-l-4 border-blue-500'])
-                            ->formatStateUsing(function (Get $get) {
+                            ->extraAttributes(['class' => 'font-bold text-xl text-white'])
+                            ->content(function (Get $get) {
                                 // Hitung total dari services
                                 $servicesTotal = collect($get('services'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
@@ -426,7 +422,7 @@ class InvoiceResource extends Resource
                                     return $quantity * $price;
                                 });
 
-                                return $servicesTotal + $itemsTotal;
+                                return self::formatCurrency($servicesTotal + $itemsTotal);
                             })
                             ->helperText('Total sebelum diskon & pajak.'),
 
@@ -447,14 +443,10 @@ class InvoiceResource extends Resource
 
 
                         // Total Akhir
-                        Forms\Components\TextInput::make('total_amount')
+                        Forms\Components\Placeholder::make('total_amount')
                             ->label('Total Akhir')
-                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                            ->prefix('Rp. ')
-                            ->readOnly()
-                            ->live()
-                            ->extraAttributes(['class' => 'font-bold text-xl bg-gradient-to-r from-green-600 to-green-700 text-white'])
-                            ->formatStateUsing(function (Get $get) {
+                            ->extraAttributes(['class' => 'font-bold text-xl text-green'])
+                            ->Content(function (Get $get) {
                                 // Hitung subtotal
                                 $servicesTotal = collect($get('services'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
@@ -480,7 +472,7 @@ class InvoiceResource extends Resource
                                 }
 
                                 $totalAmount = $subtotal - $discountAmount;
-                                return $totalAmount;
+                                return self::formatCurrency($totalAmount);
                             }),
                     ]),
                 ]),

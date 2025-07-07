@@ -29,18 +29,6 @@ class ViewInvoice extends ViewRecord
         'refresh' => '$refresh',
     ];
 
-    // Override the record retrieval to include necessary relations
-    public function getRecord(): \Illuminate\Database\Eloquent\Model
-    {
-        return parent::getRecord()->load([
-            'customer',
-            'vehicle',
-            'services',
-            'items.product', // This is the key addition - eager load product relation
-            'payments'
-        ]);
-    }
-
     // Infolist definition moved from InvoiceResource to here
     public function infolist(Infolist $infolist): Infolist
     {
