@@ -367,22 +367,30 @@ class InvoiceResource extends Resource
                                         ->danger()
                                         ->send();
                                 }
-                            })->visible(function ($state): bool {
-                                $itemRepeaterState = $state ?? [];
-                                $itemId = $itemRepeaterState['item_id'] ?? null;
-                                dd($itemId, $itemRepeaterState);
-                                if (!$itemId) return false;
+                            })->visible(function (array $arguments = [], $component = null): bool {
+                                try {
+                                    // Dapatkan UUID item dari arguments
+                                    $itemUuid = $arguments['item'] ?? null;
+                                    if (!$itemUuid) return false;
 
-                                $item = Item::find($itemId);
-                                if (!$item || $item->is_convertible) {
+                                    // Gunakan component yang diteruskan sebagai parameter
+                                    if (!$component) return false;
+
+                                    // Dapatkan state item berdasarkan UUID
+                                    $itemRepeaterState = $component->getRawItemState($itemUuid);
+                                    $itemId = $itemRepeaterState['item_id'] ?? null;
+                                    if (!$itemId) return false;
+
+                                    $item = Item::find($itemId);
+                                    if (!$item) return false;
+
+                                    // Tampilkan tombol hanya untuk item eceran (non-konvertibel)
+                                    // dan yang memiliki parent item yang bisa dipecah
+                                    return !$item->is_convertible && $item->sourceParents()->where('stock', '>', 0)->exists();
+                                } catch (\Exception $e) {
+                                    // Jika terjadi error, sembunyikan tombol
                                     return false;
                                 }
-
-                                $quantityNeeded = (int)($itemRepeaterState['quantity'] ?? 0);
-                                if ($item->stock >= $quantityNeeded) {
-                                    return false;
-                                }
-                                return $item->sourceParents()->where('stock', '>', 0)->exists();
                             })
                     ])
                     ->columns(4) // Sesuaikan jumlah kolom jika perlu
@@ -398,9 +406,14 @@ class InvoiceResource extends Resource
 
                     // Grup untuk ringkasan biaya
                     Group::make()->schema([
-                        Forms\Components\Placeholder::make('subtotal')
+                        Forms\Components\TextInput::make('subtotal')
                             ->label('Subtotal')
-                            ->content(function (Get $get) {
+                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                            ->prefix('Rp. ')
+                            ->readOnly()
+                            ->live()
+                            ->extraAttributes(['class' => 'font-semibold text-lg bg-gray-100 border-l-4 border-blue-500'])
+                            ->formatStateUsing(function (Get $get) {
                                 // Hitung total dari services
                                 $servicesTotal = collect($get('services'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
@@ -413,8 +426,7 @@ class InvoiceResource extends Resource
                                     return $quantity * $price;
                                 });
 
-                                $subtotal = $servicesTotal + $itemsTotal;
-                                return self::formatCurrency($subtotal);
+                                return $servicesTotal + $itemsTotal;
                             })
                             ->helperText('Total sebelum diskon & pajak.'),
 
@@ -435,9 +447,14 @@ class InvoiceResource extends Resource
 
 
                         // Total Akhir
-                        Forms\Components\Placeholder::make('total_amount')
+                        Forms\Components\TextInput::make('total_amount')
                             ->label('Total Akhir')
-                            ->content(function (Get $get) {
+                            ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
+                            ->prefix('Rp. ')
+                            ->readOnly()
+                            ->live()
+                            ->extraAttributes(['class' => 'font-bold text-xl bg-gradient-to-r from-green-600 to-green-700 text-white'])
+                            ->formatStateUsing(function (Get $get) {
                                 // Hitung subtotal
                                 $servicesTotal = collect($get('services'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
@@ -463,7 +480,7 @@ class InvoiceResource extends Resource
                                 }
 
                                 $totalAmount = $subtotal - $discountAmount;
-                                return self::formatCurrency($totalAmount);
+                                return $totalAmount;
                             }),
                     ]),
                 ]),
