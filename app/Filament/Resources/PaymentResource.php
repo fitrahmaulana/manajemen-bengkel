@@ -47,24 +47,32 @@ class PaymentResource extends Resource
                         Forms\Components\DatePicker::make('payment_date')
                             ->label('Tanggal Pembayaran')
                             ->default(now())
-                            ->required()
-                            ->visible(fn(string $operation) => $operation === 'edit' || $operation === 'view'),
+                            ->required(),
 
                         // Tampilkan total tagihan yang harus dibayar
                         Forms\Components\Placeholder::make('total_tagihan')
                             ->label('Total Tagihan')
-                            ->content(function ($get, $record) {
+                            ->content(function ($get, $record, $livewire) {
                                 if ($record) {
                                     // Edit mode: tampilkan total tagihan original
                                     $invoice = $record->invoice;
                                     return '🧾 Rp. ' . number_format($invoice->total_amount, 0, ',', '.');
                                 } else {
-                                    // Create mode: tampilkan sisa tagihan
-                                    $invoiceId = $get('invoice_id');
-                                    if ($invoiceId) {
-                                        $invoice = \App\Models\Invoice::find($invoiceId);
+                                    // Create mode
+                                    if ($livewire instanceof PaymentsRelationManager) {
+                                        // Dari RelationManager: ambil invoice dari owner record
+                                        $invoice = $livewire->getOwnerRecord();
                                         if ($invoice) {
                                             return '🧾 Rp. ' . number_format($invoice->balance_due, 0, ',', '.');
+                                        }
+                                    } else {
+                                        // Dari standalone form: ambil dari invoice_id
+                                        $invoiceId = $get('invoice_id');
+                                        if ($invoiceId) {
+                                            $invoice = \App\Models\Invoice::find($invoiceId);
+                                            if ($invoice) {
+                                                return '🧾 Rp. ' . number_format($invoice->balance_due, 0, ',', '.');
+                                            }
                                         }
                                     }
                                     return '🧾 Pilih invoice terlebih dahulu';
@@ -84,7 +92,7 @@ class PaymentResource extends Resource
                             ->minValue(1)
                             ->helperText('Masukkan jumlah uang tunai yang diterima dari pelanggan')
                             ->live(debounce: 300)
-                            ->afterStateUpdated(function ($state, $set, $get, $record) {
+                            ->afterStateUpdated(function ($state, $set, $get, $record, $livewire) {
                                 if ($record) {
                                     // Edit mode
                                     $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
@@ -103,40 +111,58 @@ class PaymentResource extends Resource
                                     }
                                 } else {
                                     // Create mode
-                                    $invoiceId = $get('invoice_id');
-                                    if ($invoiceId) {
-                                        $invoice = \App\Models\Invoice::find($invoiceId);
-                                        if ($invoice) {
-                                            $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
-                                            $balanceDue = $invoice->balance_due;
+                                    $invoice = null;
 
-                                            if ($amountPaid > $balanceDue) {
-                                                $overpayment = $amountPaid - $balanceDue;
-                                                $set('change_amount', $overpayment);
-                                                $set('payment_status', 'overpaid');
-                                            } elseif ($amountPaid == $balanceDue) {
-                                                $set('change_amount', 0);
-                                                $set('payment_status', 'exact');
-                                            } else {
-                                                $set('change_amount', 0);
-                                                $set('payment_status', 'underpaid');
-                                            }
+                                    if ($livewire instanceof PaymentsRelationManager) {
+                                        // Dari RelationManager: ambil invoice dari owner record
+                                        $invoice = $livewire->getOwnerRecord();
+                                    } else {
+                                        // Dari standalone form: ambil dari invoice_id
+                                        $invoiceId = $get('invoice_id');
+                                        if ($invoiceId) {
+                                            $invoice = \App\Models\Invoice::find($invoiceId);
+                                        }
+                                    }
+
+                                    if ($invoice) {
+                                        $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
+                                        $balanceDue = $invoice->balance_due;
+
+                                        if ($amountPaid > $balanceDue) {
+                                            $overpayment = $amountPaid - $balanceDue;
+                                            $set('change_amount', $overpayment);
+                                            $set('payment_status', 'overpaid');
+                                        } elseif ($amountPaid == $balanceDue) {
+                                            $set('change_amount', 0);
+                                            $set('payment_status', 'exact');
+                                        } else {
+                                            $set('change_amount', 0);
+                                            $set('payment_status', 'underpaid');
                                         }
                                     }
                                 }
                             })
-                            ->default(function ($get, $record) {
+                            ->default(function ($get, $record, $livewire) {
                                 if ($record) {
                                     // Edit mode: return current payment amount
                                     return $record->amount_paid;
                                 } else {
                                     // Create mode: suggest balance due
-                                    $invoiceId = $get('invoice_id');
-                                    if ($invoiceId) {
-                                        $invoice = \App\Models\Invoice::find($invoiceId);
-                                        if ($invoice) {
-                                            return $invoice->balance_due;
+                                    $invoice = null;
+
+                                    if ($livewire instanceof PaymentsRelationManager) {
+                                        // Dari RelationManager: ambil invoice dari owner record
+                                        $invoice = $livewire->getOwnerRecord();
+                                    } else {
+                                        // Dari standalone form: ambil dari invoice_id
+                                        $invoiceId = $get('invoice_id');
+                                        if ($invoiceId) {
+                                            $invoice = \App\Models\Invoice::find($invoiceId);
                                         }
+                                    }
+
+                                    if ($invoice) {
+                                        return $invoice->balance_due;
                                     }
                                     return null;
                                 }
@@ -148,13 +174,20 @@ class PaymentResource extends Resource
                             ->live()
                             ->afterStateUpdated(fn($state, $set) => $set('amount_paid', $state))
                             ->visible(fn(string $operation) => $operation === 'create')
-                            ->options(function ($get): array {
-                                $invoiceId = $get('invoice_id');
-                                if (!$invoiceId) {
-                                    return [];
+                            ->options(function ($get, $livewire): array {
+                                $invoice = null;
+
+                                if ($livewire instanceof PaymentsRelationManager) {
+                                    // Dari RelationManager: ambil invoice dari owner record
+                                    $invoice = $livewire->getOwnerRecord();
+                                } else {
+                                    // Dari standalone form: ambil dari invoice_id
+                                    $invoiceId = $get('invoice_id');
+                                    if ($invoiceId) {
+                                        $invoice = \App\Models\Invoice::find($invoiceId);
+                                    }
                                 }
 
-                                $invoice = \App\Models\Invoice::find($invoiceId);
                                 if (!$invoice) {
                                     return [];
                                 }
@@ -174,8 +207,18 @@ class PaymentResource extends Resource
                                 $roundingBases = [10000, 20000, 50000, 100000];
 
                                 foreach ($roundingBases as $base) {
-                                    if ($base >= $totalBill) {
-                                        $suggestions[] = ceil($totalBill / $base) * $base;
+                                    // Jangan tampilkan saran yang lebih kecil dari tagihan
+                                    if ($base < $totalBill) {
+                                        $suggestion = ceil($totalBill / $base) * $base;
+
+                                        if ($suggestion <= $totalBill) {
+                                            $suggestion += $base;
+                                        }
+
+                                        // Batasi saran agar tidak terlalu jauh (misal: tagihan 12rb, jangan sarankan 100rb)
+                                        if ($suggestion < $totalBill * 2.5 && $suggestion < 1000000) {
+                                            $suggestions[] = $suggestion;
+                                        }
                                     }
                                 }
 
@@ -203,7 +246,7 @@ class PaymentResource extends Resource
                         // Kalkulator Kembalian - Real-time
                         Forms\Components\Placeholder::make('kembalian_calculator')
                             ->label('Kembalian')
-                            ->content(function ($get, $record) {
+                            ->content(function ($get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
 
                                 if ($record) {
@@ -215,19 +258,28 @@ class PaymentResource extends Resource
                                     return '💵 Rp. ' . number_format($change, 0, ',', '.');
                                 } else {
                                     // Create mode
-                                    $invoiceId = $get('invoice_id');
-                                    if ($invoiceId) {
-                                        $invoice = \App\Models\Invoice::find($invoiceId);
-                                        if ($invoice) {
-                                            $balanceDue = $invoice->balance_due;
-                                            $change = $amountPaid - $balanceDue;
-                                            return '💵 Rp. ' . number_format($change, 0, ',', '.');
+                                    $invoice = null;
+
+                                    if ($livewire instanceof PaymentsRelationManager) {
+                                        // Dari RelationManager: ambil invoice dari owner record
+                                        $invoice = $livewire->getOwnerRecord();
+                                    } else {
+                                        // Dari standalone form: ambil dari invoice_id
+                                        $invoiceId = $get('invoice_id');
+                                        if ($invoiceId) {
+                                            $invoice = \App\Models\Invoice::find($invoiceId);
                                         }
+                                    }
+
+                                    if ($invoice) {
+                                        $balanceDue = $invoice->balance_due;
+                                        $change = $amountPaid - $balanceDue;
+                                        return '💵 Rp. ' . number_format($change, 0, ',', '.');
                                     }
                                     return '💵 Rp. 0';
                                 }
                             })
-                            ->extraAttributes(function ($get, $record) {
+                            ->extraAttributes(function ($get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
 
                                 if ($record) {
@@ -243,17 +295,26 @@ class PaymentResource extends Resource
                                     }
                                 } else {
                                     // Create mode
-                                    $invoiceId = $get('invoice_id');
-                                    if ($invoiceId) {
-                                        $invoice = \App\Models\Invoice::find($invoiceId);
-                                        if ($invoice) {
-                                            $balanceDue = $invoice->balance_due;
+                                    $invoice = null;
 
-                                            if ($amountPaid >= $balanceDue && $amountPaid > 0) {
-                                                return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
-                                            } elseif ($amountPaid > 0 && $amountPaid < $balanceDue) {
-                                                return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
-                                            }
+                                    if ($livewire instanceof PaymentsRelationManager) {
+                                        // Dari RelationManager: ambil invoice dari owner record
+                                        $invoice = $livewire->getOwnerRecord();
+                                    } else {
+                                        // Dari standalone form: ambil dari invoice_id
+                                        $invoiceId = $get('invoice_id');
+                                        if ($invoiceId) {
+                                            $invoice = \App\Models\Invoice::find($invoiceId);
+                                        }
+                                    }
+
+                                    if ($invoice) {
+                                        $balanceDue = $invoice->balance_due;
+
+                                        if ($amountPaid >= $balanceDue && $amountPaid > 0) {
+                                            return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
+                                        } elseif ($amountPaid > 0 && $amountPaid < $balanceDue) {
+                                            return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                                         }
                                     }
                                 }
@@ -287,7 +348,7 @@ class PaymentResource extends Resource
                     ->label('Invoice Number')
                     ->searchable()
                     ->sortable()
-                    ->hiddenOn(\App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager::class),
+                    ->hiddenOn(PaymentsRelationManager::class),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
                     ->label('Tanggal Pembayaran')
