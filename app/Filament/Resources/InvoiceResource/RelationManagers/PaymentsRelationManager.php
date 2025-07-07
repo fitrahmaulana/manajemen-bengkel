@@ -22,13 +22,6 @@ class PaymentsRelationManager extends RelationManager
         'refresh' => '$refresh',
     ];
 
-    /**
-     * Parse currency mask to float value
-     */
-    private function parseCurrencyMask(string $value): float
-    {
-        return (float)str_replace(['Rp. ', '.'], ['', ''], $value);
-    }
 
     public function form(Form $form): Form
     {

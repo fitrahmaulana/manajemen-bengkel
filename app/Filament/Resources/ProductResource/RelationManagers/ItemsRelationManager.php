@@ -117,7 +117,7 @@ class ItemsRelationManager extends RelationManager
                                 ->danger()
                                 ->send();
                         }
-                    })->visible(fn(Item $record): bool => $record->is_convertible??false),
+                    })->visible(fn(Item $record): bool => $record->is_convertible ?? false),
 
             ])
             ->bulkActions([
