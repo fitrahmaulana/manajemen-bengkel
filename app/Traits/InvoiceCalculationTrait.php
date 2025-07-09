@@ -3,6 +3,7 @@
 namespace App\Traits;
 
 use App\Models\Invoice;
+use App\Models\Item;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 
@@ -138,7 +139,7 @@ trait InvoiceCalculationTrait
      */
     public static function validateStockAvailability(
         int $itemId,
-        int $quantity,
+        float $quantity, // Ubah dari int ke float untuk mendukung desimal
         ?Invoice $currentInvoice = null
     ): array {
         $item = \App\Models\Item::find($itemId);
@@ -161,19 +162,27 @@ trait InvoiceCalculationTrait
         $neededStock = $currentInvoice ? max(0, $quantity - $originalQuantity) : $quantity;
 
         if ($neededStock > 0 && $item->stock < $neededStock) {
-            $hasSplitOption = !$item->is_convertible &&
-                             $item->sourceParents()->where('stock', '>', 0)->exists();
+            // Periksa apakah ada item lain dalam produk yang sama yang bisa dipecah
+            $hasSplitOption = Item::where('product_id', $item->product_id)
+                ->where('id', '!=', $item->id)
+                ->where('stock', '>', 0)
+                ->when($item->volume_value && $item->base_volume_unit, function ($query) use ($item) {
+                    // Hanya tampilkan item yang memiliki volume lebih besar dan satuan volume sama
+                    $query->where('volume_value', '>', $item->volume_value)
+                          ->where('base_volume_unit', $item->base_volume_unit);
+                })
+                ->exists();
 
             if ($hasSplitOption) {
                 return [
                     'valid' => false,
-                    'message' => "Stok {$item->name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
+                    'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
                     'can_split' => true
                 ];
             } else {
                 return [
                     'valid' => false,
-                    'message' => "Stok {$item->name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
+                    'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
                     'can_split' => false
                 ];
             }

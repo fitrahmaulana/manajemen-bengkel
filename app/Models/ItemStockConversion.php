@@ -22,6 +22,8 @@ class ItemStockConversion extends Model
 
     protected $casts = [
         'conversion_date' => 'datetime',
+        'from_quantity' => 'decimal:2',
+        'to_quantity' => 'decimal:2',
     ];
 
     public function fromItem(): BelongsTo

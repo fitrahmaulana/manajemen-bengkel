@@ -36,7 +36,7 @@ return new class extends Migration
             // Harga & stok
             $table->decimal('purchase_price', 15, 0);
             $table->decimal('selling_price', 15, 0);
-            $table->integer('stock')->default(0);
+            $table->decimal('stock', 15, 2)->default(0); // Changed to decimal for fractional quantities like 3.5 liter
             $table->string('unit', 50)->default('Pcs'); // "Liter", "Botol", dll
 
             // Konversi eceran/grosir

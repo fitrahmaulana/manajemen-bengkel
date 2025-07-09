@@ -8,7 +8,7 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
-use App\Traits\InvoiceCalculationTrait; // Added trait for optimized calculations
+use App\Traits\InvoiceCalculationTrait;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
@@ -44,6 +44,41 @@ class InvoiceResource extends Resource
     protected static ?int $navigationSort = 1;
 
 
+
+    // Helper method untuk menghitung kuantitas konversi (sama seperti di ItemResource)
+    private static function calculateToQuantityForInvoice(Forms\Set $set, Forms\Get $get, Item $toItemRecord, ?string $fromItemId, ?string $fromQuantityInput): void
+    {
+        if (!$fromItemId || !$fromQuantityInput || !is_numeric($fromQuantityInput) || (float)$fromQuantityInput <= 0) {
+            $set('calculated_to_quantity', null);
+            $set('to_quantity_unit_suffix', $toItemRecord->unit);
+            return;
+        }
+
+        $fromItem = Item::find($fromItemId);
+        $fromQuantity = (float)$fromQuantityInput;
+
+        if (
+            $fromItem && $toItemRecord->volume_value && $toItemRecord->base_volume_unit &&
+            $fromItem->volume_value && $fromItem->base_volume_unit &&
+            $fromItem->base_volume_unit === $toItemRecord->base_volume_unit &&
+            $toItemRecord->volume_value > 0
+        ) {
+            $calculated = ($fromItem->volume_value * $fromQuantity) / $toItemRecord->volume_value;
+            $precision = (strpos((string)$calculated, '.') !== false && fmod($calculated, 1) != 0) ? 2 : 0;
+            $finalCalculated = round($calculated, $precision);
+
+            if ($finalCalculated > 0) {
+                $set('calculated_to_quantity', $finalCalculated);
+                $set('to_quantity_unit_suffix', $toItemRecord->unit);
+            } else {
+                $set('calculated_to_quantity', null);
+                $set('to_quantity_unit_suffix', $toItemRecord->unit);
+            }
+        } else {
+            $set('calculated_to_quantity', null);
+            $set('to_quantity_unit_suffix', $toItemRecord->unit);
+        }
+    }
 
     public static function form(Form $form): Form
     {
@@ -174,7 +209,7 @@ class InvoiceResource extends Resource
                                         ->with(['product'])
                                         ->get()
                                         ->mapWithKeys(function ($item) {
-                                            // Menampilkan nama produk + varian (jika ada) + SKU
+                                            // Menampilkan nama produk + varian (jika ada) + SKU + STOK
                                             $productName = $item->product->name;
                                             $variantName = $item->name;
 
@@ -187,7 +222,9 @@ class InvoiceResource extends Resource
                                             }
 
                                             $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
-                                            return [$item->id => $displayName . $skuInfo];
+                                            $stockInfo = " - Stok: {$item->stock} {$item->unit}";
+
+                                            return [$item->id => $displayName . $skuInfo . $stockInfo];
                                         });
                                 })
                                 ->searchable()
@@ -199,13 +236,14 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
+                            ->step(1) // Memungkinkan input desimal seperti 3.5
                             ->default(1)
                             ->required()
                             ->live()
                             ->rules([
                                 function (Get $get, callable $set, $record, $operation) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
-                                        $quantityInput = (int)$value;
+                                        $quantityInput = (float)$value; // Ubah dari int ke float untuk mendukung desimal
                                         $itemId = $get('item_id');
 
                                         if ($quantityInput <= 0) {
@@ -240,7 +278,7 @@ class InvoiceResource extends Resource
                             ->dehydrated(false) // Tidak disimpan ke database
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
-                                $quantity = (int)($get('quantity') ?? 0);
+                                $quantity = (float)($get('quantity') ?? 0); // Ubah dari int ke float
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
                                 $total = $quantity * $price;
                                 return self::formatCurrency($total);
@@ -249,7 +287,7 @@ class InvoiceResource extends Resource
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
                             'Total: ' . self::formatCurrency(collect($get('items'))->sum(function ($item) {
-                                $quantity = (int)($item['quantity'] ?? 0);
+                                $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
                                 $price = self::parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
                             }))
@@ -283,78 +321,115 @@ class InvoiceResource extends Resource
                                     ];
                                 }
                                 return [
-                                    Forms\Components\Select::make('source_parent_item_id')
-                                        ->label('Pilih Item Induk')
+                                    Forms\Components\Placeholder::make('child_item_info')
+                                        ->label('Item yang Akan Ditambah Stoknya')
+                                        ->content(fn () => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
+
+                                    Forms\Components\Select::make('from_item_id')
+                                        ->label('Pilih Item Sumber (Induk)')
                                         ->options(function () use ($childItem) {
-                                            return $childItem->sourceParents()
+                                            return Item::where('product_id', $childItem->product_id)
+                                                ->where('id', '!=', $childItem->id)
                                                 ->where('stock', '>', 0)
                                                 ->get()
                                                 ->mapWithKeys(function ($parentItem) {
-                                                    return [$parentItem->id => "{$parentItem->name} (Stok: {$parentItem->stock})"];
+                                                    return [$parentItem->id => "{$parentItem->display_name} (Stok: {$parentItem->stock} {$parentItem->unit})"];
                                                 });
                                         })
                                         ->required()
-                                        ->live(onBlur: true)
-                                        ->helperText('Pilih item yang akan dipecah untuk menambah stok ' . $childItem->name),
-                                    Forms\Components\TextInput::make('parent_quantity_to_split')
-                                        ->label('Jumlah yang Dipecah')
+                                        ->searchable()
+                                        ->live()
+                                        ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
+                                            // Trigger calculation using the same logic as ItemResource
+                                            $fromItemId = $state;
+                                            $fromQuantity = $get('from_quantity');
+                                            self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromQuantity);
+
+                                            // Update max stock for validation
+                                            if ($fromItemId) {
+                                                $fromItem = Item::find($fromItemId);
+                                                if ($fromItem) {
+                                                    $set('current_from_item_stock', $fromItem->stock);
+                                                    if ($get('from_quantity') > $fromItem->stock) {
+                                                        $set('from_quantity', $fromItem->stock);
+                                                        self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromItem->stock);
+                                                    }
+                                                }
+                                            } else {
+                                                $set('current_from_item_stock', null);
+                                            }
+                                        }),
+
+                                    Forms\Components\Hidden::make('current_from_item_stock')->default(null),
+
+                                    Forms\Components\TextInput::make('from_quantity')
+                                        ->label('Jumlah Item Sumber yang Akan Dikonversi')
                                         ->numeric()
-                                        ->minValue(1)
+                                        ->default(1)
                                         ->required()
-                                        ->live(onBlur: true)
-                                        ->helperText('Masukkan jumlah unit yang akan dipecah')
-                                        ->rules([
-                                            function (Get $get, callable $set) {
-                                                return function (string $attribute, $value, \Closure $fail) use ($get) {
-                                                    $sourceParentItemId = $get('source_parent_item_id');
-                                                    if (!$sourceParentItemId) {
-                                                        $fail("Item induk harus dipilih.");
-                                                        return;
-                                                    }
+                                        ->minValue(1)
+                                        ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null)
+                                        ->live()
+                                        ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
+                                            $fromItemId = $get('from_item_id');
+                                            $fromQuantity = $state;
+                                            self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromQuantity);
+                                        }),
 
-                                                    $sourceParentItem = Item::find($sourceParentItemId);
-                                                    if (!$sourceParentItem) {
-                                                        $fail("Item tidak valid.");
-                                                        return;
-                                                    }
+                                    Forms\Components\Placeholder::make('to_quantity_display')
+                                        ->label('Jumlah Item yang Akan Dihasilkan')
+                                        ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
 
-                                                    if ($value > $sourceParentItem->stock) {
-                                                        $fail("Stok tidak cukup. Tersedia: {$sourceParentItem->stock}");
-                                                        return;
-                                                    }
+                                    Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
+                                    Forms\Components\Hidden::make('to_quantity_unit_suffix')->default(null),
 
-                                                    // Quick validation
-                                                    $result = $value * $sourceParentItem->conversion_value;
-                                                    if ($result <= 0) {
-                                                        $fail("Error konversi. Hubungi admin.");
-                                                        return;
-                                                    }
-                                                };
-                                            },
-                                        ]),
+                                    Forms\Components\Textarea::make('notes')
+                                        ->label('Catatan (Opsional)')
+                                        ->rows(3),
                                 ];
                             })
                             ->modalSubmitActionLabel('Lakukan Pecah Stok')
                             ->action(function (array $data, array $arguments, Forms\Components\Repeater $component) {
-                                // No validation needed - already handled by form rules!
-                                // Direct business logic execution
-
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItem = Item::find($itemRepeaterState['item_id']);
-                                $sourceParentItem = Item::find($data['source_parent_item_id']);
-                                $parentQuantityToSplit = (int)$data['parent_quantity_to_split'];
-                                $generatedChildQuantity = $parentQuantityToSplit * $sourceParentItem->conversion_value;
+                                $sourceParentItem = Item::find($data['from_item_id']);
+                                $fromQuantity = (int)$data['from_quantity'];
+                                $calculatedToQuantity = $data['calculated_to_quantity'];
+
+                                if (!$childItem || !$sourceParentItem) {
+                                    Notification::make()
+                                        ->title('Error')
+                                        ->body('Item tidak ditemukan.')
+                                        ->danger()
+                                        ->send();
+                                    return;
+                                }
+
+                                if (is_null($calculatedToQuantity) || $calculatedToQuantity <= 0) {
+                                    Notification::make()
+                                        ->title('Konversi Stok Gagal')
+                                        ->danger()
+                                        ->body('Jumlah item yang dihasilkan tidak valid atau tidak dapat dihitung. Pastikan data volume item sumber dan tujuan sudah benar dan satuan volume standar sama.')
+                                        ->send();
+                                    return;
+                                }
 
                                 try {
-                                    DB::transaction(function () use ($sourceParentItem, $childItem, $parentQuantityToSplit, $generatedChildQuantity) {
-                                        $sourceParentItem->decrement('stock', $parentQuantityToSplit);
-                                        $childItem->increment('stock', $generatedChildQuantity);
-                                    });
+                                    // Gunakan StockConversionService
+                                    $stockConversionService = app(\App\Services\StockConversionService::class);
+
+                                    $conversion = $stockConversionService->convertStock(
+                                        fromItemId: $sourceParentItem->id,
+                                        toItemId: $childItem->id,
+                                        fromQuantity: $fromQuantity,
+                                        toQuantity: $calculatedToQuantity,
+                                        notes: $data['notes'] ?? "Pecah stok untuk invoice"
+                                    );
 
                                     // Success notification
                                     Notification::make()
                                         ->title('Berhasil Pecah Stok')
-                                        ->body("{$parentQuantityToSplit} {$sourceParentItem->unit} {$sourceParentItem->name} dipecah. Stok {$childItem->name} bertambah {$generatedChildQuantity} {$childItem->unit}.")
+                                        ->body("{$fromQuantity} {$sourceParentItem->unit} {$sourceParentItem->display_name} dipecah. Stok {$childItem->display_name} bertambah {$calculatedToQuantity} {$childItem->unit}.")
                                         ->success()
                                         ->send();
 
@@ -384,9 +459,11 @@ class InvoiceResource extends Resource
                                     $item = Item::find($itemId);
                                     if (!$item) return false;
 
-                                    // Tampilkan tombol hanya untuk item eceran (non-konvertibel)
-                                    // dan yang memiliki parent item yang bisa dipecah
-                                    return !$item->is_convertible && $item->sourceParents()->where('stock', '>', 0)->exists();
+                                    // Periksa apakah ada item lain dalam produk yang sama dengan stok > 0
+                                    return Item::where('product_id', $item->product_id)
+                                        ->where('id', '!=', $item->id)
+                                        ->where('stock', '>', 0)
+                                        ->exists();
                                 } catch (\Exception $e) {
                                     // Jika terjadi error, sembunyikan tombol
                                     return false;
@@ -453,7 +530,7 @@ class InvoiceResource extends Resource
                                 });
 
                                 $itemsTotal = collect($get('items'))->sum(function ($item) {
-                                    $quantity = (int)($item['quantity'] ?? 0);
+                                    $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
                                 });

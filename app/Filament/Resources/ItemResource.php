@@ -137,8 +137,9 @@ class ItemResource extends Resource
                                 Forms\Components\TextInput::make('stock')
                                     ->label('Jumlah Stok')
                                     ->placeholder('0')
-                                    ->helperText('Jumlah barang yang tersedia')
+                                    ->helperText('Jumlah barang yang tersedia (mendukung desimal seperti 3.5)')
                                     ->numeric()
+                                    ->step(1) // Memungkinkan input desimal
                                     ->required()
                                     ->default(0),
                                 Forms\Components\Select::make('unit')
@@ -183,8 +184,6 @@ class ItemResource extends Resource
                                     ->helperText('Satuan acuan untuk perbandingan volume antar item.'),
                             ]),
                     ]),
-
-                // Section untuk is_convertible, target_child_item_id, conversion_value sudah dihapus
             ]);
     }
 
@@ -339,70 +338,6 @@ class ItemResource extends Resource
                                 ->send();
                         }
                     }),
-                // Old pecahStok action, can be removed or kept based on preference
-                // Tables\Actions\Action::make('pecahStok')
-                //     ->label('Pecah 1 Unit Stok (Lama)')
-                //     ->icon('heroicon-o-arrows-up-down')
-                //     ->requiresConfirmation()
-                //     ->modalHeading('Konfirmasi Pecah Stok (Lama)')
-                //     ->modalDescription('Apakah Anda yakin ingin memecah 1 unit dari item ini? Stok item eceran target akan bertambah sesuai nilai konversi lama.')
-                //     ->modalSubmitActionLabel('Ya, Pecah (Lama)')
-                //     ->action(function (Item $record) {
-                //         $sourceItem = $record;
-                //         $targetItem = $sourceItem->targetChild;
-
-                //         if (!$targetItem) {
-                //             Notification::make()
-                //                 ->title('Proses Gagal')
-                //                 ->body('Target item eceran belum diatur untuk item induk ini (sistem lama).')
-                //                 ->danger()
-                //                 ->send();
-                //             return;
-                //         }
-
-                //         if (!$sourceItem->conversion_value || $sourceItem->conversion_value <= 0) {
-                //             Notification::make()
-                //                 ->title('Proses Gagal')
-                //                 ->body("Nilai konversi untuk {$sourceItem->name} tidak valid atau belum diatur (sistem lama).")
-                //                 ->danger()
-                //                 ->send();
-                //             return;
-                //         }
-
-                //         if ($sourceItem->stock < 1) {
-                //             Notification::make()
-                //                 ->title('Proses Gagal')
-                //                 ->body("Stok {$sourceItem->name} tidak mencukupi untuk dipecah (kurang dari 1).")
-                //                 ->danger()
-                //                 ->send();
-                //             return;
-                //         }
-
-                //         try {
-                //             \Illuminate\Support\Facades\DB::transaction(function () use ($sourceItem, $targetItem) {
-                //                 $sourceItem->decrement('stock', 1);
-                //                 $targetItem->increment('stock', $sourceItem->conversion_value);
-                //             });
-
-                //             Notification::make()
-                //                 ->title('Berhasil Pecah Stok (Lama)')
-                //                 ->success()
-                //                 ->body("1 {$sourceItem->unit} {$sourceItem->name} telah dipecah. Stok {$targetItem->name} bertambah {$sourceItem->conversion_value} {$targetItem->unit}.")
-                //                 ->send();
-                //         } catch (\Exception $e) {
-                //             Notification::make()
-                //                 ->title('Proses Gagal')
-                //                 ->body('Terjadi kesalahan internal saat memecah stok: ' . $e->getMessage())
-                //                 ->danger()
-                //                 ->send();
-                //         }
-                //     })
-                //     ->visible(
-                //         fn(Item $record): bool =>
-                //         $record->target_child_item_id !== null &&
-                //             $record->conversion_value > 0 &&
-                //             $record->is_convertible // Keep old logic visibility for now
-                //     ),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -448,7 +383,6 @@ class ItemResource extends Resource
                             ->suffix(fn ($record) => ' ' . $record->base_volume_unit)
                             ->placeholder('-')
                             ->visible(fn ($record) => !is_null($record->volume_value)),
-                        // IconEntry untuk is_convertible sudah dihapus
                     ]),
 
                 InfolistSection::make('Harga & Stok')

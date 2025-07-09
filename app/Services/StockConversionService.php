@@ -15,8 +15,8 @@ class StockConversionService
      *
      * @param int $fromItemId
      * @param int $toItemId
-     * @param int $fromQuantity
-     * @param int $toQuantity
+     * @param float $fromQuantity - Ubah ke float untuk mendukung desimal
+     * @param float $toQuantity - Ubah ke float untuk mendukung desimal
      * @param string|null $notes
      * @param int|null $userId
      * @return ItemStockConversion
@@ -25,8 +25,8 @@ class StockConversionService
     public function convertStock(
         int $fromItemId,
         int $toItemId,
-        int $fromQuantity,
-        int $toQuantity,
+        float $fromQuantity, // Ubah dari int ke float
+        float $toQuantity,   // Ubah dari int ke float
         ?string $notes = null,
         ?int $userId = null
     ): ItemStockConversion {

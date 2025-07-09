@@ -45,10 +45,15 @@ class ItemsRelationManager extends RelationManager
                     ->color(fn($state) => $state <= 5 ? 'warning' : 'success'),
                 Tables\Columns\TextColumn::make('unit')
                     ->label('Satuan'),
-                Tables\Columns\IconColumn::make('is_convertible')
-                    ->label('Bisa Dipecah')
+                Tables\Columns\IconColumn::make('has_conversions')
+                    ->label('Bisa Dikonversi')
                     ->boolean()
-                    ->getStateUsing(fn($record) => $record->is_convertible),
+                    ->getStateUsing(function ($record) {
+                        // Periksa apakah item ini memiliki konfigurasi konversi sebagai source atau target
+                        return \App\Models\ItemStockConversion::where('from_item_id', $record->id)
+                            ->orWhere('to_item_id', $record->id)
+                            ->exists();
+                    }),
             ])
             ->filters([
                 //
@@ -62,62 +67,25 @@ class ItemsRelationManager extends RelationManager
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make(),
                 Tables\Actions\Action::make('pecahStok')
-                    ->label('Pecah Stok')
+                    ->label('Konversi Stok')
                     ->icon('heroicon-o-arrows-right-left')
                     ->requiresConfirmation()
-                    ->modalHeading('Konfirmasi Pecah Stok')
-                    ->modalDescription('Apakah Anda yakin ingin memecah 1 unit dari varian ini?')
-                    ->modalSubmitActionLabel('Ya, Pecah')
+                    ->modalHeading('Konfirmasi Konversi Stok')
+                    ->modalDescription('Fitur ini menggunakan sistem konversi baru. Silakan gunakan menu "Konversi Stok" di halaman Item untuk melakukan konversi.')
+                    ->modalSubmitActionLabel('OK')
                     ->action(function (Item $record) {
-                        $sourceItem = $record;
-                        $targetItem = $sourceItem->targetChild;
-
-                        if (!$targetItem) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Proses Gagal')
-                                ->body('Target item eceran belum diatur.')
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-
-                        if (!$sourceItem->conversion_value || $sourceItem->conversion_value <= 0) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Proses Gagal')
-                                ->body("Nilai konversi tidak valid.")
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-
-                        if ($sourceItem->stock < 1) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Proses Gagal')
-                                ->body("Stok tidak mencukupi.")
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-
-                        try {
-                            \Illuminate\Support\Facades\DB::transaction(function () use ($sourceItem, $targetItem) {
-                                $sourceItem->decrement('stock', 1);
-                                $targetItem->increment('stock', $sourceItem->conversion_value);
-                            });
-
-                            \Filament\Notifications\Notification::make()
-                                ->title('Berhasil Pecah Stok')
-                                ->success()
-                                ->body("Stok berhasil dipecah.")
-                                ->send();
-                        } catch (\Exception $e) {
-                            \Filament\Notifications\Notification::make()
-                                ->title('Proses Gagal')
-                                ->body('Terjadi kesalahan internal.')
-                                ->danger()
-                                ->send();
-                        }
-                    })->visible(fn(Item $record): bool => $record->is_convertible ?? false),
+                        \Filament\Notifications\Notification::make()
+                            ->title('Info')
+                            ->body('Silakan gunakan fitur "Konversi Stok" di halaman detail item untuk melakukan konversi dengan sistem yang baru.')
+                            ->info()
+                            ->send();
+                    })
+                    ->visible(function (Item $record): bool {
+                        // Tampilkan jika item ini memiliki konfigurasi konversi
+                        return \App\Models\ItemStockConversion::where('from_item_id', $record->id)
+                            ->orWhere('to_item_id', $record->id)
+                            ->exists();
+                    }),
 
             ])
             ->bulkActions([
