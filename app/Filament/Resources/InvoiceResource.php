@@ -236,8 +236,8 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
-                            ->step(1) // Memungkinkan input desimal seperti 3.5
-                            ->default(1)
+                            ->step('0.01') // Allow decimal input
+                            ->default(1.0) // Default to float
                             ->required()
                             ->live()
                             ->rules([
@@ -287,7 +287,7 @@ class InvoiceResource extends Resource
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
                             'Total: ' . self::formatCurrency(collect($get('items'))->sum(function ($item) {
-                                $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
+                                $quantity = (float)($item['quantity'] ?? 0.0); // Ensure float for consistency
                                 $price = self::parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
                             }))
@@ -494,7 +494,7 @@ class InvoiceResource extends Resource
 
                                 // Hitung total dari items
                                 $itemsTotal = collect($get('items'))->sum(function ($item) {
-                                    $quantity = (int)($item['quantity'] ?? 0);
+                                    $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
                                 });
@@ -591,9 +591,35 @@ class InvoiceResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make(), // Will now soft delete
-                    ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make(),
+                    Tables\Actions\DeleteBulkAction::make()
+                        ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $stockService = app(\App\Services\InvoiceStockService::class);
+                            foreach ($records as $record) {
+                                $stockService->restoreStockForInvoiceItems($record);
+                            }
+                        }),
+                    ForceDeleteBulkAction::make()
+                        ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            // Optional: Restore stock if business logic requires it for force delete
+                            // $stockService = app(\App\Services\InvoiceStockService::class);
+                            // foreach ($records as $record) {
+                            //    $stockService->restoreStockForInvoiceItems($record);
+                            // }
+                        }),
+                    RestoreBulkAction::make()
+                        ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
+                            $stockService = app(\App\Services\InvoiceStockService::class);
+                            foreach ($records as $record) {
+                                // Need to ensure items are loaded if they aren't by default on restored records in bulk
+                                $record->loadMissing('items');
+                                $itemsData = $record->items->map(function ($item) {
+                                    return ['item_id' => $item->id, 'quantity' => $item->pivot->quantity];
+                                })->toArray();
+                                $stockService->deductStockForInvoiceItems($record, $itemsData);
+                                // Also update status
+                                \App\Traits\InvoiceCalculationTrait::updateInvoiceStatus($record);
+                            }
+                        }),
                 ]),
             ]);
     }

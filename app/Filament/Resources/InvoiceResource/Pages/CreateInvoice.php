@@ -4,6 +4,7 @@ namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
 use App\Models\Item;
+use App\Services\InvoiceStockService; // Import the new service
 use App\Traits\InvoiceCalculationTrait; // Use the optimized trait
 use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
@@ -32,7 +33,7 @@ class CreateInvoice extends CreateRecord
 
         // 2. Hitung subtotal dari items
         $itemsTotal = collect($items)->sum(function ($item) {
-            $quantity = (int)($item['quantity'] ?? 0);
+            $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
             $price = self::parseCurrencyValue($item['price'] ?? '0');
             return $quantity * $price;
         });
@@ -91,14 +92,8 @@ class CreateInvoice extends CreateRecord
                     });
                     $this->record->items()->sync($itemData);
 
-                    // Update stock untuk setiap item
-                    foreach ($items as $item) {
-                        $itemModel = Item::find($item['item_id']);
-                        if ($itemModel) {
-                            $quantity = (int)($item['quantity'] ?? 1);
-                            $itemModel->decrement('stock', $quantity);
-                        }
-                    }
+                    // Use InvoiceStockService to deduct stock
+                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items);
                 }
 
                 // 3. Update invoice status after creation

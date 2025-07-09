@@ -32,7 +32,7 @@ trait InvoiceCalculationTrait
         foreach ($itemsData as $item) {
             if (!empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
                 $price = self::parseCurrencyValue($item['price']);
-                $quantity = (int)($item['quantity'] ?? 1);
+                $quantity = (float)($item['quantity'] ?? 1.0); // Changed to float
                 $subtotal += $price * $quantity;
             }
         }

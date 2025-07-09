@@ -4,6 +4,7 @@ namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
 use App\Models\Item;
+use App\Services\InvoiceStockService; // Import the new service
 use App\Traits\InvoiceCalculationTrait; // Use the optimized trait
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
@@ -32,7 +33,7 @@ class EditInvoice extends EditRecord
 
         // 2. Hitung subtotal dari items
         $itemsTotal = collect($items)->sum(function ($item) {
-            $quantity = (int)($item['quantity'] ?? 0);
+            $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
             $price = self::parseCurrencyValue($item['price'] ?? '0');
             return $quantity * $price;
         });
@@ -62,44 +63,28 @@ class EditInvoice extends EditRecord
     {
         return [
             Actions\DeleteAction::make()
-                ->before(function () {
-                    // Restore stock before deleting invoice
-                    foreach ($this->record->items as $itemPivot) {
-                        $itemModel = \App\Models\Item::find($itemPivot->id);
-                        if ($itemModel) {
-                            $quantityToRestore = $itemPivot->pivot->quantity;
-                            $itemModel->stock += $quantityToRestore;
-                            $itemModel->save();
-                        }
-                    }
+                ->before(function (InvoiceStockService $stockService) {
+                    $stockService->restoreStockForInvoiceItems($this->record);
                 })
                 ->after(function () {
-                    // Update invoice status after deletion if needed
-                    // Note: This is for soft delete, hard delete would not need this
+                    // Optional: Any other logic after soft delete
                 }),
-            Actions\ForceDeleteAction::make(),
+            Actions\ForceDeleteAction::make() // Note: Stock is not restored on ForceDelete by default here.
+                                             // If it should be, similar logic as DeleteAction::before would be needed.
+                                             // However, typically force delete implies data is gone permanently.
+                ->before(function (InvoiceStockService $stockService) {
+                     // If stock should be restored even on force delete (uncommon but possible)
+                     // $stockService->restoreStockForInvoiceItems($this->record);
+                }),
             Actions\RestoreAction::make()
-                ->after(function () {
-                    // Re-decrement stock for items on the restored invoice
-                    foreach ($this->record->items as $itemPivot) {
-                        $itemModel = \App\Models\Item::find($itemPivot->id);
-                        if ($itemModel) {
-                            $quantityToDecrement = $itemPivot->pivot->quantity;
+                ->after(function (InvoiceStockService $stockService) {
+                    // Re-deduct stock for items on the restored invoice
+                    // Convert Eloquent collection to array format expected by deductStockForInvoiceItems
+                    $itemsData = $this->record->items->map(function ($item) {
+                        return ['item_id' => $item->id, 'quantity' => $item->pivot->quantity];
+                    })->toArray();
+                    $stockService->deductStockForInvoiceItems($this->record, $itemsData);
 
-                            // Check if stock would go negative
-                            if ($itemModel->stock >= $quantityToDecrement) {
-                                $itemModel->stock -= $quantityToDecrement;
-                                $itemModel->save();
-                            } else {
-                                // Handle negative stock scenario
-                                \Filament\Notifications\Notification::make()
-                                    ->title('⚠️ Stock Tidak Mencukupi')
-                                    ->body("Item {$itemModel->name} tidak memiliki stock yang cukup untuk di-restore.")
-                                    ->warning()
-                                    ->send();
-                            }
-                        }
-                    }
                     // Update invoice status after restoration
                     self::updateInvoiceStatus($this->record);
                 }),
@@ -147,19 +132,58 @@ class EditInvoice extends EditRecord
      */
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
-
         try {
             return DB::transaction(function () use ($record, $data) {
-                // 1. Calculate and apply stock adjustments first
-                $this->adjustItemStock($record, $data['items'] ?? []);
+                $stockService = app(InvoiceStockService::class);
+                $newItemsData = $data['items'] ?? [];
 
-                // 2. Update main record
-                $updatedRecord = parent::handleRecordUpdate($record, $data);
+                // Get original items with their quantities before any changes
+                $originalItems = [];
+                foreach ($record->items as $item) {
+                    $originalItems[$item->id] = (float)$item->pivot->quantity;
+                }
 
-                // 3. Update invoice status
-                self::updateInvoiceStatus($updatedRecord);
+                // First, update the main record and its direct relations (excluding stock logic for now)
+                // We need to call parent::handleRecordUpdate to let Filament do its thing with data.
+                // The actual item data for stock adjustment will be from $data['items'] (new state)
+                // and $originalItems (old state).
+                // Note: The parent method will also sync relationships if not handled separately in afterSave.
+                // For this refactor, we'll assume stock is handled *after* the main record update.
 
-                return $updatedRecord;
+                // Detach all items first to handle removals/updates cleanly. Stock will be restored.
+                // This is a simple approach; a more complex one would compare item by item.
+                if ($record->items()->exists()) {
+                    $stockService->restoreStockForInvoiceItems($record); // Restore stock for all old items
+                    $record->items()->detach(); // Detach all items
+                }
+
+                // Update the record (this will save main invoice fields)
+                // $data is already mutated by mutateFormDataBeforeSave for totals
+                $record->fill($data);
+                $record->save();
+
+
+                // Re-attach new/updated items and deduct stock
+                // (afterSave will also sync items, but stock deduction needs $data items)
+                if (!empty($newItemsData)) {
+                    $itemsToSync = collect($newItemsData)->mapWithKeys(function ($item) {
+                        return [$item['item_id'] => [
+                            'quantity' => (float)($item['quantity'] ?? 0.0),
+                            'price' => self::parseCurrencyValue($item['price'] ?? '0'),
+                            'description' => $item['description'] ?? '',
+                        ]];
+                    })->all();
+                    $record->items()->sync($itemsToSync); // Sync new set of items
+
+                    // Deduct stock for the new set of items
+                    $stockService->deductStockForInvoiceItems($record, $newItemsData);
+                }
+
+
+                // Update invoice status
+                self::updateInvoiceStatus($record);
+
+                return $record;
             });
         } catch (\Exception $e) {
             Notification::make()
@@ -172,47 +196,7 @@ class EditInvoice extends EditRecord
         }
     }
 
-    /**
-     * Optimized stock adjustment logic.
-     * Langsung menggunakan data original dari $record - lebih efisien!
-     */
-    private function adjustItemStock(\Illuminate\Database\Eloquent\Model $record, array $newItemsData): void
-    {
-        $newItemsCollection = collect($newItemsData)->keyBy('item_id');
-
-        // Ambil data original langsung dari record - no need for separate storage!
-        $originalItemsCollection = collect($record->items)->mapWithKeys(function ($item) {
-            return [$item->id => $item->pivot->quantity];
-        });
-
-        // Process existing and new items
-        foreach ($newItemsCollection as $itemId => $itemDetails) {
-            $item = Item::find($itemId);
-            if (!$item) continue;
-
-            $newQuantity = (int)($itemDetails['quantity'] ?? 1);
-            $originalQuantity = (int)($originalItemsCollection->get($itemId, 0));
-            $quantityDifference = $newQuantity - $originalQuantity;
-
-            // Adjust stock: positive difference = more items used (decrease stock)
-            // negative difference = items returned (increase stock)
-            if ($quantityDifference !== 0) {
-                $item->stock -= $quantityDifference;
-                $item->save();
-            }
-        }
-
-        // Process removed items (restore their stock)
-        $removedItems = $originalItemsCollection->keys()->diff($newItemsCollection->keys());
-        foreach ($removedItems as $removedItemId) {
-            $item = Item::find($removedItemId);
-            if ($item) {
-                $restoredQuantity = (int)$originalItemsCollection->get($removedItemId, 0);
-                $item->stock += $restoredQuantity;
-                $item->save();
-            }
-        }
-    }
+    // The old adjustItemStock method is removed.
 
     /**
      * Hook ini dijalankan SETELAH record berhasil di-update.
@@ -237,15 +221,18 @@ class EditInvoice extends EditRecord
                 }
 
                 // Sync items with optimized data structure
+                // Note: Stock adjustment is now handled in handleRecordUpdate.
+                // This sync is primarily for saving price and description pivot data if they changed.
+                // The items themselves (IDs and quantities) are already synced in handleRecordUpdate.
                 if (!empty($itemsData)) {
                     $itemsToSync = collect($itemsData)->mapWithKeys(function ($item) {
                         return [$item['item_id'] => [
-                            'quantity' => (int)($item['quantity'] ?? 1),
-                            'price' => self::parseCurrencyValue($item['price'] ?? 0),
+                            'quantity' => (float)($item['quantity'] ?? 0.0), // Use float
+                            'price' => self::parseCurrencyValue($item['price'] ?? '0'),
                             'description' => $item['description'] ?? '',
                         ]];
                     });
-                    $this->record->items()->sync($itemsToSync);
+                    $this->record->items()->sync($itemsToSync); // This ensures pivot data is correct
                 }
             });
 
