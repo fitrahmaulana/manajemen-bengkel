@@ -184,21 +184,7 @@ class ItemResource extends Resource
                             ]),
                     ]),
 
-                // Checkbox untuk mengaktifkan konversi stok
-                Forms\Components\Section::make('Pengaturan Tambahan')
-                    ->schema([
-                        Forms\Components\Checkbox::make('is_convertible')
-                            ->label('Barang ini bisa dipecah ke eceran')
-                            ->helperText('Centang jika barang kemasan besar bisa dipecah (contoh: 1 Galon = 4 Liter)')
-                            ->live()
-                            ->afterStateUpdated(function (Forms\Set $set, $state) {
-                                if (!$state) {
-                                    // Reset conversion fields when disabled
-                                    $set('conversion_value', null);
-                                    $set('target_child_item_id', null);
-                                }
-                            }),
-                    ]),
+                // Section untuk is_convertible, target_child_item_id, conversion_value sudah dihapus
             ]);
     }
 
@@ -462,16 +448,7 @@ class ItemResource extends Resource
                             ->suffix(fn ($record) => ' ' . $record->base_volume_unit)
                             ->placeholder('-')
                             ->visible(fn ($record) => !is_null($record->volume_value)),
-                        // Status konversi
-                        IconEntry::make('is_convertible')
-                            ->label('Bisa Dipecah (Statik)')
-                            ->boolean()
-                            ->trueIcon('heroicon-o-arrows-right-left')
-                            ->trueColor('success')
-                            ->falseIcon('heroicon-o-cube')
-                            ->falseColor('gray')
-                            ->helperText(fn($state) => $state ? 'Bisa dipecah ke eceran' : 'Tidak bisa dipecah')
-                            ->getStateUsing(fn($record) => $record->is_convertible),
+                        // IconEntry untuk is_convertible sudah dihapus
                     ]),
 
                 InfolistSection::make('Harga & Stok')
@@ -494,26 +471,7 @@ class ItemResource extends Resource
                             ->size('lg'),
                     ]),
 
-                // Detail konversi - hanya muncul jika bisa dipecah
-                InfolistSection::make('Detail Konversi')
-                    ->visible(fn($record) => $record->is_convertible)
-                    ->schema([
-                        TextEntry::make('conversion_value')
-                            ->label('Nilai Konversi')
-                            ->helperText(function ($record) {
-                                $childName = $record->targetChild?->name ?? '...';
-                                $childUnit = $record->targetChild?->unit ?? '...';
-                                return "1 {$record->unit} akan menghasilkan {$record->conversion_value} {$childUnit} {$childName}";
-                            }),
-                        TextEntry::make('targetChild.name')
-                            ->label('Barang Eceran')
-                            ->formatStateUsing(function ($record) {
-                                if ($record->targetChild) {
-                                    return $record->targetChild->product->name . ' - ' . $record->targetChild->name;
-                                }
-                                return '-';
-                            }),
-                    ]),
+                // Section "Detail Konversi" yang lama sudah dihapus
             ]);
     }
 }

@@ -19,16 +19,16 @@ class Item extends Model
         'unit',
         'volume_value',
         'base_volume_unit',
-        'is_convertible',
-        'target_child_item_id',
-        'conversion_value',
+        // 'is_convertible', // Dihapus
+        // 'target_child_item_id', // Dihapus
+        // 'conversion_value', // Dihapus
     ];
 
     protected $casts = [
         'stock' => 'integer',
         'volume_value' => 'decimal:2',
-        'conversion_value' => 'decimal:2', // Will be deprecated
-        'is_convertible' => 'boolean', // Will be deprecated
+        // 'conversion_value' => 'decimal:2', // Dihapus
+        // 'is_convertible' => 'boolean', // Dihapus
     ];
 
     public function product()
@@ -41,22 +41,10 @@ class Item extends Model
         return $this->belongsToMany(Invoice::class, 'invoice_item');
     }
 
-    // Deprecating old conversion relationships
-    // /**
-    //  * Get the target eceran item for this (parent) item.
-    //  */
-    // public function targetChild(): \Illuminate\Database\Eloquent\Relations\BelongsTo
-    // {
-    //     return $this->belongsTo(Item::class, 'target_child_item_id');
-    // }
-
-    // /**
-    //  * Get all parent items that convert into this (eceran) item.
-    //  */
-    // public function sourceParents(): \Illuminate\Database\Eloquent\Relations\HasMany
-    // {
-    //     return $this->hasMany(Item::class, 'target_child_item_id');
-    // }
+    // Relasi targetChild() dan sourceParents() sudah tidak relevan dan akan dihapus.
+    // Jika masih ada referensi di kode lain (seperti di ItemResource untuk createOptionForm),
+    // itu perlu di-refactor atau dihapus juga jika tidak lagi digunakan.
+    // Untuk saat ini, kita hapus definisinya di sini.
 
     /**
      * Get all stock conversions where this item was the source.

@@ -48,8 +48,8 @@ class InvoiceObserverTest extends TestCase
 
         $this->customer = Customer::create([
             'name' => 'Test Customer',
-            'phone' => '081234567890',
-            'email' => 'test@example.com',
+            'phone_number' => '081234567890', // Changed 'phone' to 'phone_number'
+            // 'email' => 'test@example.com', // Removed email as it's not in Customer $fillable
             'address' => 'Test Address'
         ]);
 
@@ -70,6 +70,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-001',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 30000,
             'status' => 'pending'
         ]);
@@ -77,8 +79,7 @@ class InvoiceObserverTest extends TestCase
         // Attach items to invoice
         $invoice->items()->attach($this->item->id, [
             'quantity' => 5,
-            'unit_price' => 15000,
-            'total_price' => 75000
+            'price' => 15000, // Changed from unit_price, total_price removed
         ]);
 
         // Simulate stock reduction (as it would happen when invoice is created)
@@ -103,6 +104,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-002',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 45000,
             'status' => 'pending'
         ]);
@@ -110,8 +113,7 @@ class InvoiceObserverTest extends TestCase
         // Attach items to invoice
         $invoice->items()->attach($this->item->id, [
             'quantity' => 3,
-            'unit_price' => 15000,
-            'total_price' => 45000
+            'price' => 15000, // Changed from unit_price, total_price removed
         ]);
 
         // Simulate stock reduction and then deletion
@@ -147,6 +149,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-003',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 85000,
             'status' => 'pending'
         ]);
@@ -155,13 +159,11 @@ class InvoiceObserverTest extends TestCase
         $invoice->items()->attach([
             $this->item->id => [
                 'quantity' => 2,
-                'unit_price' => 15000,
-                'total_price' => 30000
+                'price' => 15000, // Changed from unit_price, total_price removed
             ],
             $item2->id => [
                 'quantity' => 3,
-                'unit_price' => 25000,
-                'total_price' => 75000
+                'price' => 25000, // Changed from unit_price, total_price removed
             ]
         ]);
 
@@ -201,6 +203,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-004',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 75000,
             'status' => 'pending'
         ]);
@@ -208,8 +212,7 @@ class InvoiceObserverTest extends TestCase
         // Attach item with quantity that will make stock go negative
         $invoice->items()->attach($lowStockItem->id, [
             'quantity' => 5,
-            'unit_price' => 15000,
-            'total_price' => 75000
+            'price' => 15000, // Changed from unit_price, total_price removed
         ]);
 
         // Simulate stock reduction (this would make it negative)
@@ -238,6 +241,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-005',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 30000,
             'status' => 'pending'
         ]);
@@ -245,8 +250,7 @@ class InvoiceObserverTest extends TestCase
         // Attach item normally
         $invoice->items()->attach($this->item->id, [
             'quantity' => 2,
-            'unit_price' => 15000,
-            'total_price' => 30000
+            'price' => 15000, // Changed from unit_price, total_price removed
         ]);
 
         // Simulate stock reduction
@@ -275,6 +279,8 @@ class InvoiceObserverTest extends TestCase
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
             'invoice_number' => 'INV-TEST-006',
+            'invoice_date' => now()->toDateString(),
+            'due_date' => now()->addDays(7)->toDateString(),
             'total_amount' => 60000,
             'status' => 'pending'
         ]);
@@ -282,8 +288,7 @@ class InvoiceObserverTest extends TestCase
         // Attach items with different quantities
         $invoice->items()->attach($this->item->id, [
             'quantity' => 4,
-            'unit_price' => 15000,
-            'total_price' => 60000
+            'price' => 15000, // Changed from unit_price, total_price removed
         ]);
 
         // Simulate stock reduction
