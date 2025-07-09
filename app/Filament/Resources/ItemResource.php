@@ -39,6 +39,44 @@ class ItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Varian';
     protected static ?int $navigationSort = 2;
 
+    private static function calculateToQuantity(Forms\Set $set, Forms\Get $get, Item $toItemRecord, ?string $fromItemId, ?string $fromQuantityInput): void
+    {
+        if (!$fromItemId || !$fromQuantityInput || !is_numeric($fromQuantityInput) || (float)$fromQuantityInput <= 0) {
+            $set('calculated_to_quantity', null);
+            $set('to_quantity_unit_suffix', $toItemRecord->unit); // Default to target item's unit
+            return;
+        }
+
+        $fromItem = Item::find($fromItemId);
+        $fromQuantity = (float)$fromQuantityInput;
+
+        if (
+            $fromItem && $toItemRecord->volume_value && $toItemRecord->base_volume_unit &&
+            $fromItem->volume_value && $fromItem->base_volume_unit &&
+            $fromItem->base_volume_unit === $toItemRecord->base_volume_unit &&
+            $toItemRecord->volume_value > 0 // Avoid division by zero
+        ) {
+            $calculated = ($fromItem->volume_value * $fromQuantity) / $toItemRecord->volume_value;
+            // Round to a sensible precision, e.g., 2 decimal places or integer
+            // If items are typically whole units (pcs, botol), consider rounding to nearest whole or specific logic.
+            // For now, flexible rounding.
+            $precision = (strpos((string)$calculated, '.') !== false && fmod($calculated, 1) != 0) ? 2 : 0;
+            $finalCalculated = round($calculated, $precision);
+
+            if ($finalCalculated > 0) {
+                $set('calculated_to_quantity', $finalCalculated);
+                $set('to_quantity_unit_suffix', $toItemRecord->unit);
+            } else {
+                $set('calculated_to_quantity', null);
+                $set('to_quantity_unit_suffix', $toItemRecord->unit);
+            }
+        } else {
+            $set('calculated_to_quantity', null);
+            $set('to_quantity_unit_suffix', $toItemRecord->unit);
+        }
+    }
+
+
     public static function roundUpToNearestHundred($number)
     {
         if (!is_numeric($number) || $number <= 0) {
@@ -325,101 +363,100 @@ class ItemResource extends Resource
             ])
             ->actions([
                 Tables\Actions\ViewAction::make(),
-                Tables\Actions\Action::make('convertStockDynamic')
-                    ->label('Konversi Stok')
-                    ->icon('heroicon-o-arrows-right-left')
+                Tables\Actions\Action::make('receiveStockFromConversion')
+                    ->label('Terima Stok dari Induk')
+                    ->icon('heroicon-o-arrow-down-on-square-stack') // Icon changed to reflect receiving
                     ->form([
-                        FormsTextInput::make('from_quantity')
-                            ->label('Jumlah Akan Dikonversi')
-                            ->helperText(fn (Item $record): string => "Stok saat ini: {$record->stock} {$record->unit}")
-                            ->numeric()
-                            ->required()
-                            ->minValue(1)
-                            ->maxValue(fn (Item $record) => $record->stock)
-                            ->live() // Make it live to trigger changes
-                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
-                                // This is the same logic as in to_item_id's afterStateUpdated
-                                // We can refactor this into a shared method if it gets more complex
-                                $fromItem = $record;
-                                $toItemId = $get('to_item_id');
-                                $fromQuantity = $state; // Current field's state
+                        Forms\Components\Placeholder::make('to_item_info')
+                            ->label('Item Tujuan (Saat Ini)')
+                            ->content(fn (Item $record): string => "{$record->display_name} (Stok: {$record->stock} {$record->unit})"),
 
-                                if ($toItemId && $fromQuantity && $fromItem->volume_value && $fromItem->base_volume_unit) {
-                                    $toItem = Item::find($toItemId);
-                                    if ($toItem && $toItem->volume_value && $toItem->base_volume_unit && $fromItem->base_volume_unit === $toItem->base_volume_unit) {
-                                        if ($toItem->volume_value > 0) {
-                                            $suggestedToQuantity = ($fromItem->volume_value * (float)$fromQuantity) / $toItem->volume_value;
-                                            $suggestedToQuantity = round($suggestedToQuantity, is_int($suggestedToQuantity) ? 0 : 2);
-                                            if ($suggestedToQuantity > 0) {
-                                                $set('to_quantity', $suggestedToQuantity);
-                                            } else {
-                                                $set('to_quantity', null);
-                                            }
-                                        } else {
-                                            $set('to_quantity', null);
-                                        }
-                                    } else {
-                                        $set('to_quantity', null);
-                                    }
-                                } else {
-                                    $set('to_quantity', null);
-                                }
-                            }),
-                        Select::make('to_item_id')
-                            ->label('Konversi Ke Item')
+                        Select::make('from_item_id')
+                            ->label('Pilih Item Sumber (Induk)')
                             ->options(function (Item $record) {
-                                // Exclude current item from options
-                                return Item::where('id', '!=', $record->id)
+                                if (!$record->product_id) {
+                                    return []; // No product context, no source items
+                                }
+                                return Item::where('product_id', $record->product_id)
+                                    ->where('id', '!=', $record->id) // Exclude self
                                     ->get()
                                     ->mapWithKeys(fn (Item $item) => [$item->id => $item->display_name . " (Stok: {$item->stock} {$item->unit})"]);
                             })
                             ->searchable()
                             ->required()
-                            ->live() // Make it live to trigger changes
+                            ->live()
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
-                                $fromItem = $record;
-                                $toItemId = $state;
+                                // Trigger to_quantity calculation
+                                $fromItemId = $state;
                                 $fromQuantity = $get('from_quantity');
+                                self::calculateToQuantity($set, $get, $record, $fromItemId, $fromQuantity);
 
-                                if ($toItemId && $fromQuantity && $fromItem->volume_value && $fromItem->base_volume_unit) {
-                                    $toItem = Item::find($toItemId);
-                                    if ($toItem && $toItem->volume_value && $toItem->base_volume_unit && $fromItem->base_volume_unit === $toItem->base_volume_unit) {
-                                        if ($toItem->volume_value > 0) { // Avoid division by zero
-                                            $suggestedToQuantity = ($fromItem->volume_value * $fromQuantity) / $toItem->volume_value;
-                                            // Round to sensible precision, e.g., 2 decimal places or integer
-                                            $suggestedToQuantity = round($suggestedToQuantity, is_int($suggestedToQuantity) ? 0 : 2);
-                                            if ($suggestedToQuantity > 0) {
-                                                $set('to_quantity', $suggestedToQuantity);
-                                            } else {
-                                                $set('to_quantity', null); // Clear if suggestion is not positive
-                                            }
-                                        } else {
-                                            $set('to_quantity', null); // Clear if to_item volume is zero
+                                // Update from_quantity max stock based on selected from_item
+                                if ($fromItemId) {
+                                    $fromItem = Item::find($fromItemId);
+                                    if ($fromItem) {
+                                        $set('current_from_item_stock', $fromItem->stock); // Store for maxValue rule
+                                        // If from_quantity exceeds new max, reset or cap it (optional, Filament might handle this with rules)
+                                        if ($get('from_quantity') > $fromItem->stock) {
+                                            $set('from_quantity', $fromItem->stock);
+                                            self::calculateToQuantity($set, $get, $record, $fromItemId, $fromItem->stock); // Recalculate
                                         }
-                                    } else {
-                                        $set('to_quantity', null); // Clear if units mismatch or to_item has no volume
                                     }
                                 } else {
-                                    $set('to_quantity', null); // Clear if not enough info
+                                     $set('current_from_item_stock', null);
                                 }
+
                             }),
-                        FormsTextInput::make('to_quantity')
-                            ->label('Jumlah Dihasilkan')
+
+                        // Hidden field to store current stock of selected from_item for validation
+                        Forms\Components\Hidden::make('current_from_item_stock')->default(null),
+
+                        FormsTextInput::make('from_quantity')
+                            ->label('Jumlah Item Sumber yang Akan Dikonversi')
                             ->numeric()
+                            ->default(1)
                             ->required()
-                            ->minValue(0.01) // Allow fractional quantities
-                            ->step('0.01'),
+                            ->minValue(1)
+                            ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
+                            ->live()
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
+                                // Trigger to_quantity calculation
+                                $fromItemId = $get('from_item_id');
+                                $fromQuantity = $state;
+                                self::calculateToQuantity($set, $get, $record, $fromItemId, $fromQuantity);
+                            }),
+
+                        Forms\Components\Placeholder::make('to_quantity_display')
+                            ->label('Jumlah Item Ini yang Akan Dihasilkan')
+                            ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
+
+                        // Hidden field to store the actual calculated to_quantity for submission
+                        Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
+                        Forms\Components\Hidden::make('to_quantity_unit_suffix')->default(null),
+
+
                         Textarea::make('notes')
                             ->label('Catatan (Opsional)')
                             ->rows(3),
                     ])
                     ->action(function (array $data, Item $record, StockConversionService $stockConversionService) {
+                        $calculatedToQuantity = $data['calculated_to_quantity'];
+
+                        if (is_null($calculatedToQuantity) || $calculatedToQuantity <= 0) {
+                            Notification::make()
+                                ->title('Konversi Stok Gagal')
+                                ->danger()
+                                ->body('Jumlah item yang dihasilkan tidak valid atau tidak dapat dihitung. Pastikan data volume item sumber dan tujuan sudah benar dan satuan volume standar sama.')
+                                ->send();
+                            return;
+                        }
+
                         try {
                             $conversion = $stockConversionService->convertStock(
-                                fromItemId: $record->id,
-                                toItemId: $data['to_item_id'],
+                                fromItemId: $data['from_item_id'],
+                                toItemId: $record->id, // Current item is the target
                                 fromQuantity: $data['from_quantity'],
-                                toQuantity: $data['to_quantity'],
+                                toQuantity: $calculatedToQuantity, // Use the auto-calculated value
                                 notes: $data['notes'],
                                 userId: Auth::id()
                             );
