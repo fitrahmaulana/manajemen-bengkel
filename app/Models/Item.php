@@ -17,6 +17,8 @@ class Item extends Model
         'selling_price',
         'stock',
         'unit',
+        'volume_value',
+        'base_volume_unit',
         'is_convertible',
         'target_child_item_id',
         'conversion_value',
@@ -24,6 +26,7 @@ class Item extends Model
 
     protected $casts = [
         'stock' => 'integer',
+        'volume_value' => 'decimal:2',
         'conversion_value' => 'decimal:2', // Will be deprecated
         'is_convertible' => 'boolean', // Will be deprecated
     ];

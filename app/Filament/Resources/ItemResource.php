@@ -117,7 +117,32 @@ class ItemResource extends Resource
                                         'Set' => 'Set',
                                         'Drum' => 'Drum',
                                     ])
-                                    ->default('Pcs'),
+                                    ->default('Pcs')
+                                    ->live(), // Make unit live to update volume_value placeholder
+                                FormsTextInput::make('volume_value')
+                                    ->label('Nilai Volume Standar')
+                                    ->numeric()
+                                    ->step('0.01')
+                                    ->helperText(fn (Forms\Get $get) => 'Isi jika item ini memiliki representasi volume standar. Cth: Botol 1 Liter -> Nilai: 1, Satuan Standar: Liter. Atau 1 Dus isi 12 Pcs -> Nilai: 12, Satuan Standar: Pcs.')
+                                    ->placeholder(fn (Forms\Get $get) => match(strtolower($get('unit'))) {
+                                        'liter' => '1000 (jika satuan standar ml)',
+                                        'ml' => 'Isi jumlah ml',
+                                        'dus' => '12 (jika isi 12 pcs)',
+                                        'pcs' => '1 (jika satuan standar pcs)',
+                                        default => 'Contoh: 1000',
+                                    }),
+                                Select::make('base_volume_unit')
+                                    ->label('Satuan Volume Standar')
+                                    ->options([
+                                        'ml' => 'Mililiter (ml)',
+                                        'liter' => 'Liter (L)',
+                                        'gram' => 'Gram (gr)',
+                                        'kg' => 'Kilogram (kg)',
+                                        'pcs' => 'Pieces (pcs)',
+                                        'set' => 'Set',
+                                    ])
+                                    ->placeholder('Pilih satuan standar')
+                                    ->helperText('Satuan acuan untuk perbandingan volume antar item.'),
                             ]),
                     ]),
 
@@ -310,7 +335,36 @@ class ItemResource extends Resource
                             ->numeric()
                             ->required()
                             ->minValue(1)
-                            ->maxValue(fn (Item $record) => $record->stock),
+                            ->maxValue(fn (Item $record) => $record->stock)
+                            ->live() // Make it live to trigger changes
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
+                                // This is the same logic as in to_item_id's afterStateUpdated
+                                // We can refactor this into a shared method if it gets more complex
+                                $fromItem = $record;
+                                $toItemId = $get('to_item_id');
+                                $fromQuantity = $state; // Current field's state
+
+                                if ($toItemId && $fromQuantity && $fromItem->volume_value && $fromItem->base_volume_unit) {
+                                    $toItem = Item::find($toItemId);
+                                    if ($toItem && $toItem->volume_value && $toItem->base_volume_unit && $fromItem->base_volume_unit === $toItem->base_volume_unit) {
+                                        if ($toItem->volume_value > 0) {
+                                            $suggestedToQuantity = ($fromItem->volume_value * (float)$fromQuantity) / $toItem->volume_value;
+                                            $suggestedToQuantity = round($suggestedToQuantity, is_int($suggestedToQuantity) ? 0 : 2);
+                                            if ($suggestedToQuantity > 0) {
+                                                $set('to_quantity', $suggestedToQuantity);
+                                            } else {
+                                                $set('to_quantity', null);
+                                            }
+                                        } else {
+                                            $set('to_quantity', null);
+                                        }
+                                    } else {
+                                        $set('to_quantity', null);
+                                    }
+                                } else {
+                                    $set('to_quantity', null);
+                                }
+                            }),
                         Select::make('to_item_id')
                             ->label('Konversi Ke Item')
                             ->options(function (Item $record) {
@@ -320,12 +374,41 @@ class ItemResource extends Resource
                                     ->mapWithKeys(fn (Item $item) => [$item->id => $item->display_name . " (Stok: {$item->stock} {$item->unit})"]);
                             })
                             ->searchable()
-                            ->required(),
+                            ->required()
+                            ->live() // Make it live to trigger changes
+                            ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
+                                $fromItem = $record;
+                                $toItemId = $state;
+                                $fromQuantity = $get('from_quantity');
+
+                                if ($toItemId && $fromQuantity && $fromItem->volume_value && $fromItem->base_volume_unit) {
+                                    $toItem = Item::find($toItemId);
+                                    if ($toItem && $toItem->volume_value && $toItem->base_volume_unit && $fromItem->base_volume_unit === $toItem->base_volume_unit) {
+                                        if ($toItem->volume_value > 0) { // Avoid division by zero
+                                            $suggestedToQuantity = ($fromItem->volume_value * $fromQuantity) / $toItem->volume_value;
+                                            // Round to sensible precision, e.g., 2 decimal places or integer
+                                            $suggestedToQuantity = round($suggestedToQuantity, is_int($suggestedToQuantity) ? 0 : 2);
+                                            if ($suggestedToQuantity > 0) {
+                                                $set('to_quantity', $suggestedToQuantity);
+                                            } else {
+                                                $set('to_quantity', null); // Clear if suggestion is not positive
+                                            }
+                                        } else {
+                                            $set('to_quantity', null); // Clear if to_item volume is zero
+                                        }
+                                    } else {
+                                        $set('to_quantity', null); // Clear if units mismatch or to_item has no volume
+                                    }
+                                } else {
+                                    $set('to_quantity', null); // Clear if not enough info
+                                }
+                            }),
                         FormsTextInput::make('to_quantity')
                             ->label('Jumlah Dihasilkan')
                             ->numeric()
                             ->required()
-                            ->minValue(1),
+                            ->minValue(0.01) // Allow fractional quantities
+                            ->step('0.01'),
                         Textarea::make('notes')
                             ->label('Catatan (Opsional)')
                             ->rows(3),
@@ -458,9 +541,14 @@ class ItemResource extends Resource
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
                         TextEntry::make('product.brand')->label('Merek'),
+                        TextEntry::make('volume_value')
+                            ->label('Nilai Volume Std.')
+                            ->suffix(fn ($record) => ' ' . $record->base_volume_unit)
+                            ->placeholder('-')
+                            ->visible(fn ($record) => !is_null($record->volume_value)),
                         // Status konversi
                         IconEntry::make('is_convertible')
-                            ->label('Bisa Dipecah')
+                            ->label('Bisa Dipecah (Statik)')
                             ->boolean()
                             ->trueIcon('heroicon-o-arrows-right-left')
                             ->trueColor('success')
