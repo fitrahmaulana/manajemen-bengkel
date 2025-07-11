@@ -71,4 +71,15 @@ class Invoice extends Model
     {
         return max(0, $this->total_paid_amount - $this->total_amount);
     }
+
+    /**
+     * Scope a query to only include overdue invoices.
+     *
+     * @param  \Illuminate\Database\Eloquent\Builder  $query
+     * @return \Illuminate\Database\Eloquent\Builder
+     */
+    public function scopeOverdue($query)
+    {
+        return $query->where('status', 'Overdue');
+    }
 }
