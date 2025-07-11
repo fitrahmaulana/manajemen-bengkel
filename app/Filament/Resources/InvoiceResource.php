@@ -29,6 +29,7 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Components\Actions\Action;
 use Illuminate\Support\HtmlString;
+use App\Services\ItemUnitConversionService; // Added import
 
 class InvoiceResource extends Resource
 {
@@ -43,42 +44,7 @@ class InvoiceResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Faktur';
     protected static ?int $navigationSort = 1;
 
-
-
-    // Helper method untuk menghitung kuantitas konversi (sama seperti di ItemResource)
-    private static function calculateToQuantityForInvoice(Forms\Set $set, Forms\Get $get, Item $toItemRecord, ?string $fromItemId, ?string $fromQuantityInput): void
-    {
-        if (!$fromItemId || !$fromQuantityInput || !is_numeric($fromQuantityInput) || (float)$fromQuantityInput <= 0) {
-            $set('calculated_to_quantity', null);
-            $set('to_quantity_unit_suffix', $toItemRecord->unit);
-            return;
-        }
-
-        $fromItem = Item::find($fromItemId);
-        $fromQuantity = (float)$fromQuantityInput;
-
-        if (
-            $fromItem && $toItemRecord->volume_value && $toItemRecord->base_volume_unit &&
-            $fromItem->volume_value && $fromItem->base_volume_unit &&
-            $fromItem->base_volume_unit === $toItemRecord->base_volume_unit &&
-            $toItemRecord->volume_value > 0
-        ) {
-            $calculated = ($fromItem->volume_value * $fromQuantity) / $toItemRecord->volume_value;
-            $precision = (strpos((string)$calculated, '.') !== false && fmod($calculated, 1) != 0) ? 2 : 0;
-            $finalCalculated = round($calculated, $precision);
-
-            if ($finalCalculated > 0) {
-                $set('calculated_to_quantity', $finalCalculated);
-                $set('to_quantity_unit_suffix', $toItemRecord->unit);
-            } else {
-                $set('calculated_to_quantity', null);
-                $set('to_quantity_unit_suffix', $toItemRecord->unit);
-            }
-        } else {
-            $set('calculated_to_quantity', null);
-            $set('to_quantity_unit_suffix', $toItemRecord->unit);
-        }
-    }
+    // Removed private static function calculateToQuantityForInvoice(...)
 
     public static function form(Form $form): Form
     {
@@ -340,20 +306,26 @@ class InvoiceResource extends Resource
                                         ->searchable()
                                         ->live()
                                         ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
-                                            // Trigger calculation using the same logic as ItemResource
                                             $fromItemId = $state;
-                                            $fromQuantity = $get('from_quantity');
-                                            self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromQuantity);
+                                            $fromQuantityInput = $get('from_quantity');
+                                            $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
+
+                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
+                                                $calculated = ItemUnitConversionService::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                                $set('calculated_to_quantity', $calculated);
+                                            } else {
+                                                $set('calculated_to_quantity', null);
+                                            }
+                                            $set('to_quantity_unit_suffix', $childItem->unit);
 
                                             // Update max stock for validation
-                                            if ($fromItemId) {
-                                                $fromItem = Item::find($fromItemId);
-                                                if ($fromItem) {
-                                                    $set('current_from_item_stock', $fromItem->stock);
-                                                    if ($get('from_quantity') > $fromItem->stock) {
-                                                        $set('from_quantity', $fromItem->stock);
-                                                        self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromItem->stock);
-                                                    }
+                                            if ($sourceItem) {
+                                                $set('current_from_item_stock', $sourceItem->stock);
+                                                if ($get('from_quantity') > $sourceItem->stock) {
+                                                    $set('from_quantity', $sourceItem->stock);
+                                                    // Recalculate if capped
+                                                    $recalculated = ItemUnitConversionService::calculateTargetQuantity($sourceItem, $childItem, (float)$sourceItem->stock);
+                                                    $set('calculated_to_quantity', $recalculated);
                                                 }
                                             } else {
                                                 $set('current_from_item_stock', null);
@@ -372,8 +344,16 @@ class InvoiceResource extends Resource
                                         ->live()
                                         ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
                                             $fromItemId = $get('from_item_id');
-                                            $fromQuantity = $state;
-                                            self::calculateToQuantityForInvoice($set, $get, $childItem, $fromItemId, $fromQuantity);
+                                            $fromQuantityInput = $state;
+                                            $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
+
+                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
+                                                $calculated = ItemUnitConversionService::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                                $set('calculated_to_quantity', $calculated);
+                                            } else {
+                                                $set('calculated_to_quantity', null);
+                                            }
+                                            $set('to_quantity_unit_suffix', $childItem->unit);
                                         }),
 
                                     Forms\Components\Placeholder::make('to_quantity_display')

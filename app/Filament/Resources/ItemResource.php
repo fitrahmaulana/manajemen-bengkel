@@ -24,6 +24,7 @@ use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput as FormsTextInput;
 use Filament\Forms\Components\Textarea;
 use Illuminate\Support\Facades\Auth;
+use App\Services\ItemUnitConversionService; // Added import
 
 use function Laravel\Prompts\text;
 use function Livewire\on;
@@ -39,43 +40,7 @@ class ItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Varian';
     protected static ?int $navigationSort = 2;
 
-    private static function calculateToQuantity(Forms\Set $set, Forms\Get $get, Item $toItemRecord, ?string $fromItemId, ?string $fromQuantityInput): void
-    {
-        if (!$fromItemId || !$fromQuantityInput || !is_numeric($fromQuantityInput) || (float)$fromQuantityInput <= 0) {
-            $set('calculated_to_quantity', null);
-            $set('to_quantity_unit_suffix', $toItemRecord->unit); // Default to target item's unit
-            return;
-        }
-
-        $fromItem = Item::find($fromItemId);
-        $fromQuantity = (float)$fromQuantityInput;
-
-        if (
-            $fromItem && $toItemRecord->volume_value && $toItemRecord->base_volume_unit &&
-            $fromItem->volume_value && $fromItem->base_volume_unit &&
-            $fromItem->base_volume_unit === $toItemRecord->base_volume_unit &&
-            $toItemRecord->volume_value > 0 // Avoid division by zero
-        ) {
-            $calculated = ($fromItem->volume_value * $fromQuantity) / $toItemRecord->volume_value;
-            // Round to a sensible precision, e.g., 2 decimal places or integer
-            // If items are typically whole units (pcs, botol), consider rounding to nearest whole or specific logic.
-            // For now, flexible rounding.
-            $precision = (strpos((string)$calculated, '.') !== false && fmod($calculated, 1) != 0) ? 2 : 0;
-            $finalCalculated = round($calculated, $precision);
-
-            if ($finalCalculated > 0) {
-                $set('calculated_to_quantity', $finalCalculated);
-                $set('to_quantity_unit_suffix', $toItemRecord->unit);
-            } else {
-                $set('calculated_to_quantity', null);
-                $set('to_quantity_unit_suffix', $toItemRecord->unit);
-            }
-        } else {
-            $set('calculated_to_quantity', null);
-            $set('to_quantity_unit_suffix', $toItemRecord->unit);
-        }
-    }
-
+    // Removed private static function calculateToQuantity(...)
 
     public static function roundUpToNearestHundred($number)
     {
@@ -249,21 +214,27 @@ class ItemResource extends Resource
                             ->required()
                             ->live()
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
-                                // Trigger to_quantity calculation
                                 $fromItemId = $state;
-                                $fromQuantity = $get('from_quantity');
-                                self::calculateToQuantity($set, $get, $record, $fromItemId, $fromQuantity);
+                                $fromQuantityInput = $get('from_quantity');
+                                $fromItem = $fromItemId ? Item::find($fromItemId) : null;
+
+                                if ($fromItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
+                                    $calculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
+                                    $set('calculated_to_quantity', $calculated);
+                                } else {
+                                    $set('calculated_to_quantity', null);
+                                }
+                                $set('to_quantity_unit_suffix', $record->unit);
+
 
                                 // Update from_quantity max stock based on selected from_item
-                                if ($fromItemId) {
-                                    $fromItem = Item::find($fromItemId);
-                                    if ($fromItem) {
-                                        $set('current_from_item_stock', $fromItem->stock); // Store for maxValue rule
-                                        // If from_quantity exceeds new max, reset or cap it (optional, Filament might handle this with rules)
-                                        if ($get('from_quantity') > $fromItem->stock) {
-                                            $set('from_quantity', $fromItem->stock);
-                                            self::calculateToQuantity($set, $get, $record, $fromItemId, $fromItem->stock); // Recalculate
-                                        }
+                                if ($fromItem) {
+                                    $set('current_from_item_stock', $fromItem->stock);
+                                    if ($get('from_quantity') > $fromItem->stock) {
+                                        $set('from_quantity', $fromItem->stock);
+                                        // Recalculate if capped
+                                        $recalculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromItem->stock);
+                                        $set('calculated_to_quantity', $recalculated);
                                     }
                                 } else {
                                     $set('current_from_item_stock', null);
@@ -282,10 +253,17 @@ class ItemResource extends Resource
                             ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
                             ->live()
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
-                                // Trigger to_quantity calculation
                                 $fromItemId = $get('from_item_id');
-                                $fromQuantity = $state;
-                                self::calculateToQuantity($set, $get, $record, $fromItemId, $fromQuantity);
+                                $fromQuantityInput = $state;
+                                $fromItem = $fromItemId ? Item::find($fromItemId) : null;
+
+                                if ($fromItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
+                                    $calculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
+                                    $set('calculated_to_quantity', $calculated);
+                                } else {
+                                    $set('calculated_to_quantity', null);
+                                }
+                                $set('to_quantity_unit_suffix', $record->unit);
                             }),
 
                         Forms\Components\Placeholder::make('to_quantity_display')
