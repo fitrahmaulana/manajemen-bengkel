@@ -59,9 +59,6 @@ class ItemFactory extends Factory
                         return $this->faker->randomElement(['ml', 'gr', 'pcs']);
                 }
             },
-            // 'is_convertible' => false, // Dihapus
-            // 'target_child_item_id' => null, // Dihapus
-            // 'conversion_value' => null, // Dihapus
         ];
     }
 }

@@ -98,8 +98,6 @@ class EditProduct extends EditRecord
                 'purchase_price' => $data['standard_purchase_price'] ?? 0,
                 'selling_price' => $data['standard_selling_price'] ?? 0,
                 'stock' => $data['standard_stock'] ?? 0,
-                'target_child_item_id' => null,
-                'conversion_value' => null,
             ]);
         }
     }

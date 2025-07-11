@@ -15,8 +15,8 @@ return new class extends Migration
             $table->id();
             $table->foreignId('from_item_id')->constrained('items')->comment('Item asal yang dikonversi');
             $table->foreignId('to_item_id')->constrained('items')->comment('Item tujuan hasil konversi');
-            $table->integer('from_quantity')->comment('Jumlah item asal yang dikonversi');
-            $table->integer('to_quantity')->comment('Jumlah item tujuan yang dihasilkan');
+            $table->decimal('from_quantity', 15, 2)->comment('Jumlah item asal yang dikonversi');
+            $table->decimal('to_quantity', 15, 2)->comment('Jumlah item tujuan yang dihasilkan');
             $table->foreignId('user_id')->nullable()->constrained('users')->comment('User yang melakukan konversi');
             $table->timestamp('conversion_date')->default(now());
             $table->text('notes')->nullable();

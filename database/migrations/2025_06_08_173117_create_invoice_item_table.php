@@ -15,7 +15,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('invoice_id')->constrained()->cascadeOnDelete();
             $table->foreignId('item_id')->constrained()->cascadeOnDelete();
-            $table->float('quantity');
+            $table->decimal('quantity', 15, 2)->comment('Jumlah item yang dijual'); // Changed to decimal for fractional quantities
             $table->decimal('price', 15, 0);
             $table->text('description')->nullable();
         });

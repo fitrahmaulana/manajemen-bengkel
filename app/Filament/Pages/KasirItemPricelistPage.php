@@ -87,14 +87,6 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->badge()
                     ->color(fn($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
                     ->formatStateUsing(fn($state, Item $record) => $state . ' ' . $record->unit),
-
-                IconColumn::make('is_convertible')
-                    ->label('Bisa Dipecah')
-                    ->boolean()
-                    ->getStateUsing(fn(Item $record) => $record->is_convertible)
-                    ->trueIcon('heroicon-o-arrows-right-left')
-                    ->falseIcon('heroicon-o-cube')
-                    ->toggleable(isToggledHiddenByDefault: true),
             ])
             ->filters([
                 SelectFilter::make('type_item_id')

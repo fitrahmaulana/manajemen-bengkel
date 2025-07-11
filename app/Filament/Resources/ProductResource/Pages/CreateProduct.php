@@ -79,8 +79,6 @@ class CreateProduct extends CreateRecord
             'purchase_price' => $this->standardData['standard_purchase_price'] ?? 0,
             'selling_price' => $this->standardData['standard_selling_price'] ?? 0,
             'stock' => $this->standardData['standard_stock'] ?? 0,
-            'target_child_item_id' => null,
-            'conversion_value' => null,
         ]);
     }
 
@@ -97,8 +95,6 @@ class CreateProduct extends CreateRecord
             'purchase_price' => 0,
             'selling_price' => 0,
             'stock' => 0,
-            'target_child_item_id' => null,
-            'conversion_value' => null,
         ]);
     }
 

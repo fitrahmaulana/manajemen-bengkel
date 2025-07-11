@@ -39,10 +39,9 @@ return new class extends Migration
             $table->decimal('stock', 15, 2)->default(0); // Changed to decimal for fractional quantities like 3.5 liter
             $table->string('unit', 50)->default('Pcs'); // "Liter", "Botol", dll
 
-            // Konversi eceran/grosir
-            $table->boolean('is_convertible')->default(false); // Apakah bisa dipecah ke eceran
-            $table->foreignId('target_child_item_id')->nullable()->constrained('items')->onDelete('set null');
-            $table->decimal('conversion_value', 8, 2)->nullable(); // 1 botol 4L = 4 liter eceran
+            // Tambahan volume
+            $table->decimal('volume_value', 10, 2)->nullable()->comment('Nilai volume item, misal 1000 untuk 1000ml');
+            $table->string('base_volume_unit', 50)->nullable()->comment('Satuan dasar volume, misal ml, gr, pcs');
 
             $table->timestamps();
         });
