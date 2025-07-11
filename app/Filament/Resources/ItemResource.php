@@ -40,16 +40,6 @@ class ItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Varian';
     protected static ?int $navigationSort = 2;
 
-    // Removed private static function calculateToQuantity(...)
-
-    public static function roundUpToNearestHundred($number)
-    {
-        if (!is_numeric($number) || $number <= 0) {
-            return 0;
-        }
-        return ceil($number / 100) * 100;
-    }
-
     public static function form(Form $form): Form
     {
         return $form
