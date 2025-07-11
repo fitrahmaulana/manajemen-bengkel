@@ -162,8 +162,8 @@ class ItemResource extends Resource
                                     ->label('Nilai Volume Standar')
                                     ->numeric()
                                     ->step('0.01')
-                                    ->helperText(fn (Forms\Get $get) => 'Isi jika item ini memiliki representasi volume standar. Cth: Botol 1 Liter -> Nilai: 1, Satuan Standar: Liter. Atau 1 Dus isi 12 Pcs -> Nilai: 12, Satuan Standar: Pcs.')
-                                    ->placeholder(fn (Forms\Get $get) => match(strtolower($get('unit'))) {
+                                    ->helperText(fn(Forms\Get $get) => 'Isi jika item ini memiliki representasi volume standar. Cth: Botol 1 Liter -> Nilai: 1, Satuan Standar: Liter. Atau 1 Dus isi 12 Pcs -> Nilai: 12, Satuan Standar: Pcs.')
+                                    ->placeholder(fn(Forms\Get $get) => match (strtolower($get('unit'))) {
                                         'liter' => '1000 (jika satuan standar ml)',
                                         'ml' => 'Isi jumlah ml',
                                         'dus' => '12 (jika isi 12 pcs)',
@@ -226,14 +226,13 @@ class ItemResource extends Resource
                 // Nanti kita bisa tambahkan filter di sini
             ])
             ->actions([
-                Tables\Actions\ViewAction::make(),
                 Tables\Actions\Action::make('receiveStockFromConversion')
                     ->label('Terima Stok dari Induk')
                     ->icon('heroicon-o-arrow-down-on-square-stack') // Icon changed to reflect receiving
                     ->form([
                         Forms\Components\Placeholder::make('to_item_info')
                             ->label('Item Tujuan (Saat Ini)')
-                            ->content(fn (Item $record): string => "{$record->display_name} (Stok: {$record->stock} {$record->unit})"),
+                            ->content(fn(Item $record): string => "{$record->display_name} (Stok: {$record->stock} {$record->unit})"),
 
                         Select::make('from_item_id')
                             ->label('Pilih Item Sumber (Induk)')
@@ -244,7 +243,7 @@ class ItemResource extends Resource
                                 return Item::where('product_id', $record->product_id)
                                     ->where('id', '!=', $record->id) // Exclude self
                                     ->get()
-                                    ->mapWithKeys(fn (Item $item) => [$item->id => $item->display_name . " (Stok: {$item->stock} {$item->unit})"]);
+                                    ->mapWithKeys(fn(Item $item) => [$item->id => $item->display_name . " (Stok: {$item->stock} {$item->unit})"]);
                             })
                             ->searchable()
                             ->required()
@@ -267,9 +266,8 @@ class ItemResource extends Resource
                                         }
                                     }
                                 } else {
-                                     $set('current_from_item_stock', null);
+                                    $set('current_from_item_stock', null);
                                 }
-
                             }),
 
                         // Hidden field to store current stock of selected from_item for validation
@@ -281,7 +279,7 @@ class ItemResource extends Resource
                             ->default(1)
                             ->required()
                             ->minValue(1)
-                            ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
+                            ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
                             ->live()
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
                                 // Trigger to_quantity calculation
@@ -292,7 +290,7 @@ class ItemResource extends Resource
 
                         Forms\Components\Placeholder::make('to_quantity_display')
                             ->label('Jumlah Item Ini yang Akan Dihasilkan')
-                            ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
+                            ->content(fn(Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
 
                         // Hidden field to store the actual calculated to_quantity for submission
                         Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
@@ -338,6 +336,13 @@ class ItemResource extends Resource
                                 ->send();
                         }
                     }),
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\EditAction::make(),
+                    Tables\Actions\DeleteAction::make(),
+                ])
+                    ->label('Aksi')
+                    ->tooltip('Aksi untuk varian ini')
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -380,9 +385,9 @@ class ItemResource extends Resource
                         TextEntry::make('product.brand')->label('Merek'),
                         TextEntry::make('volume_value')
                             ->label('Nilai Volume Std.')
-                            ->suffix(fn ($record) => ' ' . $record->base_volume_unit)
+                            ->suffix(fn($record) => ' ' . $record->base_volume_unit)
                             ->placeholder('-')
-                            ->visible(fn ($record) => !is_null($record->volume_value)),
+                            ->visible(fn($record) => !is_null($record->volume_value)),
                     ]),
 
                 InfolistSection::make('Harga & Stok')

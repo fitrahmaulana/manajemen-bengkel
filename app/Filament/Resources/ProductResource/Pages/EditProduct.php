@@ -5,8 +5,10 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Models\Item;
 use Filament\Actions;
+use Filament\Notifications\Notification;
 use Filament\Resources\Pages\EditRecord;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class EditProduct extends EditRecord
 {
@@ -61,13 +63,22 @@ class EditProduct extends EditRecord
 
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
-        // Update product terlebih dahulu
-        $record->update($data);
-
-        // Kemudian handle items berdasarkan perubahan
-        $this->handleItemsAfterProductUpdate($record);
-
-        return $record;
+        // Refactor: gunakan transaction untuk update product dan item
+        try{
+            DB::transaction(function () use ($record, $data) {
+                $record->update($data);
+                $this->handleItemsAfterProductUpdate($record);
+            });
+            return $record;
+        } catch (\Exception $e) {
+            // Tampilkan notifikasi error ke user
+            Notification::make()
+                ->title('Gagal menyimpan data')
+                ->body('Terjadi kesalahan: ' . $e->getMessage())
+                ->danger()
+                ->send();
+            throw $e;
+        }
     }
 
     private function handleItemsAfterProductUpdate($product): void
@@ -79,10 +90,8 @@ class EditProduct extends EditRecord
 
         if (isset($data['has_variants']) && $data['has_variants']) {
             // Produk dengan varian - varian akan dikelola melalui RelationManager
-            // Jika sebelumnya produk tunggal, hapus item lama
-            if ($product->items()->count() == 1) {
-                $product->items()->delete();
-            }
+            // Hapus hanya item default produk tunggal (name kosong)
+            $product->items()->where('name', '')->delete();
         } else {
             // Produk tanpa varian - buat atau update single item
             // Hapus semua items lama dulu

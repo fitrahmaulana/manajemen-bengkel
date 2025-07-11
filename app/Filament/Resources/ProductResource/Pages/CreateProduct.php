@@ -53,17 +53,9 @@ class CreateProduct extends CreateRecord
         if (!$product->has_variants) {
             // Produk standard - gunakan data dari standardData
             $this->createDefaultItem($product);
-        } else {
-            // Produk dengan varian - buat placeholder
-            $this->createPlaceholderItem($product);
         }
 
         return $product;
-    }
-
-    protected function afterCreate(): void
-    {
-        // Tidak perlu lagi karena sudah ditangani di handleRecordCreation
     }
 
     /**
@@ -79,22 +71,6 @@ class CreateProduct extends CreateRecord
             'purchase_price' => $this->standardData['standard_purchase_price'] ?? 0,
             'selling_price' => $this->standardData['standard_selling_price'] ?? 0,
             'stock' => $this->standardData['standard_stock'] ?? 0,
-        ]);
-    }
-
-    /**
-     * Create placeholder item for variant product without variants
-     */
-    private function createPlaceholderItem($product): void
-    {
-        Item::create([
-            'product_id' => $product->id,
-            'name' => 'Belum Ada Varian',
-            'sku' => $this->generateDefaultSKU($product) . '-TEMP',
-            'unit' => 'Pcs',
-            'purchase_price' => 0,
-            'selling_price' => 0,
-            'stock' => 0,
         ]);
     }
 

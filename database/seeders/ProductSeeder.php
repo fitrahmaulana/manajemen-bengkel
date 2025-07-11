@@ -52,6 +52,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => strtolower($variant['unit']) === 'liter' ? 1 : (strtolower($variant['unit']) === 'botol' ? 1 : (strtolower($variant['unit']) === 'galon' ? 4 : 1)),
+                'base_volume_unit' => in_array(strtolower($variant['unit']), ['liter','botol','ml','galon']) ? 'liter' : 'pcs',
             ]);
         }
 
@@ -92,6 +94,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => strtolower($variant['unit']) === 'liter' ? 1 : (strtolower($variant['unit']) === 'botol' ? 1 : (strtolower($variant['unit']) === 'galon' ? 4 : 1)),
+                'base_volume_unit' => in_array(strtolower($variant['unit']), ['liter','botol','ml','galon']) ? 'liter' : 'pcs',
             ]);
         }
 
@@ -140,6 +144,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => 1,
+                'base_volume_unit' => 'pcs',
             ]);
         }
 
@@ -188,6 +194,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => 1,
+                'base_volume_unit' => 'pcs',
             ]);
         }
 
@@ -228,6 +236,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => 1,
+                'base_volume_unit' => 'pcs',
             ]);
         }
 
@@ -248,6 +258,8 @@ class ProductSeeder extends Seeder
             'purchase_price' => 650000,
             'selling_price' => 750000,
             'stock' => 15,
+            'volume_value' => 1,
+            'base_volume_unit' => 'pcs',
         ]);
 
         // 7. Ban Bridgestone - Produk TANPA varian
@@ -267,6 +279,8 @@ class ProductSeeder extends Seeder
             'purchase_price' => 850000,
             'selling_price' => 950000,
             'stock' => 20,
+            'volume_value' => 1,
+            'base_volume_unit' => 'pcs',
         ]);
 
         // 8. Timing Belt Gates dengan varian mobil
@@ -314,6 +328,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => 1,
+                'base_volume_unit' => 'pcs',
             ]);
         }
 
@@ -334,6 +350,8 @@ class ProductSeeder extends Seeder
             'purchase_price' => 75000,
             'selling_price' => 90000,
             'stock' => 25,
+            'volume_value' => 1,
+            'base_volume_unit' => 'liter',
         ]);
 
         // 10. Minyak Rem Bosch dengan varian tipe
@@ -373,6 +391,8 @@ class ProductSeeder extends Seeder
                 'purchase_price' => $variant['purchase_price'],
                 'selling_price' => $variant['selling_price'],
                 'stock' => $variant['stock'],
+                'volume_value' => 1,
+                'base_volume_unit' => 'liter',
             ]);
         }
 
