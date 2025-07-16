@@ -85,7 +85,7 @@ class CreateInvoice extends CreateRecord
                 if (!empty($items)) {
                     $itemData = collect($items)->mapWithKeys(function ($item) {
                         return [$item['item_id'] => [
-                            'quantity' => (int)($item['quantity'] ?? 1),
+                            'quantity' => (float)($item['quantity'] ?? 1.0),
                             'price' => self::parseCurrencyValue($item['price'] ?? 0),
                             'description' => $item['description'] ?? '',
                         ]];

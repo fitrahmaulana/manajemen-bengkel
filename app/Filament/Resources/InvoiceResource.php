@@ -373,7 +373,7 @@ class InvoiceResource extends Resource
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItem = Item::find($itemRepeaterState['item_id']);
                                 $sourceParentItem = Item::find($data['from_item_id']);
-                                $fromQuantity = (int)$data['from_quantity'];
+                                $fromQuantity = (float)$data['from_quantity'];
                                 $calculatedToQuantity = $data['calculated_to_quantity'];
 
                                 if (!$childItem || !$sourceParentItem) {
