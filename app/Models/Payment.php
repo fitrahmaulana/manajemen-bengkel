@@ -10,7 +10,8 @@ class Payment extends Model
     use HasFactory;
 
     protected $fillable = [
-        'invoice_id',
+        'payable_id',
+        'payable_type',
         'payment_date',
         'amount_paid',
         'payment_method',
@@ -27,10 +28,10 @@ class Payment extends Model
     ];
 
     /**
-     * Get the invoice that this payment belongs to.
+     * Get the parent payable model (invoice or purchase order).
      */
-    public function invoice()
+    public function payable()
     {
-        return $this->belongsTo(Invoice::class);
+        return $this->morphTo();
     }
 }

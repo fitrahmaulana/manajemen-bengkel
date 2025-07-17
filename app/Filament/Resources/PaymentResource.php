@@ -2,25 +2,26 @@
 
 namespace App\Filament\Resources;
 
-use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager as InvoicePaymentsRelationManager;
 use App\Filament\Resources\PaymentResource\Pages;
-use App\Filament\Resources\PaymentResource\RelationManagers;
+use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelationManager as PurchaseOrderPaymentsRelationManager;
+use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PurchaseOrder;
+use App\Traits\InvoiceCalculationTrait;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Traits\InvoiceCalculationTrait; // Import trait
+use Illuminate\Database\Eloquent\Model;
 
 class PaymentResource extends Resource
 {
-    use InvoiceCalculationTrait; // Gunakan trait
+    use InvoiceCalculationTrait;
+
     protected static ?string $model = Payment::class;
     protected static bool $shouldRegisterNavigation = false;
-
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
     protected static ?string $navigationGroup = 'Transaksi';
@@ -29,27 +30,26 @@ class PaymentResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Pembayaran';
     protected static ?int $navigationSort = 2;
 
-    private static function getInvoiceFromContext(Forms\Get $get, $record, $livewire): ?\App\Models\Invoice
+    private static function getPayableFromContext(Forms\Get $get, $record, $livewire): ?Model
     {
-        if ($record && $record->invoice) { // Check if $record->invoice exists
-            // Edit mode: return the existing invoice from the payment record
-            return $record->invoice;
+        if ($record && $record->payable) {
+            return $record->payable;
         }
 
-        // Create mode
-        if ($livewire instanceof PaymentsRelationManager) {
-            // If in RelationManager context, invoice is the owner record
-            $invoice = $livewire->getOwnerRecord();
-            if ($invoice instanceof \App\Models\Invoice) {
-                return $invoice;
-            }
-        } else {
-            // If in standalone form, get invoice_id from form state
-            $invoiceId = $get('invoice_id');
-            if ($invoiceId) {
-                return \App\Models\Invoice::find($invoiceId);
+        if ($livewire instanceof InvoicePaymentsRelationManager || $livewire instanceof PurchaseOrderPaymentsRelationManager) {
+            $owner = $livewire->getOwnerRecord();
+            if ($owner instanceof Invoice || $owner instanceof PurchaseOrder) {
+                return $owner;
             }
         }
+
+        $payableType = $get('payable_type');
+        $payableId = $get('payable_id');
+
+        if ($payableType && $payableId) {
+            return $payableType::find($payableId);
+        }
+
         return null;
     }
 
@@ -59,36 +59,37 @@ class PaymentResource extends Resource
             ->schema([
                 Forms\Components\Group::make()
                     ->schema([
-                        Forms\Components\Select::make('invoice_id')
-                            ->relationship('invoice', 'invoice_number')
-                            ->label('Invoice Number')
+                        Forms\Components\MorphToSelect::make('payable')
+                            ->label('Tagihan')
+                            ->types([
+                                Forms\Components\MorphToSelect\Type::make(Invoice::class)
+                                    ->titleAttribute('invoice_number'),
+                                Forms\Components\MorphToSelect\Type::make(PurchaseOrder::class)
+                                    ->titleAttribute('po_number'),
+                            ])
                             ->searchable()
                             ->preload()
                             ->required()
                             ->columnSpanFull()
                             ->live()
-                            ->hiddenOn(PaymentsRelationManager::class)
-                            ->disabled(fn(string $operation) => $operation === 'edit'),
+                            ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
 
                         Forms\Components\DatePicker::make('payment_date')
                             ->label('Tanggal Pembayaran')
                             ->default(now())
                             ->required(),
 
-                        // Tampilkan total tagihan yang harus dibayar
                         Forms\Components\Placeholder::make('total_tagihan')
                             ->label('Total Tagihan')
-                            ->content(function (Forms\Get $get, $record, $livewire) { // Explicitly type Forms\Get
-                                $invoice = self::getInvoiceFromContext($get, $record, $livewire);
-                                if ($invoice) {
-                                    // For 'total_tagihan', in edit mode, show original total_amount. In create, show balance_due.
-                                    if ($record) { // Edit mode
-                                        return '🧾 ' . self::formatCurrency($invoice->total_amount);
+                            ->content(function (Forms\Get $get, $record, $livewire) {
+                                $payable = self::getPayableFromContext($get, $record, $livewire);
+                                if ($payable) {
+                                    if ($record) {
+                                        return '🧾 ' . self::formatCurrency($payable->total_amount);
                                     }
-                                    // Create mode
-                                    return '🧾 ' . self::formatCurrency($invoice->balance_due);
+                                    return '🧾 ' . self::formatCurrency($payable->balance_due ?? $payable->total_amount);
                                 }
-                                return '🧾 Pilih invoice terlebih dahulu';
+                                return '🧾 Pilih tagihan terlebih dahulu';
                             })
                             ->extraAttributes([
                                 'class' => 'border border-200 rounded-lg p-3 font-bold',
@@ -105,53 +106,31 @@ class PaymentResource extends Resource
                             ->helperText('Masukkan jumlah uang tunai yang diterima dari pelanggan')
                             ->live(debounce: 300)
                             ->afterStateUpdated(function ($state, $set, $get, $record, $livewire) {
-                                if ($record) {
-                                    // Edit mode
+                                $payable = self::getPayableFromContext($get, $record, $livewire);
+                                if ($payable) {
                                     $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
-                                    $invoice = $record->invoice;
+                                    $balanceDue = $payable->balance_due ?? $payable->total_amount;
 
-                                    // Edit mode: hitung berdasarkan total tagihan dikurangi pembayaran lain
-                                    $otherPayments = $invoice->payments()->where('id', '!=', $record->id)->sum('amount_paid');
-                                    $remainingBill = $invoice->total_amount - $otherPayments;
-
-                                    if ($amountPaid > $remainingBill) {
+                                    if ($amountPaid > $balanceDue) {
+                                        $overpayment = $amountPaid - $balanceDue;
+                                        $set('change_amount', $overpayment);
                                         $set('payment_status', 'overpaid');
-                                    } elseif ($amountPaid == $remainingBill) {
+                                    } elseif ($amountPaid == $balanceDue) {
+                                        $set('change_amount', 0);
                                         $set('payment_status', 'exact');
                                     } else {
+                                        $set('change_amount', 0);
                                         $set('payment_status', 'underpaid');
-                                    }
-                                } else {
-                                    // Create mode
-                                    $invoice = self::getInvoiceFromContext($get, $record, $livewire);
-
-                                    if ($invoice) {
-                                        $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
-                                        $balanceDue = $invoice->balance_due;
-
-                                        if ($amountPaid > $balanceDue) {
-                                            $overpayment = $amountPaid - $balanceDue;
-                                            $set('change_amount', $overpayment);
-                                            $set('payment_status', 'overpaid');
-                                        } elseif ($amountPaid == $balanceDue) {
-                                            $set('change_amount', 0);
-                                            $set('payment_status', 'exact');
-                                        } else {
-                                            $set('change_amount', 0);
-                                            $set('payment_status', 'underpaid');
-                                        }
                                     }
                                 }
                             })
                             ->default(function ($get, $record, $livewire) {
                                 if ($record) {
-                                    // Edit mode: return current payment amount
                                     return $record->amount_paid;
                                 } else {
-                                    // Create mode: suggest balance due
-                                    $invoice = self::getInvoiceFromContext($get, $record, $livewire);
-                                    if ($invoice) {
-                                        return $invoice->balance_due;
+                                    $payable = self::getPayableFromContext($get, $record, $livewire);
+                                    if ($payable) {
+                                        return $payable->balance_due ?? $payable->total_amount;
                                     }
                                     return null;
                                 }
@@ -163,14 +142,14 @@ class PaymentResource extends Resource
                             ->live()
                             ->afterStateUpdated(fn($state, $set) => $set('amount_paid', $state))
                             ->visible(fn(string $operation) => $operation === 'create')
-                            ->options(function (Forms\Get $get, $livewire): array { // Explicitly type Forms\Get
-                                $invoice = self::getInvoiceFromContext($get, null, $livewire); // $record is null in this context for options
+                            ->options(function (Forms\Get $get, $livewire): array {
+                                $payable = self::getPayableFromContext($get, null, $livewire);
 
-                                if (!$invoice) {
+                                if (!$payable) {
                                     return [];
                                 }
 
-                                $totalBill = $invoice->balance_due;
+                                $totalBill = $payable->balance_due ?? $payable->total_amount;
                                 if (!$totalBill || $totalBill <= 0) {
                                     return [];
                                 }
@@ -178,14 +157,11 @@ class PaymentResource extends Resource
                                 $options = [];
                                 $suggestions = [];
 
-                                // 1. Opsi Uang Pas
                                 $options[(string)$totalBill] = '💰 Uang Pas';
 
-                                // 2. Daftar pembulatan umum
                                 $roundingBases = [10000, 20000, 50000, 100000];
 
                                 foreach ($roundingBases as $base) {
-                                    // Jangan tampilkan saran yang lebih kecil dari tagihan
                                     if ($base < $totalBill) {
                                         $suggestion = ceil($totalBill / $base) * $base;
 
@@ -193,19 +169,16 @@ class PaymentResource extends Resource
                                             $suggestion += $base;
                                         }
 
-                                        // Batasi saran agar tidak terlalu jauh (misal: tagihan 12rb, jangan sarankan 100rb)
                                         if ($suggestion < $totalBill * 2.5 && $suggestion < 1000000) {
                                             $suggestions[] = $suggestion;
                                         }
                                     }
                                 }
 
-                                // Tambahkan juga pembulatan ke 100rb terdekat jika tagihan besar
                                 if ($totalBill > 50000) {
                                     $suggestions[] = ceil($totalBill / 100000) * 100000;
                                 }
 
-                                // 3. Saring hasil dan ambil 3 terbaik
                                 $uniqueSuggestions = array_unique($suggestions);
                                 sort($uniqueSuggestions);
 
@@ -221,50 +194,36 @@ class PaymentResource extends Resource
                             })
                             ->columns(4),
 
-                        // Kalkulator Kembalian - Real-time
                         Forms\Components\Placeholder::make('kembalian_calculator')
                             ->label('Kembalian')
-                            ->content(function (Forms\Get $get, $record, $livewire) { // Explicitly type Forms\Get
+                            ->content(function (Forms\Get $get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
-                                $invoice = self::getInvoiceFromContext($get, $record, $livewire);
+                                $payable = self::getPayableFromContext($get, $record, $livewire);
 
-                                if (!$invoice) {
+                                if (!$payable) {
                                     return '💵 Rp. 0';
                                 }
 
-                                if ($record) { // Edit mode
-                                    $otherPayments = $invoice->payments()->where('id', '!=', $record->id)->sum('amount_paid');
-                                    $remainingBill = $invoice->total_amount - $otherPayments;
-                                    $change = $amountPaid - $remainingBill;
-                                } else { // Create mode
-                                    $balanceDue = $invoice->balance_due;
-                                    $change = $amountPaid - $balanceDue;
-                                }
+                                $balanceDue = $payable->balance_due ?? $payable->total_amount;
+                                $change = $amountPaid - $balanceDue;
+
                                 return '💵 ' . self::formatCurrency($change);
                             })
                             ->extraAttributes(function (Forms\Get $get, $record, $livewire) { // Explicitly type Forms\Get
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
-                                $invoice = self::getInvoiceFromContext($get, $record, $livewire);
+                                $payable = self::getPayableFromContext($get, $record, $livewire);
 
-                                if (!$invoice) {
-                                    // Default style if no invoice context
+                                if (!$payable) {
                                     return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                                 }
 
-                                $targetAmount = 0;
-                                if ($record) { // Edit mode
-                                    $otherPayments = $invoice->payments()->where('id', '!=', $record->id)->sum('amount_paid');
-                                    $targetAmount = $invoice->total_amount - $otherPayments;
-                                } else { // Create mode
-                                    $targetAmount = $invoice->balance_due;
-                                }
+                                $targetAmount = $payable->balance_due ?? $payable->total_amount;
 
                                 if ($amountPaid >= $targetAmount && $amountPaid > 0) {
                                     return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
                                 } elseif ($amountPaid > 0 && $amountPaid < $targetAmount) {
                                     return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                                 }
-                                // Waiting for input or zero amount paid
                                 return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                             }),
 
@@ -290,11 +249,19 @@ class PaymentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('invoice.invoice_number')
-                    ->label('Invoice Number')
-                    ->searchable()
-                    ->sortable()
-                    ->hiddenOn(PaymentsRelationManager::class),
+                Tables\Columns\TextColumn::make('payable')
+                    ->label('Nomor Tagihan')
+                    ->formatStateUsing(fn($state) => $state->invoice_number ?? $state->po_number)
+                    ->searchable(
+                        query: function ($query, string $search) {
+                            // Membuat search berfungsi untuk kedua kolom
+                            $query->orWhereHas('payable', function ($q) use ($search) {
+                                $q->where('invoice_number', 'like', "%{$search}%")
+                                    ->orWhere('po_number', 'like', "%{$search}%");
+                            });
+                        }
+                    )->sortable(['invoice_number', 'po_number'])
+                    ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
                     ->label('Tanggal Pembayaran')
@@ -326,47 +293,24 @@ class PaymentResource extends Resource
                 Tables\Actions\EditAction::make(),
                 Tables\Actions\DeleteAction::make()
                     ->before(function (Payment $record) {
-                        // Store invoice info before deletion
-                        $record->loadMissing('invoice');
+                        $record->loadMissing('payable');
                     })
                     ->after(function (Payment $record) {
-                        // Update invoice status after payment deletion
-                        $invoice = $record->invoice;
-                        if ($invoice) {
-                            $invoice->refresh();
-                            if ($invoice->total_paid_amount >= $invoice->total_amount) {
-                                $invoice->status = 'paid';
-                            } else if ($invoice->payments()->exists()) {
-                                $invoice->status = 'partially_paid';
-                            } else {
-                                $invoice->status = 'unpaid';
-                            }
-                            $invoice->save();
-                        }
+                        self::handleAfterPaymentAction($record);
                     }),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
                         ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            // Store invoice info before deletion
-                            $records->load('invoice');
+                            $records->load('payable');
                         })
                         ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            // Get unique invoices and update their status
-                            $invoices = $records->pluck('invoice')->unique('id');
+                            $payables = $records->pluck('payable')->unique('id');
 
-                            foreach ($invoices as $invoice) {
-                                if ($invoice) {
-                                    $invoice->refresh();
-                                    if ($invoice->total_paid_amount >= $invoice->total_amount) {
-                                        $invoice->status = 'paid';
-                                    } else if ($invoice->payments()->exists()) {
-                                        $invoice->status = 'partially_paid';
-                                    } else {
-                                        $invoice->status = 'unpaid';
-                                    }
-                                    $invoice->save();
+                            foreach ($payables as $payable) {
+                                if ($payable instanceof Invoice) {
+                                    self::updateInvoiceStatus($payable);
                                 }
                             }
                         }),
@@ -381,58 +325,52 @@ class PaymentResource extends Resource
         ];
     }
 
-    /**
-     * Handle after payment actions (create, edit, delete) - Shared method
-     */
     public static function handleAfterPaymentAction(?Payment $payment = null): void
     {
-        if ($payment) {
-            $invoice = $payment->invoice;
-        } else {
+        if (!$payment) {
             return;
         }
 
-        if ($invoice) {
-            // Panggil method dari InvoiceCalculationTrait untuk update status
-            self::updateInvoiceStatus($invoice); // Ini akan menghandle save juga
-            $invoice->refresh(); // Refresh untuk mendapatkan status terbaru dan balance_due
+        $payable = $payment->payable;
 
-            // Logika notifikasi bisa tetap di sini atau disesuaikan berdasarkan status baru
-            // Contoh notifikasi yang disesuaikan:
-            $newStatus = $invoice->status;
-            $balanceDue = $invoice->balance_due; // balance_due dari accessor di model Invoice
-            $overpayment = $invoice->overpayment; // overpayment dari accessor di model Invoice
+        if ($payable instanceof Invoice) {
+            self::updateInvoiceStatus($payable);
+            $payable->refresh();
+
+            $newStatus = $payable->status;
+            $balanceDue = $payable->balance_due;
+            $overpayment = $payable->overpayment;
 
             if ($newStatus === 'paid') {
                 if ($overpayment > 0) {
                     \Filament\Notifications\Notification::make()
                         ->title('✅ Invoice Lunas dengan Kembalian')
-                        ->body("Invoice {$invoice->invoice_number} lunas. Kembalian: Rp. " . number_format($overpayment, 0, ',', '.'))
+                        ->body("Invoice {$payable->invoice_number} lunas. Kembalian: Rp. " . number_format($overpayment, 0, ',', '.'))
                         ->success()
                         ->send();
                 } else {
                     \Filament\Notifications\Notification::make()
                         ->title('✅ Invoice Lunas')
-                        ->body("Invoice {$invoice->invoice_number} telah lunas.")
+                        ->body("Invoice {$payable->invoice_number} telah lunas.")
                         ->success()
                         ->send();
                 }
             } elseif ($newStatus === 'partially_paid') {
                 \Filament\Notifications\Notification::make()
                     ->title('💰 Status Pembayaran Diperbarui')
-                    ->body("Invoice {$invoice->invoice_number} sebagian dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} sebagian dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
                     ->info()
                     ->send();
             } elseif ($newStatus === 'unpaid') {
                 \Filament\Notifications\Notification::make()
                     ->title('📋 Status Invoice Diperbarui')
-                    ->body("Invoice {$invoice->invoice_number} menjadi belum dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} menjadi belum dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
                     ->warning()
                     ->send();
             } elseif ($newStatus === 'overdue') {
-                 \Filament\Notifications\Notification::make()
+                \Filament\Notifications\Notification::make()
                     ->title('⚠️ Invoice Jatuh Tempo')
-                    ->body("Invoice {$invoice->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
                     ->danger()
                     ->send();
             }

@@ -16,6 +16,10 @@ class ViewPurchaseOrder extends ViewRecord
 {
     protected static string $resource = PurchaseOrderResource::class;
 
+    protected $listeners = [
+        'refresh' => '$refresh',
+    ];
+
     protected function getHeaderActions(): array
     {
         return [
@@ -133,7 +137,7 @@ class ViewPurchaseOrder extends ViewRecord
 
                 Infolists\Components\Section::make('Ringkasan Biaya')
                     ->schema([
-                        Infolists\Components\Grid::make(2)
+                        Infolists\Components\Grid::make(3)
                             ->schema([
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('notes')
@@ -153,6 +157,39 @@ class ViewPurchaseOrder extends ViewRecord
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
                                         ->currency('IDR'),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('payment_status')
+                                        ->label('Status Pembayaran')
+                                        ->state(function (PurchaseOrder $record): string {
+                                            if ($record->balance_due <= 0) {
+                                                return 'Lunas';
+                                            } elseif ($record->total_paid_amount > 0) {
+                                                return 'Sebagian Dibayar';
+                                            } else {
+                                                return 'Belum Dibayar';
+                                            }
+                                        })
+                                        ->badge()
+                                        ->color(fn(string $state): string => match ($state) {
+                                            'Belum Dibayar' => 'gray',
+                                            'Sebagian Dibayar' => 'info',
+                                            'Lunas' => 'success',
+                                        }),
+                                    Infolists\Components\TextEntry::make('total_paid_amount')
+                                        ->label('Total Dibayar')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->weight('semibold'),
+                                    Infolists\Components\TextEntry::make('balance_due')
+                                        ->label('Sisa Tagihan')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->balance_due)
+                                        ->weight('bold')
+                                        ->color('danger')
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->icon('heroicon-o-exclamation-triangle'),
                                 ]),
                             ]),
                     ]),
