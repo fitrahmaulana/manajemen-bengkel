@@ -40,6 +40,17 @@ class ItemResource extends Resource
     protected static ?string $pluralModelLabel = 'Daftar Varian';
     protected static ?int $navigationSort = 2;
 
+    public static function getNavigationBadge(): ?string
+    {
+        $lowStockCount = Item::whereColumn('stock', '<=', 'minimum_stock')->count();
+        return $lowStockCount > 0 ? (string) $lowStockCount : null;
+    }
+
+    public static function getNavigationBadgeColor(): string|array|null
+    {
+        return 'danger';
+    }
+
     public static function form(Form $form): Form
     {
         return $form
@@ -65,6 +76,13 @@ class ItemResource extends Resource
                             ->helperText('Kode unik untuk identifikasi barang')
                             ->required()
                             ->unique(ignoreRecord: true),
+                        Forms\Components\Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->placeholder('Pilih Supplier')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Pilih supplier untuk barang ini (opsional).'),
                     ]),
 
                 Forms\Components\Section::make('Harga & Stok')
@@ -95,6 +113,13 @@ class ItemResource extends Resource
                                     ->helperText('Jumlah barang yang tersedia (mendukung desimal seperti 3.5)')
                                     ->numeric()
                                     ->step(1) // Memungkinkan input desimal
+                                    ->required()
+                                    ->default(0),
+                                Forms\Components\TextInput::make('minimum_stock')
+                                    ->label('Stok Minimum')
+                                    ->placeholder('0')
+                                    ->helperText('Batas minimum stok sebelum notifikasi muncul')
+                                    ->numeric()
                                     ->required()
                                     ->default(0),
                                 Forms\Components\Select::make('unit')
@@ -158,6 +183,11 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('supplier.name')
+                    ->label('Supplier')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('selling_price')
                     ->currency('IDR')
                     ->label('Harga Jual')
@@ -351,6 +381,7 @@ class ItemResource extends Resource
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
                         TextEntry::make('product.brand')->label('Merek'),
+                        TextEntry::make('supplier.name')->label('Supplier'),
                         TextEntry::make('volume_value')
                             ->label('Nilai Volume Std.')
                             ->suffix(fn($record) => ' ' . $record->base_volume_unit)
@@ -365,6 +396,12 @@ class ItemResource extends Resource
                             ->label('Stok Saat Ini')
                             ->badge()
                             ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success')
+                            ->suffix(fn($record) => ' ' . $record->unit),
+
+                        TextEntry::make('minimum_stock')
+                            ->label('Stok Minimum')
+                            ->badge()
+                            ->color('danger')
                             ->suffix(fn($record) => ' ' . $record->unit),
 
                         TextEntry::make('purchase_price')

@@ -16,9 +16,11 @@ class Item extends Model
         'purchase_price',
         'selling_price',
         'stock',
+        'minimum_stock',
         'unit',
         'volume_value',
         'base_volume_unit',
+        'supplier_id',
     ];
 
     protected $casts = [
@@ -31,9 +33,19 @@ class Item extends Model
         return $this->belongsTo(Product::class);
     }
 
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
+    }
+
     public function invoices()
     {
         return $this->belongsToMany(Invoice::class, 'invoice_item');
+    }
+
+    public function purchaseOrderItems()
+    {
+        return $this->hasMany(PurchaseOrderItem::class);
     }
 
     /**
@@ -72,4 +84,6 @@ class Item extends Model
         // Jika produk dengan varian, tampilkan nama produk + varian
         return $productName . ' ' . $variantName;
     }
+
+
 }
