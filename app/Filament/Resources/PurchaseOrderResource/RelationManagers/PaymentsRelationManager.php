@@ -23,4 +23,16 @@ class PaymentsRelationManager extends RelationManager
                 \Filament\Tables\Actions\CreateAction::make(),
             ]);
     }
+
+    protected function canCreate(): bool
+    {
+        $owner = $this->getOwnerRecord();
+
+        if ($owner instanceof \App\Models\PurchaseOrder) {
+            $totalPaid = $owner->payments()->sum('amount_paid');
+            return $owner->total_amount > $totalPaid;
+        }
+
+        return false;
+    }
 }

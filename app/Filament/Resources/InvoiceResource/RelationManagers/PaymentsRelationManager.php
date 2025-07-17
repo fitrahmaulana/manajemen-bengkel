@@ -87,11 +87,18 @@ class PaymentsRelationManager extends RelationManager
 
     protected function canCreate(): bool
     {
-        /** @var Invoice $invoice */
-        $invoice = $this->getOwnerRecord();
-        if (!$invoice) {
-            return false;
+        $owner = $this->getOwnerRecord();
+
+        if ($owner instanceof Invoice) {
+            return $owner->balance_due > 0;
         }
-        return $invoice->balance_due > 0;
+
+        if ($owner instanceof \App\Models\PurchaseOrder) {
+            // Assuming PurchaseOrder has a total_amount and payments relationship
+            $totalPaid = $owner->payments()->sum('amount_paid');
+            return $owner->total_amount > $totalPaid;
+        }
+
+        return false;
     }
 }
