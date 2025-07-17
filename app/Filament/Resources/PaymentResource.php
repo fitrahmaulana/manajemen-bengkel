@@ -251,9 +251,16 @@ class PaymentResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('payable')
                     ->label('Nomor Tagihan')
-                    ->formatStateUsing(fn ($state) => $state->invoice_number ?? $state->po_number)
-                    ->searchable(['invoice_number', 'po_number'])
-                    ->sortable(['invoice_number', 'po_number'])
+                    ->formatStateUsing(fn($state) => $state->invoice_number ?? $state->po_number)
+                    ->searchable(
+                        query: function ($query, string $search) {
+                            // Membuat search berfungsi untuk kedua kolom
+                            $query->orWhereHas('payable', function ($q) use ($search) {
+                                $q->where('invoice_number', 'like', "%{$search}%")
+                                    ->orWhere('po_number', 'like', "%{$search}%");
+                            });
+                        }
+                    )->sortable(['invoice_number', 'po_number'])
                     ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
@@ -361,7 +368,7 @@ class PaymentResource extends Resource
                     ->warning()
                     ->send();
             } elseif ($newStatus === 'overdue') {
-                 \Filament\Notifications\Notification::make()
+                \Filament\Notifications\Notification::make()
                     ->title('⚠️ Invoice Jatuh Tempo')
                     ->body("Invoice {$payable->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
                     ->danger()
