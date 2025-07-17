@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager as InvoicePaymentsRelationManager;
 use App\Filament\Resources\PaymentResource\Pages;
+use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelationManager as PurchaseOrderPaymentsRelationManager;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
@@ -34,7 +36,7 @@ class PaymentResource extends Resource
             return $record->payable;
         }
 
-        if ($livewire instanceof \App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager || $livewire instanceof \App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelationManager) {
+        if ($livewire instanceof InvoicePaymentsRelationManager || $livewire instanceof PurchaseOrderPaymentsRelationManager) {
             $owner = $livewire->getOwnerRecord();
             if ($owner instanceof Invoice || $owner instanceof PurchaseOrder) {
                 return $owner;
@@ -69,7 +71,8 @@ class PaymentResource extends Resource
                             ->preload()
                             ->required()
                             ->columnSpanFull()
-                            ->live(),
+                            ->live()
+                            ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
 
                         Forms\Components\DatePicker::make('payment_date')
                             ->label('Tanggal Pembayaran')
@@ -191,7 +194,8 @@ class PaymentResource extends Resource
                 Tables\Columns\TextColumn::make('payable.invoice_number')
                     ->label('Nomor Tagihan')
                     ->searchable()
-                    ->sortable(),
+                    ->sortable()
+                    ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
                     ->label('Tanggal Pembayaran')
