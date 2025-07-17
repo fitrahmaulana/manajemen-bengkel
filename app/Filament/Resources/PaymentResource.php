@@ -136,6 +136,64 @@ class PaymentResource extends Resource
                                 }
                             }),
 
+                        Forms\Components\ToggleButtons::make('quick_payment_options')
+                            ->label('Pilihan Cepat Pembayaran')
+                            ->helperText('Klik salah satu tombol untuk mengisi jumlah bayar secara otomatis.')
+                            ->live()
+                            ->afterStateUpdated(fn($state, $set) => $set('amount_paid', $state))
+                            ->visible(fn(string $operation) => $operation === 'create')
+                            ->options(function (Forms\Get $get, $livewire): array {
+                                $payable = self::getPayableFromContext($get, null, $livewire);
+
+                                if (!$payable) {
+                                    return [];
+                                }
+
+                                $totalBill = $payable->balance_due ?? $payable->total_amount;
+                                if (!$totalBill || $totalBill <= 0) {
+                                    return [];
+                                }
+
+                                $options = [];
+                                $suggestions = [];
+
+                                $options[(string)$totalBill] = '💰 Uang Pas';
+
+                                $roundingBases = [10000, 20000, 50000, 100000];
+
+                                foreach ($roundingBases as $base) {
+                                    if ($base < $totalBill) {
+                                        $suggestion = ceil($totalBill / $base) * $base;
+
+                                        if ($suggestion <= $totalBill) {
+                                            $suggestion += $base;
+                                        }
+
+                                        if ($suggestion < $totalBill * 2.5 && $suggestion < 1000000) {
+                                            $suggestions[] = $suggestion;
+                                        }
+                                    }
+                                }
+
+                                if ($totalBill > 50000) {
+                                    $suggestions[] = ceil($totalBill / 100000) * 100000;
+                                }
+
+                                $uniqueSuggestions = array_unique($suggestions);
+                                sort($uniqueSuggestions);
+
+                                $finalSuggestions = array_slice($uniqueSuggestions, 0, 3);
+
+                                foreach ($finalSuggestions as $s) {
+                                    if ($s != $totalBill) {
+                                        $options[(string)$s] = '💵 Rp. ' . number_format($s, 0, ',', '.');
+                                    }
+                                }
+
+                                return $options;
+                            })
+                            ->columns(4),
+
                         Forms\Components\Placeholder::make('kembalian_calculator')
                             ->label('Kembalian')
                             ->content(function (Forms\Get $get, $record, $livewire) {
