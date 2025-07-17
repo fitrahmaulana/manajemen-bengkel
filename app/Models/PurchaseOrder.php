@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class PurchaseOrder extends Model
 {
@@ -24,10 +25,8 @@ class PurchaseOrder extends Model
         return $this->belongsTo(Supplier::class);
     }
 
-    public function items()
+    public function purchaseOrderItems(): HasMany
     {
-        return $this->belongsToMany(Item::class, 'purchase_order_items')
-            ->withPivot('quantity', 'price')
-            ->withTimestamps();
+        return $this->hasMany(PurchaseOrderItem::class);
     }
 }

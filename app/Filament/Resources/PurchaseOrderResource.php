@@ -59,7 +59,8 @@ class PurchaseOrderResource extends Resource
             ]),
 
             Section::make('Detail Barang')->schema([
-                CustomTableRepeater::make('items')
+                CustomTableRepeater::make('purchaseOrderItems')
+                    ->relationship()
                     ->headers([
                         Header::make('Barang / Suku Cadang')->width('45%'),
                         Header::make('Kuantitas')->width('15%'),
@@ -135,7 +136,7 @@ class PurchaseOrderResource extends Resource
                     ])
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('items'))->sum(function ($item) {
+                            'Total: ' . self::formatCurrency(collect($get('purchaseOrderItems'))->sum(function ($item) {
                                 $quantity = (float)($item['quantity'] ?? 0.0);
                                 $price = self::parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
@@ -156,7 +157,7 @@ class PurchaseOrderResource extends Resource
                             ->label('Subtotal')
                             ->extraAttributes(['class' => 'font-bold text-xl text-white'])
                             ->content(function (Get $get) {
-                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                $itemsTotal = collect($get('purchaseOrderItems'))->sum(function ($item) {
                                     $quantity = (float)($item['quantity'] ?? 0.0);
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
@@ -183,7 +184,7 @@ class PurchaseOrderResource extends Resource
                             ->label('Total Akhir')
                             ->extraAttributes(['class' => 'font-bold text-xl text-green'])
                             ->Content(function (Get $get) {
-                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                $itemsTotal = collect($get('purchaseOrderItems'))->sum(function ($item) {
                                     $quantity = (float)($item['quantity'] ?? 0);
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
@@ -243,9 +244,9 @@ class PurchaseOrderResource extends Resource
                             return;
                         }
 
-                        foreach ($record->items as $item) {
-                            $item->stock += $item->pivot->quantity;
-                            $item->save();
+                        foreach ($record->purchaseOrderItems as $item) {
+                            $item->item->stock += $item->quantity;
+                            $item->item->save();
                         }
 
                         $record->status = 'completed';
