@@ -150,25 +150,6 @@ class ViewPurchaseOrder extends ViewRecord
                                             }
                                             return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
-                                    Infolists\Components\TextEntry::make('payment_status')
-                                        ->label('Status Pembayaran')
-                                        ->state(function (PurchaseOrder $record): string {
-                                            if ($record->balance_due <= 0) {
-                                                return 'Lunas';
-                                            } elseif ($record->total_paid_amount > 0) {
-                                                return 'Sebagian Dibayar';
-                                            } else {
-                                                return 'Belum Dibayar';
-                                            }
-                                        })
-                                        ->badge()
-                                        ->color(fn(string $state): string => match ($state) {
-                                            'Belum Dibayar' => 'gray',
-                                            'Sebagian Dibayar' => 'info',
-                                            'Lunas' => 'success',
-                                        }),
-                                ]),
-                                Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
                                         ->currency('IDR'),
@@ -186,6 +167,25 @@ class ViewPurchaseOrder extends ViewRecord
                                         ->size('lg')
                                         ->visible(fn($record) => $record->balance_due > 0)
                                         ->icon('heroicon-o-exclamation-triangle'),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('payment_status')
+                                        ->label('Status Pembayaran')
+                                        ->state(function (PurchaseOrder $record): string {
+                                            if ($record->balance_due <= 0) {
+                                                return 'Lunas';
+                                            } elseif ($record->total_paid_amount > 0) {
+                                                return 'Sebagian Dibayar';
+                                            } else {
+                                                return 'Belum Dibayar';
+                                            }
+                                        })
+                                        ->badge()
+                                        ->color(fn(string $state): string => match ($state) {
+                                            'Belum Dibayar' => 'gray',
+                                            'Sebagian Dibayar' => 'info',
+                                            'Lunas' => 'success',
+                                        }),
                                 ]),
                             ]),
                     ]),
