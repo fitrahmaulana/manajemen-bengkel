@@ -20,7 +20,23 @@ class PaymentsRelationManager extends RelationManager
     {
         return PaymentResource::table($table)
             ->headerActions([
-                \Filament\Tables\Actions\CreateAction::make()->view('create-payment'),
+                \Filament\Tables\Actions\CreateAction::make()
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
+                        $livewire->dispatch('refresh');
+                    }),
+            ])
+            ->actions([
+                \Filament\Tables\Actions\EditAction::make()
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
+                        $livewire->dispatch('refresh');
+                    }),
+                \Filament\Tables\Actions\DeleteAction::make()
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
+                        $livewire->dispatch('refresh');
+                    }),
             ]);
     }
 
