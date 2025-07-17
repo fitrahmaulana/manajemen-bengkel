@@ -156,16 +156,6 @@ class ViewPurchaseOrder extends ViewRecord
                                 ]),
                             ]),
                     ]),
-                Infolists\Components\Section::make('Riwayat Pembayaran')
-                    ->schema([
-                        Infolists\Components\Actions::make([
-                            Infolists\Components\Actions\Action::make('add_payment')
-                                ->label('Tambah Pembayaran')
-                                ->url(fn($record) => PurchaseOrderResource::getUrl('edit', ['record' => $record, 'activeRelationManager' => 0]))
-                                ->icon('heroicon-o-plus-circle')
-                                ->color('success')
-                        ]),
-                    ]),
             ]);
     }
 }
