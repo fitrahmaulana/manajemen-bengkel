@@ -19,6 +19,7 @@ class Item extends Model
         'unit',
         'volume_value',
         'base_volume_unit',
+        'supplier_id',
     ];
 
     protected $casts = [
@@ -29,6 +30,11 @@ class Item extends Model
     public function product()
     {
         return $this->belongsTo(Product::class);
+    }
+
+    public function supplier()
+    {
+        return $this->belongsTo(Supplier::class);
     }
 
     public function invoices()

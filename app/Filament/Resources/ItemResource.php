@@ -65,6 +65,13 @@ class ItemResource extends Resource
                             ->helperText('Kode unik untuk identifikasi barang')
                             ->required()
                             ->unique(ignoreRecord: true),
+                        Forms\Components\Select::make('supplier_id')
+                            ->label('Supplier')
+                            ->placeholder('Pilih Supplier')
+                            ->relationship('supplier', 'name')
+                            ->searchable()
+                            ->preload()
+                            ->helperText('Pilih supplier untuk barang ini (opsional).'),
                     ]),
 
                 Forms\Components\Section::make('Harga & Stok')
@@ -158,6 +165,11 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
                     ->searchable(),
+                Tables\Columns\TextColumn::make('supplier.name')
+                    ->label('Supplier')
+                    ->searchable()
+                    ->sortable()
+                    ->toggleable(isToggledHiddenByDefault: true),
                 Tables\Columns\TextColumn::make('selling_price')
                     ->currency('IDR')
                     ->label('Harga Jual')
@@ -351,6 +363,7 @@ class ItemResource extends Resource
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
                         TextEntry::make('product.brand')->label('Merek'),
+                        TextEntry::make('supplier.name')->label('Supplier'),
                         TextEntry::make('volume_value')
                             ->label('Nilai Volume Std.')
                             ->suffix(fn($record) => ' ' . $record->base_volume_unit)
