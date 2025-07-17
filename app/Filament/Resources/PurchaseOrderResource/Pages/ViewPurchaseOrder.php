@@ -16,10 +16,6 @@ class ViewPurchaseOrder extends ViewRecord
 {
     protected static string $resource = PurchaseOrderResource::class;
 
-    protected $listeners = [
-        'refresh' => '$refresh',
-    ];
-
     protected function getHeaderActions(): array
     {
         return [
@@ -137,7 +133,7 @@ class ViewPurchaseOrder extends ViewRecord
 
                 Infolists\Components\Section::make('Ringkasan Biaya')
                     ->schema([
-                        Infolists\Components\Grid::make(3)
+                        Infolists\Components\Grid::make(2)
                             ->schema([
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('notes')
@@ -157,6 +153,20 @@ class ViewPurchaseOrder extends ViewRecord
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
                                         ->currency('IDR'),
+                                    Infolists\Components\TextEntry::make('total_paid_amount')
+                                        ->label('Total Dibayar')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->weight('semibold'),
+                                    Infolists\Components\TextEntry::make('balance_due')
+                                        ->label('Sisa Tagihan')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->balance_due)
+                                        ->weight('bold')
+                                        ->color('danger')
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->icon('heroicon-o-exclamation-triangle'),
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('payment_status')
@@ -176,20 +186,6 @@ class ViewPurchaseOrder extends ViewRecord
                                             'Sebagian Dibayar' => 'info',
                                             'Lunas' => 'success',
                                         }),
-                                    Infolists\Components\TextEntry::make('total_paid_amount')
-                                        ->label('Total Dibayar')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount)
-                                        ->weight('semibold'),
-                                    Infolists\Components\TextEntry::make('balance_due')
-                                        ->label('Sisa Tagihan')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due)
-                                        ->weight('bold')
-                                        ->color('danger')
-                                        ->size('lg')
-                                        ->visible(fn($record) => $record->balance_due > 0)
-                                        ->icon('heroicon-o-exclamation-triangle'),
                                 ]),
                             ]),
                     ]),

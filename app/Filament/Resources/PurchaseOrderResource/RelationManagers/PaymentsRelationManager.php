@@ -21,25 +21,23 @@ class PaymentsRelationManager extends RelationManager
         return PaymentResource::table($table)
             ->headerActions([
                 \Filament\Tables\Actions\CreateAction::make()
-                    ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
                         $livewire->dispatch('refresh');
                     }),
             ])
             ->actions([
                 \Filament\Tables\Actions\EditAction::make()
-                    ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
                         $livewire->dispatch('refresh');
                     }),
                 \Filament\Tables\Actions\DeleteAction::make()
-                    ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                    ->after(function ($record, \Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        PaymentResource::handleAfterPaymentAction($record);
                         $livewire->dispatch('refresh');
                     }),
             ]);
-    }
-
-    public function isReadOnly(): bool
-    {
-        return false;
     }
 
     protected function canCreate(): bool

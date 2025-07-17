@@ -249,10 +249,11 @@ class PaymentResource extends Resource
     {
         return $table
             ->columns([
-                Tables\Columns\TextColumn::make('payable.invoice_number')
+                Tables\Columns\TextColumn::make('payable')
                     ->label('Nomor Tagihan')
-                    ->searchable()
-                    ->sortable()
+                    ->formatStateUsing(fn ($state) => $state->invoice_number ?? $state->po_number)
+                    ->searchable(['invoice_number', 'po_number'])
+                    ->sortable(['invoice_number', 'po_number'])
                     ->hiddenOn([InvoicePaymentsRelationManager::class, PurchaseOrderPaymentsRelationManager::class]),
                 Tables\Columns\TextColumn::make('payment_date')
                     ->date('d M Y')
@@ -322,7 +323,6 @@ class PaymentResource extends Resource
         if (!$payment) {
             return;
         }
-
 
         $payable = $payment->payable;
 
