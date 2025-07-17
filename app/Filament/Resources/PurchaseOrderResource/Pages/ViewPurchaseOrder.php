@@ -150,25 +150,6 @@ class ViewPurchaseOrder extends ViewRecord
                                             }
                                             return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
-                                    Infolists\Components\TextEntry::make('total_amount')
-                                        ->label('Total Akhir')
-                                        ->currency('IDR'),
-                                    Infolists\Components\TextEntry::make('total_paid_amount')
-                                        ->label('Total Dibayar')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount)
-                                        ->weight('semibold'),
-                                    Infolists\Components\TextEntry::make('balance_due')
-                                        ->label('Sisa Tagihan')
-                                        ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due)
-                                        ->weight('bold')
-                                        ->color('danger')
-                                        ->size('lg')
-                                        ->visible(fn($record) => $record->balance_due > 0)
-                                        ->icon('heroicon-o-exclamation-triangle'),
-                                ]),
-                                Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('payment_status')
                                         ->label('Status Pembayaran')
                                         ->state(function (PurchaseOrder $record): string {
@@ -186,6 +167,25 @@ class ViewPurchaseOrder extends ViewRecord
                                             'Sebagian Dibayar' => 'info',
                                             'Lunas' => 'success',
                                         }),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
+                                    Infolists\Components\TextEntry::make('total_amount')
+                                        ->label('Total Akhir')
+                                        ->currency('IDR'),
+                                    Infolists\Components\TextEntry::make('total_paid_amount')
+                                        ->label('Total Dibayar')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->weight('semibold'),
+                                    Infolists\Components\TextEntry::make('balance_due')
+                                        ->label('Sisa Tagihan')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->balance_due)
+                                        ->weight('bold')
+                                        ->color('danger')
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->icon('heroicon-o-exclamation-triangle'),
                                 ]),
                             ]),
                     ]),
