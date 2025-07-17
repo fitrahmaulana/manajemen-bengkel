@@ -20,8 +20,13 @@ class PaymentsRelationManager extends RelationManager
     {
         return PaymentResource::table($table)
             ->headerActions([
-                \Filament\Tables\Actions\CreateAction::make()->view('create-payment'),
+                \Filament\Tables\Actions\CreateAction::make(),
             ]);
+    }
+
+    public function isReadOnly(): bool
+    {
+        return false;
     }
 
     protected function canCreate(): bool
