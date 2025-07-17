@@ -206,64 +206,64 @@ class PurchaseOrderResource extends Resource
                 //
             ])
             ->actions([
-                Tables\Actions\EditAction::make(),
-                Action::make('complete')
-                    ->label('Complete')
-                    ->action(function (PurchaseOrder $record) {
-                        if ($record->status === 'completed') {
+                Tables\Actions\ActionGroup::make([
+                    Tables\Actions\ViewAction::make(),
+                    Tables\Actions\EditAction::make(),
+                    Action::make('complete')
+                        ->label('Complete')
+                        ->action(function (PurchaseOrder $record) {
+                            if ($record->status === 'completed') {
+                                Notification::make()
+                                    ->title('Error')
+                                    ->body('Purchase order is already completed.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+
+                            foreach ($record->purchaseOrderItems as $item) {
+                                $item->item->stock += $item->quantity;
+                                $item->item->save();
+                            }
+
+                            $record->status = 'completed';
+                            $record->save();
+
                             Notification::make()
-                                ->title('Error')
-                                ->body('Purchase order is already completed.')
-                                ->danger()
+                                ->title('Success')
+                                ->body('Purchase order has been completed and stock has been updated.')
+                                ->success()
                                 ->send();
-                            return;
-                        }
+                        })
+                        ->requiresConfirmation()
+                        ->color('success')
+                        ->icon('heroicon-o-check-circle')
+                        ->visible(fn(PurchaseOrder $record) => $record->status === 'draft'),
+                    Action::make('revert')
+                        ->label('Kembalikan ke Draft')
+                        ->action(function (PurchaseOrder $record) {
+                            if ($record->status !== 'completed') {
+                                Notification::make()
+                                    ->title('Error')
+                                    ->body('Purchase order must be completed before reverting.')
+                                    ->danger()
+                                    ->send();
+                                return;
+                            }
+                            foreach ($record->purchaseOrderItems as $item) {
+                                $item->item->decrement('stock', $item->quantity);
+                            }
 
-                        foreach ($record->purchaseOrderItems as $item) {
-                            $item->item->stock += $item->quantity;
-                            $item->item->save();
-                        }
+                            $record->status = 'draft';
+                            $record->save();
 
-                        $record->status = 'completed';
-                        $record->save();
-
-                        Notification::make()
-                            ->title('Success')
-                            ->body('Purchase order has been completed and stock has been updated.')
-                            ->success()
-                            ->send();
-                    })
-                    ->requiresConfirmation()
-                    ->color('success')
-                    ->icon('heroicon-o-check-circle')
-                    ->visible(fn(PurchaseOrder $record) => $record->status === 'draft'),
-                // Di dalam Actions\ActionGroup atau di samping action 'complete'
-                Action::make('revert')
-                    ->label('Kembalikan ke Draft')
-                    ->action(function (PurchaseOrder $record) {
-                        if ($record->status !== 'completed') {
-                            Notification::make()
-                                ->title('Error')
-                                ->body('Purchase order must be completed before reverting.')
-                                ->danger()
-                                ->send();
-                            return;
-                        }
-                        // Kurangi kembali stok yang sudah ditambahkan
-                        foreach ($record->purchaseOrderItems as $item) {
-                            // Pastikan stok tidak menjadi minus (opsional, tergantung logika bisnis)
-                            $item->item->decrement('stock', $item->quantity);
-                        }
-
-                        $record->status = 'draft';
-                        $record->save();
-
-                        Notification::make()->title('Sukses')->body('Pesanan dikembalikan ke draft dan stok telah disesuaikan.')->success()->send();
-                    })
-                    ->requiresConfirmation()
-                    ->color('warning')
-                    ->icon('heroicon-o-arrow-uturn-left')
-                    ->visible(fn(PurchaseOrder $record) => $record->status === 'completed') // Hanya tampil jika sudah selesai
+                            Notification::make()->title('Sukses')->body('Pesanan dikembalikan ke draft dan stok telah disesuaikan.')->success()->send();
+                        })
+                        ->requiresConfirmation()
+                        ->color('warning')
+                        ->icon('heroicon-o-arrow-uturn-left')
+                        ->visible(fn(PurchaseOrder $record) => $record->status === 'completed'),
+                ]),
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -285,6 +285,7 @@ class PurchaseOrderResource extends Resource
             'index' => Pages\ListPurchaseOrders::route('/'),
             'create' => Pages\CreatePurchaseOrder::route('/create'),
             'edit' => Pages\EditPurchaseOrder::route('/{record}/edit'),
+            'view' => Pages\ViewPurchaseOrder::route('/{record}'),
         ];
     }
 
