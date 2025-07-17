@@ -14,6 +14,9 @@ class PurchaseOrder extends Model
         'order_date',
         'total_price',
         'status',
+        'discount',
+        'discount_type',
+        'notes',
     ];
 
     public function supplier()
