@@ -323,6 +323,7 @@ class PaymentResource extends Resource
             return;
         }
 
+
         $payable = $payment->payable;
 
         if ($payable instanceof Invoice) {

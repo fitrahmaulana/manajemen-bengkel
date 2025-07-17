@@ -16,6 +16,10 @@ class ViewPurchaseOrder extends ViewRecord
 {
     protected static string $resource = PurchaseOrderResource::class;
 
+    protected $listeners = [
+        'refresh' => '$refresh',
+    ];
+
     protected function getHeaderActions(): array
     {
         return [
