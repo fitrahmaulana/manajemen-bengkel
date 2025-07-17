@@ -29,8 +29,7 @@ class PaymentsRelationManager extends RelationManager
         $owner = $this->getOwnerRecord();
 
         if ($owner instanceof \App\Models\PurchaseOrder) {
-            $totalPaid = $owner->payments()->sum('amount_paid');
-            return $owner->total_amount > $totalPaid;
+            return $owner->balance_due > 0;
         }
 
         return false;

@@ -39,4 +39,24 @@ class PurchaseOrder extends Model
     {
         return $this->morphMany(Payment::class, 'payable');
     }
+
+    /**
+     * Accessor for the total amount paid.
+     *
+     * @return float
+     */
+    public function getTotalPaidAmountAttribute(): float
+    {
+        return $this->payments()->sum('amount_paid');
+    }
+
+    /**
+     * Accessor for the balance due.
+     *
+     * @return float
+     */
+    public function getBalanceDueAttribute(): float
+    {
+        return $this->total_amount - $this->total_paid_amount;
+    }
 }
