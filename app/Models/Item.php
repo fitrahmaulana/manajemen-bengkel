@@ -16,6 +16,7 @@ class Item extends Model
         'purchase_price',
         'selling_price',
         'stock',
+        'minimum_stock',
         'unit',
         'volume_value',
         'base_volume_unit',
