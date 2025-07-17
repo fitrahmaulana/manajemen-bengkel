@@ -15,8 +15,10 @@ return new class extends Migration
             $table->id();
             $table->foreignId('purchase_order_id')->constrained()->cascadeOnDelete();
             $table->foreignId('item_id')->constrained()->cascadeOnDelete();
-            $table->integer('quantity');
-            $table->decimal('price', 15, 2);
+            $table->decimal('quantity', 15, 2)->comment('Jumlah item yang dibeli'); // Changed to decimal for fractional quantities
+            $table->decimal('price', 15, 0);
+            $table->text('description')->nullable();
+
             $table->timestamps();
         });
     }

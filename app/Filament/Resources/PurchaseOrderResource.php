@@ -22,6 +22,7 @@ use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\HtmlString;
 
 class PurchaseOrderResource extends Resource
@@ -50,7 +51,7 @@ class PurchaseOrderResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('po_number')->label('Nomor PO')->default('PO-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed',])->default('draft')->required(),
+                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed',])->default('draft')->required()->disabled(fn(string $operation): bool => $operation !== 'create'),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('order_date')->label('Tanggal PO')->default(now())->required(),
@@ -75,27 +76,10 @@ class PurchaseOrderResource extends Resource
                             Forms\Components\Select::make('item_id')
                                 ->label('Barang')
                                 ->hiddenLabel()
-                                ->options(function () {
-                                    return Item::query()
-                                        ->with(['product'])
-                                        ->get()
-                                        ->mapWithKeys(function ($item) {
-                                            $productName = $item->product->name;
-                                            $variantName = $item->name;
-
-                                            if (empty($variantName)) {
-                                                $displayName = $productName;
-                                            } else {
-                                                $displayName = $productName . ' ' . $variantName;
-                                            }
-
-                                            $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
-                                            $stockInfo = " - Stok: {$item->stock} {$item->unit}";
-
-                                            return [$item->id => $displayName . $skuInfo . $stockInfo];
-                                        });
-                                })
+                                ->relationship('item', 'name')
+                                ->getOptionLabelFromRecordUsing(fn(Model $record) => $record->display_name)
                                 ->searchable()
+                                ->preload()
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated(function (Set $set, Get $get, $state) {
@@ -112,18 +96,18 @@ class PurchaseOrderResource extends Resource
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
-                            ->step('0.01')
                             ->default(1.0)
                             ->required()
-                            ->live(),
+                            ->live()
+                            ->suffix(fn(Get $get) => $get('unit_name') ? ' ' . $get('unit_name') : ''),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
                             ->prefix('Rp. ')
                             ->live()
                             ->required(),
-                        Forms\Components\Hidden::make('unit_name'),
-                        Forms\Components\Placeholder::make('subtotal_item')
+                        Forms\Components\Hidden::make('unit_name')->dehydrated(false),
+                        Forms\Components\Placeholder::make('subtotal')
                             ->hiddenLabel()
                             ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
@@ -134,15 +118,6 @@ class PurchaseOrderResource extends Resource
                                 return self::formatCurrency($total);
                             }),
                     ])
-                    ->footerItem(
-                        fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('purchaseOrderItems'))->sum(function ($item) {
-                                $quantity = (float)($item['quantity'] ?? 0.0);
-                                $price = self::parseCurrencyValue($item['price'] ?? '0');
-                                return $quantity * $price;
-                            }))
-                        )
-                    )
                     ->columns(4)
             ]),
 
@@ -224,7 +199,7 @@ class PurchaseOrderResource extends Resource
                         'draft' => 'gray',
                         'completed' => 'success',
                     })->searchable(),
-                Tables\Columns\TextColumn::make('total_price')->label('Total Biaya')->currency('IDR')->sortable(),
+                Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('order_date')->label('Tanggal PO')->date('d M Y')->sortable(),
             ])
             ->filters([
@@ -260,7 +235,35 @@ class PurchaseOrderResource extends Resource
                     })
                     ->requiresConfirmation()
                     ->color('success')
-                    ->icon('heroicon-o-check-circle'),
+                    ->icon('heroicon-o-check-circle')
+                    ->visible(fn(PurchaseOrder $record) => $record->status === 'draft'),
+                // Di dalam Actions\ActionGroup atau di samping action 'complete'
+                Action::make('revert')
+                    ->label('Kembalikan ke Draft')
+                    ->action(function (PurchaseOrder $record) {
+                        if ($record->status !== 'completed') {
+                            Notification::make()
+                                ->title('Error')
+                                ->body('Purchase order must be completed before reverting.')
+                                ->danger()
+                                ->send();
+                            return;
+                        }
+                        // Kurangi kembali stok yang sudah ditambahkan
+                        foreach ($record->purchaseOrderItems as $item) {
+                            // Pastikan stok tidak menjadi minus (opsional, tergantung logika bisnis)
+                            $item->item->decrement('stock', $item->quantity);
+                        }
+
+                        $record->status = 'draft';
+                        $record->save();
+
+                        Notification::make()->title('Sukses')->body('Pesanan dikembalikan ke draft dan stok telah disesuaikan.')->success()->send();
+                    })
+                    ->requiresConfirmation()
+                    ->color('warning')
+                    ->icon('heroicon-o-arrow-uturn-left')
+                    ->visible(fn(PurchaseOrder $record) => $record->status === 'completed') // Hanya tampil jika sudah selesai
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
@@ -293,5 +296,36 @@ class PurchaseOrderResource extends Resource
     public static function formatCurrency($value): string
     {
         return 'Rp ' . number_format($value, 0, ',', '.');
+    }
+
+    public static function calculateTotals(array $data): array
+    {
+        // Hitung Subtotal dari semua item
+        $subtotal = collect($data['purchaseOrderItems'] ?? [])->sum(function ($item) {
+            $quantity = (float)($item['quantity'] ?? 0);
+            // Gunakan metode parseCurrencyValue dari resource ini
+            $price = self::parseCurrencyValue($item['price'] ?? '0');
+            return $quantity * $price;
+        });
+
+        // Ambil tipe dan nilai diskon
+        $discountType = $data['discount_type'] ?? 'fixed';
+        $discountValue = self::parseCurrencyValue($data['discount_value'] ?? '0');
+
+        // Hitung jumlah diskon
+        $discountAmount = 0;
+        if ($discountType === 'percentage') {
+            $discountAmount = ($subtotal * $discountValue) / 100;
+        } else {
+            $discountAmount = $discountValue;
+        }
+
+        // Hitung Total Akhir
+        $totalAmount = $subtotal - $discountAmount;
+
+        return [
+            'subtotal' => $subtotal,
+            'total_amount' => $totalAmount,
+        ];
     }
 }

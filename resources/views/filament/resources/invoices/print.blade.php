@@ -166,7 +166,16 @@
                 @endforeach
                 @foreach ($invoice->items as $item)
                 <tr>
-                    <td>{{ $item->product->name }} {{ $item->name }}</td>
+                    <td>
+                        @if ($item->product)
+                            {{ $item->product->name }}
+                        @endif
+                        {{ $item->name == 'Eceran' ? '' : $item->name }}
+                        @if ($item->pivot->description)
+                            <br><small class="text-muted">{{ $item->pivot->description }}</small>
+                        @endif
+                    </td>
+                    <td class="text-center">{{ $item->pivot->quantity }} {{ $item->unit }}</td>
                     <td class="text-center">{{ $item->pivot->quantity }}</td>
                     <td class="text-right">{{ number_format($item->pivot->price, 0, ',', '.') }}</td>
                     <td class="text-right">{{ number_format($item->pivot->quantity * $item->pivot->price, 0, ',', '.') }}</td>

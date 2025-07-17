@@ -43,6 +43,11 @@ class Item extends Model
         return $this->belongsToMany(Invoice::class, 'invoice_item');
     }
 
+    public function purchaseOrderItems()
+    {
+        return $this->hasMany(PurchaseOrderItem::class);
+    }
+
     /**
      * Get all stock conversions where this item was the source.
      */
@@ -79,4 +84,6 @@ class Item extends Model
         // Jika produk dengan varian, tampilkan nama produk + varian
         return $productName . ' ' . $variantName;
     }
+
+
 }

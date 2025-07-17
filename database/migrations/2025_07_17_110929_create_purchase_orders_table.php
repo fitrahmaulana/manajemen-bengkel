@@ -14,9 +14,14 @@ return new class extends Migration
         Schema::create('purchase_orders', function (Blueprint $table) {
             $table->id();
             $table->foreignId('supplier_id')->constrained()->cascadeOnDelete();
+            $table->string('po_number')->unique();
             $table->date('order_date');
-            $table->decimal('total_price', 15, 2)->default(0);
             $table->string('status')->default('draft');
+            $table->decimal('discount_value', 15, 0)->default(0);
+            $table->string('discount_type')->default('percentage');
+            $table->decimal('subtotal', 15, 0)->default(0);
+            $table->decimal('total_amount', 15, 0)->default(0);
+            $table->text('notes')->nullable();
             $table->timestamps();
         });
     }
