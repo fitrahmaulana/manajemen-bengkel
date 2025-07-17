@@ -3,6 +3,7 @@
 namespace Database\Seeders;
 
 use App\Models\Payment;
+use App\Models\Invoice;
 use Illuminate\Database\Seeder;
 
 class PaymentSeeder extends Seeder
@@ -15,7 +16,8 @@ class PaymentSeeder extends Seeder
         $payments = [
             // Pembayaran untuk Invoice 1 (Lunas)
             [
-                'invoice_id' => 1,
+                'payable_id' => 1,
+                'payable_type' => Invoice::class,
                 'payment_date' => '2024-01-16',
                 'amount_paid' => 427500,
                 'payment_method' => 'Transfer Bank',
@@ -24,7 +26,8 @@ class PaymentSeeder extends Seeder
 
             // Pembayaran untuk Invoice 3 (Partial)
             [
-                'invoice_id' => 3,
+                'payable_id' => 3,
+                'payable_type' => Invoice::class,
                 'payment_date' => '2024-01-26',
                 'amount_paid' => 150000,
                 'payment_method' => 'Cash',
@@ -33,14 +36,16 @@ class PaymentSeeder extends Seeder
 
             // Pembayaran untuk Invoice 4 (Lunas)
             [
-                'invoice_id' => 4,
+                'payable_id' => 4,
+                'payable_type' => Invoice::class,
                 'payment_date' => '2024-02-02',
                 'amount_paid' => 500000,
                 'payment_method' => 'Transfer Bank',
                 'notes' => 'Pembayaran pertama via transfer Mandiri',
             ],
             [
-                'invoice_id' => 4,
+                'payable_id' => 4,
+                'payable_type' => Invoice::class,
                 'payment_date' => '2024-02-10',
                 'amount_paid' => 600000,
                 'payment_method' => 'Cash',
@@ -49,7 +54,8 @@ class PaymentSeeder extends Seeder
 
             // Pembayaran untuk Invoice 6 (Overdue - ada pembayaran sebagian)
             [
-                'invoice_id' => 6,
+                'payable_id' => 6,
+                'payable_type' => Invoice::class,
                 'payment_date' => '2024-02-28',
                 'amount_paid' => 300000,
                 'payment_method' => 'Transfer Bank',

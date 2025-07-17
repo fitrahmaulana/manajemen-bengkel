@@ -35,11 +35,11 @@ class Invoice extends Model
     }
 
     /**
-     * Get the payments for the invoice.
+     * Get all of the invoice's payments.
      */
     public function payments()
     {
-        return $this->hasMany(Payment::class);
+        return $this->morphMany(Payment::class, 'payable');
     }
 
     /**

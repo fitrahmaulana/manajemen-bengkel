@@ -31,4 +31,12 @@ class PurchaseOrder extends Model
     {
         return $this->hasMany(PurchaseOrderItem::class);
     }
+
+    /**
+     * Get all of the purchase order's payments.
+     */
+    public function payments()
+    {
+        return $this->morphMany(Payment::class, 'payable');
+    }
 }
