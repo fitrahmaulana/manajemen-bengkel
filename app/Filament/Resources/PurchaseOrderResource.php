@@ -40,7 +40,8 @@ class PurchaseOrderResource extends Resource
                     ->relationship()
                     ->schema([
                         Forms\Components\Select::make('item_id')
-                            ->relationship('item', 'name')
+                            ->label('Item')
+                            ->options(Item::query()->pluck('name', 'id'))
                             ->required(),
                         Forms\Components\TextInput::make('quantity')
                             ->numeric()
