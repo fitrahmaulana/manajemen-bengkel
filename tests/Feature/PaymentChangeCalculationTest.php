@@ -26,11 +26,11 @@ class PaymentChangeCalculationTest extends TestCase
 
         $this->assertEquals(10000, $change);
 
-        $payment->amount_paid = 700000;
+        $payment->amount_paid = 690000;
         $payment->save();
 
         $change = PaymentResource::calculateChange($payment->amount_paid, $purchaseOrder, $payment);
 
-        $this->assertEquals(0, $change);
+        $this->assertEquals(-10000, $change);
     }
 }

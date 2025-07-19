@@ -334,7 +334,7 @@ class PaymentResource extends Resource
         $balanceDue = $payable->total_amount - $otherPayments;
         $change = $amountPaid - $balanceDue;
 
-        return $change > 0 ? $change : 0;
+        return $change;
     }
 
     public static function handleAfterPaymentAction(?Payment $payment = null): void
