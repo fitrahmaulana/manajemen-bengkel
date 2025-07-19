@@ -208,7 +208,7 @@ class PaymentResource extends Resource
 
                                 return '💵 ' . self::formatCurrency($change);
                             })
-                            ->extraAttributes(function (Forms\Get $get, $record, $livewire) { // Explicitly type Forms\Get
+                            ->extraAttributes(function (Forms\Get $get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
 
@@ -216,11 +216,11 @@ class PaymentResource extends Resource
                                     return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                                 }
 
-                                $targetAmount = $payable->balance_due ?? $payable->total_amount;
+                                $change = self::calculateChange($amountPaid, $payable, $record);
 
-                                if ($amountPaid >= $targetAmount && $amountPaid > 0) {
+                                if ($change > 0) {
                                     return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
-                                } elseif ($amountPaid > 0 && $amountPaid < $targetAmount) {
+                                } elseif ($change < 0) {
                                     return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                                 }
                                 return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
