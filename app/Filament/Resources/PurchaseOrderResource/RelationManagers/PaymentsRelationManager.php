@@ -22,16 +22,19 @@ class PaymentsRelationManager extends RelationManager
             ->headerActions([
                 \Filament\Tables\Actions\CreateAction::make()
                     ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        $livewire->getOwnerRecord()->updatePaymentStatus();
                         $livewire->dispatch('refresh');
                     }),
             ])
             ->actions([
                 \Filament\Tables\Actions\EditAction::make()
                     ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        $livewire->getOwnerRecord()->updatePaymentStatus();
                         $livewire->dispatch('refresh');
                     }),
                 \Filament\Tables\Actions\DeleteAction::make()
                     ->after(function (\Filament\Resources\RelationManagers\RelationManager $livewire) {
+                        $livewire->getOwnerRecord()->updatePaymentStatus();
                         $livewire->dispatch('refresh');
                     }),
             ]);
