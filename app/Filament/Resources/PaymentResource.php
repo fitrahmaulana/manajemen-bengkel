@@ -204,12 +204,11 @@ class PaymentResource extends Resource
                                     return '💵 Rp. 0';
                                 }
 
-                                $balanceDue = $payable->balance_due ?? $payable->total_amount;
-                                $change = $amountPaid - $balanceDue;
+                                $change = self::calculateChange($amountPaid, $payable, $record);
 
                                 return '💵 ' . self::formatCurrency($change);
                             })
-                            ->extraAttributes(function (Forms\Get $get, $record, $livewire) { // Explicitly type Forms\Get
+                            ->extraAttributes(function (Forms\Get $get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
 
@@ -217,11 +216,11 @@ class PaymentResource extends Resource
                                     return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                                 }
 
-                                $targetAmount = $payable->balance_due ?? $payable->total_amount;
+                                $change = self::calculateChange($amountPaid, $payable, $record);
 
-                                if ($amountPaid >= $targetAmount && $amountPaid > 0) {
+                                if ($change > 0) {
                                     return ['class' => 'bg-green-50 border border-green-200 rounded-lg p-4 text-green-700 font-bold text-xl'];
-                                } elseif ($amountPaid > 0 && $amountPaid < $targetAmount) {
+                                } elseif ($change < 0) {
                                     return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                                 }
                                 return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
@@ -323,6 +322,19 @@ class PaymentResource extends Resource
         return [
             'index' => Pages\ManagePayments::route('/'),
         ];
+    }
+
+    public static function calculateChange(float $amountPaid, Model $payable, ?Payment $currentPayment = null): float
+    {
+        if (!$payable) {
+            return 0;
+        }
+
+        $otherPayments = $payable->payments()->where('id', '!=', $currentPayment?->id)->sum('amount_paid');
+        $balanceDue = $payable->total_amount - $otherPayments;
+        $change = $amountPaid - $balanceDue;
+
+        return $change;
     }
 
     public static function handleAfterPaymentAction(?Payment $payment = null): void

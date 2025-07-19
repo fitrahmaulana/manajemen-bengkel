@@ -17,6 +17,7 @@ class PurchaseOrder extends Model
         'subtotal',
         'total_amount',
         'status',
+        'payment_status',
         'discount_value',
         'discount_type',
         'notes',
@@ -58,5 +59,30 @@ class PurchaseOrder extends Model
     public function getBalanceDueAttribute(): float
     {
         return $this->total_amount - $this->total_paid_amount;
+    }
+
+    public function updatePaymentStatus(): void
+    {
+        $totalPaid = $this->total_paid_amount;
+
+        if ($totalPaid <= 0) {
+            $this->payment_status = 'unpaid';
+        } elseif ($totalPaid < $this->total_amount) {
+            $this->payment_status = 'partial';
+        } else {
+            $this->payment_status = 'paid';
+        }
+
+        $this->save();
+    }
+
+     /**
+     * Accessor for the overpayment amount.
+     *
+     * @return float
+     */
+    public function getOverpaymentAttribute(): float
+    {
+        return max(0, $this->total_paid_amount - $this->total_amount);
     }
 }

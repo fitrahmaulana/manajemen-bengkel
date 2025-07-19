@@ -199,6 +199,23 @@ class PurchaseOrderResource extends Resource
                         'draft' => 'gray',
                         'completed' => 'success',
                     })->searchable(),
+                Tables\Columns\TextColumn::make('payment_status')
+                    ->label('Status Pembayaran')
+                    ->formatStateUsing(function (string $state): string {
+                        return match ($state) {
+                            'unpaid' => 'Belum Dibayar',
+                            'partial' => 'Sebagian Dibayar',
+                            'paid' => 'Lunas',
+                            default => $state,
+                        };
+                    })
+                    ->badge()
+                    ->color(fn(string $state): string => match ($state) {
+                        'unpaid' => 'danger',
+                        'partial' => 'info',
+                        'paid' => 'success',
+                        default => 'gray',
+                    }),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('order_date')->label('Tanggal PO')->date('d M Y')->sortable(),
             ])
