@@ -106,6 +106,23 @@ class ViewPurchaseOrder extends ViewRecord
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('order_date')->label('Tanggal PO')->date('d M Y'),
+                                    Infolists\Components\TextEntry::make('payment_status')
+                                        ->label('Status Pembayaran')
+                                        ->state(function (PurchaseOrder $record): string {
+                                            if ($record->balance_due <= 0) {
+                                                return 'Lunas';
+                                            } elseif ($record->total_paid_amount > 0) {
+                                                return 'Sebagian Dibayar';
+                                            } else {
+                                                return 'Belum Dibayar';
+                                            }
+                                        })
+                                        ->badge()
+                                        ->color(fn(string $state): string => match ($state) {
+                                            'Belum Dibayar' => 'gray',
+                                            'Sebagian Dibayar' => 'info',
+                                            'Lunas' => 'success',
+                                        }),
                                 ]),
                             ]),
                     ]),
@@ -154,28 +171,11 @@ class ViewPurchaseOrder extends ViewRecord
                                             }
                                             return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
+                                ]),
+                                Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('total_amount')
                                         ->label('Total Akhir')
                                         ->currency('IDR'),
-                                ]),
-                                Infolists\Components\Group::make()->schema([
-                                    Infolists\Components\TextEntry::make('payment_status')
-                                        ->label('Status Pembayaran')
-                                        ->state(function (PurchaseOrder $record): string {
-                                            if ($record->balance_due <= 0) {
-                                                return 'Lunas';
-                                            } elseif ($record->total_paid_amount > 0) {
-                                                return 'Sebagian Dibayar';
-                                            } else {
-                                                return 'Belum Dibayar';
-                                            }
-                                        })
-                                        ->badge()
-                                        ->color(fn(string $state): string => match ($state) {
-                                            'Belum Dibayar' => 'gray',
-                                            'Sebagian Dibayar' => 'info',
-                                            'Lunas' => 'success',
-                                        }),
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
@@ -186,10 +186,19 @@ class ViewPurchaseOrder extends ViewRecord
                                         ->currency('IDR')
                                         ->state(fn($record) => $record->balance_due)
                                         ->weight('bold')
-                                        ->color('danger')
+                                        ->color('danger') // Red untuk urgent
                                         ->size('lg')
                                         ->visible(fn($record) => $record->balance_due > 0)
                                         ->icon('heroicon-o-exclamation-triangle'),
+                                    Infolists\Components\TextEntry::make('overpayment')
+                                        ->label('Kembalian')
+                                        ->currency('IDR')
+                                        ->state(fn($record) => $record->overpayment)
+                                        ->weight('bold')
+                                        ->color('success') // Green untuk positive
+                                        ->size('lg')
+                                        ->visible(fn($record) => $record->overpayment > 0)
+                                        ->icon('heroicon-o-banknotes'),
                                 ]),
                             ]),
                     ]),

@@ -75,4 +75,14 @@ class PurchaseOrder extends Model
 
         $this->save();
     }
+
+     /**
+     * Accessor for the overpayment amount.
+     *
+     * @return float
+     */
+    public function getOverpaymentAttribute(): float
+    {
+        return max(0, $this->total_paid_amount - $this->total_amount);
+    }
 }

@@ -204,7 +204,7 @@ class PurchaseOrderResource extends Resource
                     ->formatStateUsing(function (string $state): string {
                         return match ($state) {
                             'unpaid' => 'Belum Dibayar',
-                            'partial' => 'Dibayar Sebagian',
+                            'partial' => 'Sebagian Dibayar',
                             'paid' => 'Lunas',
                             default => $state,
                         };
@@ -212,7 +212,7 @@ class PurchaseOrderResource extends Resource
                     ->badge()
                     ->color(fn(string $state): string => match ($state) {
                         'unpaid' => 'danger',
-                        'partial' => 'warning',
+                        'partial' => 'info',
                         'paid' => 'success',
                         default => 'gray',
                     }),
