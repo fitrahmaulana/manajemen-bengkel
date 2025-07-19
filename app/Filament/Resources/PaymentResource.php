@@ -204,8 +204,7 @@ class PaymentResource extends Resource
                                     return '💵 Rp. 0';
                                 }
 
-                                $balanceDue = $payable->balance_due ?? $payable->total_amount;
-                                $change = $amountPaid - $balanceDue;
+                                $change = self::calculateChange($amountPaid, $payable, $record);
 
                                 return '💵 ' . self::formatCurrency($change);
                             })
@@ -323,6 +322,19 @@ class PaymentResource extends Resource
         return [
             'index' => Pages\ManagePayments::route('/'),
         ];
+    }
+
+    public static function calculateChange(float $amountPaid, Model $payable, ?Payment $currentPayment = null): float
+    {
+        if (!$payable) {
+            return 0;
+        }
+
+        $otherPayments = $payable->payments()->where('id', '!=', $currentPayment?->id)->sum('amount_paid');
+        $balanceDue = $payable->total_amount - $otherPayments;
+        $change = $amountPaid - $balanceDue;
+
+        return $change > 0 ? $change : 0;
     }
 
     public static function handleAfterPaymentAction(?Payment $payment = null): void
