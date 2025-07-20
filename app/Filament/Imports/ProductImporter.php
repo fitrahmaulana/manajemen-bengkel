@@ -3,7 +3,6 @@
 namespace App\Filament\Imports;
 
 use App\Models\Product;
-use App\Models\Product;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Models\Import;
@@ -49,28 +48,26 @@ class ProductImporter extends Importer
 
     public function resolveRecord(): ?Product
     {
-        $product = Product::firstOrNew([
+        return Product::firstOrNew([
             'name' => $this->data['name'],
         ]);
-
-        if ($product->exists) {
-            $this->handleRecordUpdate($product);
-        }
-
-        return $product;
     }
 
     protected function afterSave(): void
     {
         if ($this->record->has_variants && !empty($this->data['item_name'])) {
-            $this->record->items()->create([
-                'name' => $this->data['item_name'],
-                'sku' => $this->data['item_sku'],
-                'purchase_price' => $this->data['item_purchase_price'],
-                'selling_price' => $this->data['item_selling_price'],
-                'stock' => $this->data['item_stock'],
-                'unit' => $this->data['item_unit'],
-            ]);
+            $this->record->items()->updateOrCreate(
+                [
+                    'sku' => $this->data['item_sku']
+                ],
+                [
+                    'name' => $this->data['item_name'],
+                    'purchase_price' => $this->data['item_purchase_price'],
+                    'selling_price' => $this->data['item_selling_price'],
+                    'stock' => $this->data['item_stock'],
+                    'unit' => $this->data['item_unit'],
+                ]
+            );
         }
     }
 
