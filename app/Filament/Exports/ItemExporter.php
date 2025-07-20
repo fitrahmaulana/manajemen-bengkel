@@ -33,8 +33,14 @@ class ItemExporter extends Exporter
                 ->label('Harga Jual Varian'),
             ExportColumn::make('stock')
                 ->label('Stok Varian'),
+            ExportColumn::make('minimum_stock')
+                ->label('Stok Minimum'),
             ExportColumn::make('unit')
                 ->label('Satuan Varian'),
+            ExportColumn::make('volume_value')
+                ->label('Nilai Volume'),
+            ExportColumn::make('base_volume_unit')
+                ->label('Satuan Volume Dasar'),
         ];
     }
 

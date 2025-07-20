@@ -41,8 +41,16 @@ class ItemImporter extends Importer
             ImportColumn::make('stock')
                 ->label('Stok Varian')
                 ->numeric(),
+            ImportColumn::make('minimum_stock')
+                ->label('Stok Minimum')
+                ->numeric(),
             ImportColumn::make('unit')
                 ->label('Satuan Varian'),
+            ImportColumn::make('volume_value')
+                ->label('Nilai Volume')
+                ->numeric(),
+            ImportColumn::make('base_volume_unit')
+                ->label('Satuan Volume Dasar'),
         ];
     }
 
@@ -66,7 +74,10 @@ class ItemImporter extends Importer
                 'purchase_price' => $this->data['purchase_price'],
                 'selling_price' => $this->data['selling_price'],
                 'stock' => $this->data['stock'],
+                'minimum_stock' => $this->data['minimum_stock'],
                 'unit' => $this->data['unit'],
+                'volume_value' => $this->data['volume_value'],
+                'base_volume_unit' => $this->data['base_volume_unit'],
             ]
         );
 
