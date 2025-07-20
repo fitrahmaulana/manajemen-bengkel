@@ -41,6 +41,8 @@ class ItemExporter extends Exporter
                 ->label('Nilai Volume'),
             ExportColumn::make('base_volume_unit')
                 ->label('Satuan Volume Dasar'),
+            ExportColumn::make('supplier.name')
+                ->label('Supplier'),
         ];
     }
 

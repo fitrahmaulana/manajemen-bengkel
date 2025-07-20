@@ -4,6 +4,7 @@ namespace App\Filament\Imports;
 
 use App\Models\Item;
 use App\Models\Product;
+use App\Models\Supplier;
 use App\Models\TypeItem;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\ImportColumn;
@@ -51,6 +52,8 @@ class ItemImporter extends Importer
                 ->numeric(),
             ImportColumn::make('base_volume_unit')
                 ->label('Satuan Volume Dasar'),
+            ImportColumn::make('supplier.name')
+                ->label('Supplier'),
         ];
     }
 
@@ -66,6 +69,11 @@ class ItemImporter extends Importer
             ]
         );
 
+        $supplier = null;
+        if (!empty($this->data['supplier.name'])) {
+            $supplier = Supplier::firstOrCreate(['name' => $this->data['supplier.name']]);
+        }
+
         $item = Item::firstOrNew(
             ['sku' => $this->data['sku']],
             [
@@ -78,6 +86,7 @@ class ItemImporter extends Importer
                 'unit' => $this->data['unit'],
                 'volume_value' => $this->data['volume_value'],
                 'base_volume_unit' => $this->data['base_volume_unit'],
+                'supplier_id' => $supplier?->id,
             ]
         );
 
