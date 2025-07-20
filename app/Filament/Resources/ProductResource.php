@@ -7,6 +7,8 @@ use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
+use App\Filament\Exports\ProductExporter;
+use App\Filament\Imports\ProductImporter;
 use Filament\Tables;
 use Filament\Tables\Table;
 use Filament\Infolists\Components\Section as InfolistSection;
@@ -14,6 +16,8 @@ use Filament\Infolists\Components\TextEntry;
 use Filament\Notifications\Notification;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Artisan;
+use Filament\Tables\Actions\ExportAction;
+use Filament\Tables\Actions\ImportAction;
 
 class ProductResource extends Resource
 {

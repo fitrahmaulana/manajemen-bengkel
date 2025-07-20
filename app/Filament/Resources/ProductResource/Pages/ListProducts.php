@@ -3,8 +3,14 @@
 namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
+use App\Models\Item;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
+use App\Filament\Exports\ItemExporter;
+use App\Filament\Imports\ItemImporter;
+use Filament\Actions\ImportAction;
+use Filament\Actions\ExportAction;
+
 
 class ListProducts extends ListRecords
 {
@@ -20,6 +26,10 @@ class ListProducts extends ListRecords
                 ->modalHeading('Tambah Produk Baru')
                 ->modalSubmitActionLabel('Simpan Produk')
                 ->successNotificationTitle('Produk berhasil ditambahkan'),
+            ImportAction::make()
+                ->importer(ItemImporter::class),
+            ExportAction::make()
+                ->exporter(ItemExporter::class),
         ];
     }
 }

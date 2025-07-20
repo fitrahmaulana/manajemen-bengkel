@@ -34,7 +34,7 @@ class ItemResource extends Resource
     protected static ?string $model = Item::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-squares-2x2';
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Hidden';
     protected static ?string $navigationLabel = 'Varian Barang';
     protected static ?string $modelLabel = 'Varian';
     protected static ?string $pluralModelLabel = 'Daftar Varian';

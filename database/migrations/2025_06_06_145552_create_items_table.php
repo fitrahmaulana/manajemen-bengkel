@@ -30,7 +30,7 @@ return new class extends Migration
             $table->foreignId('product_id')->constrained()->onDelete('cascade');
 
             // Info varian
-            $table->string('name'); // "1 Liter", "4 Liter", "Eceran"
+            $table->string('name')->nullable(); // "1 Liter", "4 Liter", "Eceran"
             $table->string('sku')->unique(); // "HX7-1L", "HX7-4L", "HX7-ECER"
 
             // Harga & stok
