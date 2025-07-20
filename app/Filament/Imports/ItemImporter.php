@@ -3,6 +3,8 @@
 namespace App\Filament\Imports;
 
 use App\Models\Item;
+use App\Models\Product;
+use App\Models\TypeItem;
 use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\ImportColumn;
 use Filament\Actions\Imports\Models\Import;
@@ -18,6 +20,12 @@ class ItemImporter extends Importer
                 ->label('Nama Produk')
                 ->requiredMapping()
                 ->rules(['required', 'max:255']),
+            ImportColumn::make('product.brand')
+                ->label('Merek'),
+            ImportColumn::make('product.description')
+                ->label('Deskripsi'),
+            ImportColumn::make('product.typeItem.name')
+                ->label('Kategori Produk'),
             ImportColumn::make('name')
                 ->label('Nama Varian'),
             ImportColumn::make('sku')
@@ -40,9 +48,29 @@ class ItemImporter extends Importer
 
     public function resolveRecord(): ?Item
     {
-        return Item::firstOrNew([
-            'sku' => $this->data['sku'],
-        ]);
+        $product = Product::firstOrCreate(
+            ['name' => $this->data['product.name']],
+            [
+                'brand' => $this->data['product.brand'],
+                'description' => $this->data['product.description'],
+                'type_item_id' => TypeItem::firstOrCreate(['name' => $this->data['product.typeItem.name']])->id,
+                'has_variants' => true,
+            ]
+        );
+
+        $item = Item::firstOrNew(
+            ['sku' => $this->data['sku']],
+            [
+                'product_id' => $product->id,
+                'name' => $this->data['name'],
+                'purchase_price' => $this->data['purchase_price'],
+                'selling_price' => $this->data['selling_price'],
+                'stock' => $this->data['stock'],
+                'unit' => $this->data['unit'],
+            ]
+        );
+
+        return $item;
     }
 
     public static function getCompletedNotificationBody(Import $import): string

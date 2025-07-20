@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\ProductResource\Pages;
 
 use App\Filament\Resources\ProductResource;
+use App\Models\Item;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use App\Filament\Exports\ItemExporter;
@@ -28,7 +29,8 @@ class ListProducts extends ListRecords
             ImportAction::make()
                 ->importer(ItemImporter::class),
             ExportAction::make()
-                ->exporter(ItemExporter::class),
+                ->exporter(ItemExporter::class)
+                ->query(fn () => Item::query()),
         ];
     }
 }
