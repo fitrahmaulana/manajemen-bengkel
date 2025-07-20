@@ -5,8 +5,8 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
-use App\Filament\Exports\ProductExporter;
-use App\Filament\Imports\ProductImporter;
+use App\Filament\Exports\ItemExporter;
+use App\Filament\Imports\ItemImporter;
 use Filament\Actions\ImportAction;
 use Filament\Actions\ExportAction;
 
@@ -26,9 +26,9 @@ class ListProducts extends ListRecords
                 ->modalSubmitActionLabel('Simpan Produk')
                 ->successNotificationTitle('Produk berhasil ditambahkan'),
             ImportAction::make()
-                ->importer(ProductImporter::class),
+                ->importer(ItemImporter::class),
             ExportAction::make()
-                ->exporter(ProductExporter::class),
+                ->exporter(ItemExporter::class),
         ];
     }
 }
