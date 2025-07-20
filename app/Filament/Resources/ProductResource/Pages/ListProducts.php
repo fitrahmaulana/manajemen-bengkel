@@ -29,8 +29,7 @@ class ListProducts extends ListRecords
             ImportAction::make()
                 ->importer(ItemImporter::class),
             ExportAction::make()
-                ->exporter(ItemExporter::class)
-                ->query(fn () => Item::query()),
+                ->exporter(ItemExporter::class),
         ];
     }
 }
