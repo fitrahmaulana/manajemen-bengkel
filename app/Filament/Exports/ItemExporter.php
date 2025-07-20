@@ -6,6 +6,7 @@ use App\Models\Item;
 use Filament\Actions\Exports\Exporter;
 use Filament\Actions\Exports\ExportColumn;
 use Filament\Actions\Exports\Models\Export;
+use Illuminate\Database\Eloquent\Builder;
 
 class ItemExporter extends Exporter
 {
@@ -36,9 +37,14 @@ class ItemExporter extends Exporter
         $body = 'Your item export has completed and ' . number_format($export->successful_rows) . ' ' . str('row')->plural($export->successful_rows) . ' exported.';
 
         if ($failedRowsCount = $export->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to export.';
+            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
         }
 
         return $body;
+    }
+
+    public static function modifyQuery(Builder $query): Builder
+    {
+        return $query->with('product');
     }
 }
