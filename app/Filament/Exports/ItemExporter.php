@@ -15,19 +15,19 @@ class ItemExporter extends Exporter
     public static function getColumns(): array
     {
         return [
-            ExportColumn::make('name')
+            ExportColumn::make('product.name')
                 ->label('Nama Produk'),
-            ExportColumn::make('items.name')
+            ExportColumn::make('name')
                 ->label('Nama Varian'),
-            ExportColumn::make('items.sku')
+            ExportColumn::make('sku')
                 ->label('SKU Varian'),
-            ExportColumn::make('items.purchase_price')
+            ExportColumn::make('purchase_price')
                 ->label('Harga Beli Varian'),
-            ExportColumn::make('items.selling_price')
+            ExportColumn::make('selling_price')
                 ->label('Harga Jual Varian'),
-            ExportColumn::make('items.stock')
+            ExportColumn::make('stock')
                 ->label('Stok Varian'),
-            ExportColumn::make('items.unit')
+            ExportColumn::make('unit')
                 ->label('Satuan Varian'),
         ];
     }
@@ -45,6 +45,6 @@ class ItemExporter extends Exporter
 
     public static function modifyQuery(Builder $query): Builder
     {
-        return $query->with('items');
+        return Item::with(['product.typeItem']);
     }
 }
