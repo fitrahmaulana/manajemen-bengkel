@@ -23,6 +23,9 @@ class ItemExporter extends Exporter
                 ->label('product_description'),
             ExportColumn::make('product.typeItem.name')
                 ->label('product_type_item_name'),
+            ExportColumn::make('product.has_variants')
+                ->label('product_has_variants')
+                ->formatStateUsing(fn ($state) => $state ? 'True' : 'False'),
             ExportColumn::make('name')
                 ->label('Nama Varian'),
             ExportColumn::make('sku')
