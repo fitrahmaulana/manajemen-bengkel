@@ -17,15 +17,15 @@ class ItemImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('product.name')
+            ImportColumn::make('product_name')
                 ->label('Nama Produk')
                 ->requiredMapping()
                 ->rules(['required', 'max:255']),
-            ImportColumn::make('product.brand')
+            ImportColumn::make('product_brand')
                 ->label('Merek'),
-            ImportColumn::make('product.description')
+            ImportColumn::make('product_description')
                 ->label('Deskripsi'),
-            ImportColumn::make('product.typeItem.name')
+            ImportColumn::make('product_type_item_name')
                 ->label('Kategori Produk'),
             ImportColumn::make('name')
                 ->label('Nama Varian'),
@@ -59,22 +59,22 @@ class ItemImporter extends Importer
 
     public function resolveRecord(): ?Item
     {
-        $product = Product::firstOrCreate(
-            ['name' => $this->data['product.name']],
+        $product = Product::updateOrCreate(
+            ['name' => $this->data['product_name']],
             [
-                'brand' => $this->data['product.brand'],
-                'description' => $this->data['product.description'],
-                'type_item_id' => TypeItem::firstOrCreate(['name' => $this->data['product.typeItem.name']])->id,
+                'brand' => $this->data['product_brand'],
+                'description' => $this->data['product_description'],
+                'type_item_id' => TypeItem::firstOrCreate(['name' => $this->data['product_type_item_name']])->id,
                 'has_variants' => true,
             ]
         );
 
         $supplier = null;
         if (!empty($this->data['supplier.name'])) {
-            $supplier = Supplier::firstOrCreate(['name' => $this->data['supplier.name']]);
+            $supplier = Supplier::updateOrCreate(['name' => $this->data['supplier.name']]);
         }
 
-        $item = Item::firstOrNew(
+        $item = Item::updateOrCreate(
             ['sku' => $this->data['sku']],
             [
                 'product_id' => $product->id,
