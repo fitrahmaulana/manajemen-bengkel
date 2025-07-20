@@ -17,16 +17,9 @@ class ItemImporter extends Importer
     public static function getColumns(): array
     {
         return [
-            ImportColumn::make('product_name')
+            ImportColumn::make('product')
                 ->label('Nama Produk')
-                ->requiredMapping()
-                ->rules(['required', 'max:255']),
-            ImportColumn::make('product_brand')
-                ->label('Merek'),
-            ImportColumn::make('product_description')
-                ->label('Deskripsi'),
-            ImportColumn::make('product_type_item_name')
-                ->label('Kategori Produk'),
+                ->relationship(resolveUsing: 'name'),
             ImportColumn::make('name')
                 ->label('Nama Varian'),
             ImportColumn::make('sku')
@@ -52,45 +45,17 @@ class ItemImporter extends Importer
                 ->numeric(),
             ImportColumn::make('base_volume_unit')
                 ->label('Satuan Volume Dasar'),
-            ImportColumn::make('supplier.name')
-                ->label('Supplier'),
+            ImportColumn::make('supplier')
+                ->label('Supplier')
+                ->relationship(resolveUsing: 'name'),
         ];
     }
 
     public function resolveRecord(): ?Item
     {
-        $product = Product::updateOrCreate(
-            ['name' => $this->data['product_name']],
-            [
-                'brand' => $this->data['product_brand'],
-                'description' => $this->data['product_description'],
-                'type_item_id' => TypeItem::firstOrCreate(['name' => $this->data['product_type_item_name']])->id,
-                'has_variants' => true,
-            ]
-        );
-
-        $supplier = null;
-        if (!empty($this->data['supplier.name'])) {
-            $supplier = Supplier::updateOrCreate(['name' => $this->data['supplier.name']]);
-        }
-
-        $item = Item::updateOrCreate(
-            ['sku' => $this->data['sku']],
-            [
-                'product_id' => $product->id,
-                'name' => $this->data['name'],
-                'purchase_price' => $this->data['purchase_price'],
-                'selling_price' => $this->data['selling_price'],
-                'stock' => $this->data['stock'],
-                'minimum_stock' => $this->data['minimum_stock'],
-                'unit' => $this->data['unit'],
-                'volume_value' => $this->data['volume_value'],
-                'base_volume_unit' => $this->data['base_volume_unit'],
-                'supplier_id' => $supplier?->id,
-            ]
-        );
-
-        return $item;
+        return Item::firstOrNew([
+            'sku' => $this->data['sku'],
+        ]);
     }
 
     public static function getCompletedNotificationBody(Import $import): string
