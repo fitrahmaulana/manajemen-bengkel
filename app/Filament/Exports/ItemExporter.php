@@ -17,6 +17,12 @@ class ItemExporter extends Exporter
         return [
             ExportColumn::make('product.name')
                 ->label('Nama Produk'),
+            ExportColumn::make('product.brand')
+                ->label('Merek'),
+            ExportColumn::make('product.description')
+                ->label('Deskripsi'),
+            ExportColumn::make('product.typeItem.name')
+                ->label('Kategori Produk'),
             ExportColumn::make('name')
                 ->label('Nama Varian'),
             ExportColumn::make('sku')
