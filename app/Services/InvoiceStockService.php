@@ -29,25 +29,19 @@ class InvoiceStockService
                 $quantity = (float)($rawItemData['quantity'] ?? 0.0);
 
                 if (!$itemId || $quantity <= 0) {
-                    continue; // Skip if no item ID or quantity is not positive
+                    continue;
                 }
 
                 $itemModel = Item::find($itemId);
                 if ($itemModel) {
-                    // Log before decrementing for traceability
-                    Log::info("InvoiceStockService: Decrementing stock for item ID {$itemId} by {$quantity} for invoice ID {$invoice->id}. Current stock: {$itemModel->stock}");
-
-                    $newStock = $itemModel->stock - $quantity;
-                    $itemModel->stock = $newStock; // Directly set for precision with decimals
+                    $originalStock = $itemModel->stock;
+                    $newStock = $originalStock - $quantity;
+                    $itemModel->stock = $newStock;
                     $itemModel->save();
 
-                    // Alternative: $itemModel->decrement('stock', $quantity);
-                    // Using direct assignment and save might be more explicit for decimal handling,
-                    // though decrement should also work correctly with decimal casts on the model.
-
-                    Log::info("InvoiceStockService: New stock for item ID {$itemId} is {$itemModel->stock} after invoice ID {$invoice->id}.");
+                    Log::info("DEDUCT: Item ID {$itemId}, Invoice ID {$invoice->id}. Original Stock: {$originalStock}, Quantity: {$quantity}, New Stock: {$newStock}");
                 } else {
-                    Log::warning("InvoiceStockService: Item ID {$itemId} not found while trying to deduct stock for invoice ID {$invoice->id}.");
+                    Log::warning("DEDUCT FAILED: Item ID {$itemId} not found for Invoice ID {$invoice->id}.");
                 }
             }
         });
@@ -55,14 +49,12 @@ class InvoiceStockService
 
     /**
      * Restore stock for items in an invoice.
-     * Typically used when an invoice is deleted or items are removed/quantity reduced.
      *
      * @param Invoice $invoice The invoice instance whose items' stock needs to be restored.
      * @throws \Exception
      */
     public function restoreStockForInvoiceItems(Invoice $invoice): void
     {
-        // Eager load items with pivot data to avoid N+1 queries if not already loaded.
         $invoiceItems = $invoice->invoiceItems()->with('item')->get();
 
         if ($invoiceItems->isEmpty()) {
@@ -72,30 +64,24 @@ class InvoiceStockService
         DB::transaction(function () use ($invoiceItems, $invoice) {
             foreach ($invoiceItems as $invoiceItem) {
                 $itemModel = $invoiceItem->item;
-                // The quantity to restore is from the pivot table
                 $quantityToRestore = (float)($invoiceItem->quantity ?? 0.0);
 
-                if ($quantityToRestore <= 0) {
-                    continue; // Skip if quantity is not positive
+                if (!$itemModel || $quantityToRestore <= 0) {
+                    continue;
                 }
 
-                // Log before incrementing for traceability
-                Log::info("InvoiceStockService: Restoring stock for item ID {$itemModel->id} by {$quantityToRestore} from invoice ID {$invoice->id}. Current stock: {$itemModel->stock}");
-
-                $newStock = $itemModel->stock + $quantityToRestore;
-                $itemModel->stock = $newStock; // Directly set for precision
+                $originalStock = $itemModel->stock;
+                $newStock = $originalStock + $quantityToRestore;
+                $itemModel->stock = $newStock;
                 $itemModel->save();
 
-                // Alternative: $itemModel->increment('stock', $quantityToRestore);
-
-                Log::info("InvoiceStockService: New stock for item ID {$itemModel->id} is {$itemModel->stock} after restoring from invoice ID {$invoice->id}.");
+                Log::info("RESTORE: Item ID {$itemModel->id}, Invoice ID {$invoice->id}. Original Stock: {$originalStock}, Quantity: {$quantityToRestore}, New Stock: {$newStock}");
             }
         });
     }
 
     /**
      * Adjust stock for a single item.
-     * Can be used for more granular updates during invoice editing.
      *
      * @param int $itemId
      * @param float $quantityChange Positive to deduct, negative to restore.
@@ -108,17 +94,16 @@ class InvoiceStockService
 
         $itemModel = Item::find($itemId);
         if ($itemModel) {
-            DB::transaction(function () use ($itemModel, $quantityChange, $itemId) { // Added $itemId to use()
-                Log::info("InvoiceStockService: Adjusting stock for item ID {$itemId} by {$quantityChange}. Current stock: {$itemModel->stock}");
-
-                $newStock = $itemModel->stock - $quantityChange; // if quantityChange is positive, stock decreases. if negative, stock increases.
+            DB::transaction(function () use ($itemModel, $quantityChange, $itemId) {
+                $originalStock = $itemModel->stock;
+                $newStock = $originalStock - $quantityChange;
                 $itemModel->stock = $newStock;
                 $itemModel->save();
 
-                Log::info("InvoiceStockService: New stock for item ID {$itemId} is {$itemModel->stock}.");
+                Log::info("ADJUST: Item ID {$itemId}. Original Stock: {$originalStock}, Change: {$quantityChange}, New Stock: {$newStock}");
             });
         } else {
-            Log::warning("InvoiceStockService: Item ID {$itemId} not found while trying to adjust stock.");
+            Log::warning("ADJUST FAILED: Item ID {$itemId} not found.");
         }
     }
 }

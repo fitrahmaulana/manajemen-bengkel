@@ -87,27 +87,20 @@ class EditInvoice extends EditRecord
 
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
-        $originalItems = collect($this->originalItems);
-        $newItems = collect($data['invoiceItems'] ?? []);
-
-        DB::transaction(function () use ($record, $data, $originalItems, $newItems) {
+        DB::transaction(function () use ($record, $data) {
             $stockService = app(InvoiceStockService::class);
 
-            // Calculate stock changes
-            $allItems = $originalItems->keys()->merge($newItems->pluck('item_id'))->unique();
+            // Restore stock for all original items
+            $stockService->restoreStockForInvoiceItems($record);
 
-            foreach ($allItems as $itemId) {
-                $originalQty = $originalItems->get($itemId, 0);
-                $newQty = $newItems->firstWhere('item_id', $itemId)['quantity'] ?? 0;
-                $diff = $newQty - $originalQty;
-
-                if ($diff != 0) {
-                    $stockService->adjustStockForItem($itemId, $diff);
-                }
-            }
-
-            // Let Filament handle the update after our stock logic
+            // Let Filament handle the update
             parent::handleRecordUpdate($record, $data);
+
+            // Deduct stock for the new set of items
+            $newItems = $data['invoiceItems'] ?? [];
+            if (!empty($newItems)) {
+                $stockService->deductStockForInvoiceItems($record, $newItems);
+            }
 
             self::updateInvoiceStatus($record);
         });
