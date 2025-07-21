@@ -124,7 +124,7 @@ class InvoiceResource extends Resource
                         Forms\Components\Group::make()->schema([
                             Forms\Components\Select::make('service_id')
                                 ->hiddenLabel()
-                                ->options(Service::all()->pluck('name', 'id'))
+                                ->relationship('service', 'name')
                                 ->searchable()
                                 ->required()
                                 ->live()
@@ -167,19 +167,8 @@ class InvoiceResource extends Resource
                             Forms\Components\Select::make('item_id')
                                 ->label('Barang')
                                 ->hiddenLabel()
-                                ->options(function () {
-                                    return Item::query()
-                                        ->with(['product'])
-                                        ->get()
-                                        ->mapWithKeys(function ($item) {
-                                            $productName = $item->product->name;
-                                            $variantName = $item->name;
-                                            $displayName = empty($variantName) ? $productName : $productName . ' ' . $variantName;
-                                            $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
-                                            $stockInfo = " - Stok: {$item->stock} {$item->unit}";
-                                            return [$item->id => $displayName . $skuInfo . $stockInfo];
-                                        });
-                                })
+                                ->relationship('item', 'name')
+                                ->getOptionLabelFromRecordUsing(fn (Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
                                 ->searchable()
                                 ->required()
                                 ->live()
