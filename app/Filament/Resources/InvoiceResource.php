@@ -109,6 +109,7 @@ class InvoiceResource extends Resource
                 CustomTableRepeater::make('invoiceServices')
                     ->relationship()
                     ->reorderAtStart()
+                    ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at', 'updated_at'])
                     ->hiddenLabel()
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
@@ -132,6 +133,7 @@ class InvoiceResource extends Resource
                                 ->hiddenLabel()
                                 ->relationship('service', 'name')
                                 ->searchable()
+                                ->preload()
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated($updateServicePrice),
@@ -161,6 +163,7 @@ class InvoiceResource extends Resource
                 // Sama seperti jasa, repeater ini terhubung dengan relasi 'invoiceItems' pada model Invoice.
                 CustomTableRepeater::make('invoiceItems')
                     ->relationship()
+                    ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at', 'updated_at'])
                     ->headers([
                         Header::make('Barang / Suku Cadang')->width('45%'),
                         Header::make('Kuantitas')->width('15%'),
@@ -181,6 +184,7 @@ class InvoiceResource extends Resource
                                 ->relationship('item', 'name')
                                 ->getOptionLabelFromRecordUsing(fn (Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
                                 ->searchable()
+                                ->preload()
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated($updateItemData),
