@@ -16,6 +16,8 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
+    public array $originalItems = [];
+
     /**
      * Hook ini dijalankan SEBELUM data form utama dan relasi di-update ke database.
      * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
@@ -26,6 +28,10 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $this->originalItems = $this->record->invoiceItems->mapWithKeys(function ($item) {
+            return [$item->item_id => $item->quantity];
+        })->toArray();
+
         $services = $data['invoiceServices'] ?? [];
         $items = $data['invoiceItems'] ?? [];
 
@@ -79,9 +85,7 @@ class EditInvoice extends EditRecord
     protected function afterSave(): void
     {
         $newItems = collect($this->data['invoiceItems'] ?? []);
-        $originalItems = collect($this->record->invoiceItems->mapWithKeys(function ($item) {
-            return [$item->item_id => $item->quantity];
-        }));
+        $originalItems = collect($this->originalItems);
 
         try {
             DB::transaction(function () use ($newItems, $originalItems) {
@@ -95,7 +99,7 @@ class EditInvoice extends EditRecord
                     $newQty = $newItems->firstWhere('item_id', $itemId)['quantity'] ?? 0;
                     $diff = $newQty - $originalQty;
 
-                    if ($diff !== 0) {
+                    if ($diff != 0) {
                         $stockService->adjustStockForItem($itemId, $diff);
                     }
                 }
