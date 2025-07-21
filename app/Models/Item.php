@@ -24,9 +24,14 @@ class Item extends Model
     ];
 
     protected $casts = [
-        'stock' => 'decimal:2',
+        'stock' => 'decimal:1',
         'volume_value' => 'decimal:2',
     ];
+
+    public function getStockAttribute($value)
+    {
+        return $value + 0;
+    }
 
     public function product()
     {
