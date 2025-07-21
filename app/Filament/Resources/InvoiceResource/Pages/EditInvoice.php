@@ -90,18 +90,26 @@ class EditInvoice extends EditRecord
         DB::transaction(function () use ($record, $data) {
             $stockService = app(InvoiceStockService::class);
 
-            // Restore stock for all original items
+            // 1. Restore stock for all original items
             $stockService->restoreStockForInvoiceItems($record);
 
-            // Let Filament handle the update
-            parent::handleRecordUpdate($record, $data);
+            // 2. Update the main invoice attributes
+            $record->update($data);
 
-            // Deduct stock for the new set of items
-            $newItems = $data['invoiceItems'] ?? [];
-            if (!empty($newItems)) {
-                $stockService->deductStockForInvoiceItems($record, $newItems);
+            // 3. Sync the new invoiceServices and invoiceItems
+            $services = $data['invoiceServices'] ?? [];
+            $items = $data['invoiceItems'] ?? [];
+            $record->invoiceServices()->delete();
+            $record->invoiceItems()->delete();
+            $record->invoiceServices()->createMany($services);
+            $record->invoiceItems()->createMany($items);
+
+            // 4. Deduct stock for the new set of items
+            if (!empty($items)) {
+                $stockService->deductStockForInvoiceItems($record, $items);
             }
 
+            // 5. Update the invoice status
             self::updateInvoiceStatus($record);
         });
 
