@@ -220,7 +220,7 @@ class InvoiceResource extends Resource
                             ->prefix('Rp. ')
                             ->live()
                             ->required(),
-                        Forms\Components\Hidden::make('unit_name'),
+                        Forms\Components\Hidden::make('unit_name')->dehydrated(false),
                         Forms\Components\Placeholder::make('subtotal_item')
                             ->hiddenLabel()
                             ->dehydrated(false)
