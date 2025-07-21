@@ -16,8 +16,6 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
-    public array $originalItems = [];
-
     /**
      * Hook ini dijalankan SEBELUM data form utama dan relasi di-update ke database.
      * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
@@ -28,11 +26,6 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        // Store the original items before they are updated
-        $this->originalItems = $this->record->invoiceItems->mapWithKeys(function ($item) {
-            return [$item->item_id => $item->quantity];
-        })->toArray();
-
         // Get the current state of the form data, including relationships
         $currentData = $this->data;
         $services = $currentData['invoiceServices'] ?? [];
@@ -83,36 +76,5 @@ class EditInvoice extends EditRecord
                     self::updateInvoiceStatus($this->record);
                 }),
         ];
-    }
-
-    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
-    {
-        DB::transaction(function () use ($record, $data) {
-            $stockService = app(InvoiceStockService::class);
-
-            // 1. Restore stock for all original items
-            $stockService->restoreStockForInvoiceItems($record);
-
-            // 2. Update the main invoice attributes
-            $record->update($data);
-
-            // 3. Sync the new invoiceServices and invoiceItems
-            $services = $data['invoiceServices'] ?? [];
-            $items = $data['invoiceItems'] ?? [];
-            $record->invoiceServices()->delete();
-            $record->invoiceItems()->delete();
-            $record->invoiceServices()->createMany($services);
-            $record->invoiceItems()->createMany($items);
-
-            // 4. Deduct stock for the new set of items
-            if (!empty($items)) {
-                $stockService->deductStockForInvoiceItems($record, $items);
-            }
-
-            // 5. Update the invoice status
-            self::updateInvoiceStatus($record);
-        });
-
-        return $record;
     }
 }
