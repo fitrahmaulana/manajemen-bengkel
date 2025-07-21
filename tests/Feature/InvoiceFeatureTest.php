@@ -189,4 +189,40 @@ class InvoiceFeatureTest extends TestCase
         // Check if it's retrieved as a float/decimal due to model casting on Invoice items()
         $this->assertIsFloat($attachedItem->quantity);
     }
+
+    /** @test */
+    public function stock_is_adjusted_correctly_when_invoice_item_quantity_is_edited(): void
+    {
+        $item = $this->createItem('Item Edit Test', 'SKU-EDIT', 20.00);
+        $invoice = $this->createInvoiceForTest();
+        $initialQuantity = 5.0;
+        $newQuantity = 8.0;
+        $quantityDifference = $newQuantity - $initialQuantity; // 3.0
+
+        // Simulate initial creation and stock deduction
+        $this->stockService->deductStockForInvoiceItems($invoice, [['item_id' => $item->id, 'quantity' => $initialQuantity]]);
+        $this->assertEquals(15.00, $item->fresh()->stock);
+
+        // Simulate editing the invoice
+        $invoice->invoiceItems()->create(['item_id' => $item->id, 'quantity' => $initialQuantity, 'price' => 100.00]);
+        $originalItems = $invoice->invoiceItems->mapWithKeys(function ($item) {
+            return [$item->item_id => $item->quantity];
+        });
+        $newItemsData = [['item_id' => $item->id, 'quantity' => $newQuantity]];
+
+        $stockService = app(InvoiceStockService::class);
+        $allItems = $originalItems->keys()->merge(collect($newItemsData)->pluck('item_id'))->unique();
+
+        foreach ($allItems as $itemId) {
+            $originalQty = $originalItems->get($itemId, 0);
+            $newQty = collect($newItemsData)->firstWhere('item_id', $itemId)['quantity'] ?? 0;
+            $diff = $newQty - $originalQty;
+
+            if ($diff != 0) {
+                $stockService->adjustStockForItem($itemId, $diff);
+            }
+        }
+
+        $this->assertEquals(15.00 - $quantityDifference, $item->fresh()->stock); // 15.00 - 3.0 = 12.00
+    }
 }

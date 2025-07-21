@@ -29,8 +29,10 @@ class CreateInvoice extends CreateRecord
      */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
-        $services = $data['invoiceServices'] ?? [];
-        $items = $data['invoiceItems'] ?? [];
+        // Get the current state of the form data, including relationships
+        $currentData = $this->data;
+        $services = $currentData['invoiceServices'] ?? [];
+        $items = $currentData['invoiceItems'] ?? [];
 
         $servicesTotal = collect($services)->sum(function ($service) {
             return self::parseCurrencyValue($service['price'] ?? '0');
@@ -71,12 +73,13 @@ class CreateInvoice extends CreateRecord
      */
     protected function afterCreate(): void
     {
-        $items = $this->record->invoiceItems()->get();
+        // Access the repeater data from the form's state
+        $items = $this->data['invoiceItems'] ?? [];
 
         try {
             DB::transaction(function () use ($items) {
-                if ($items->isNotEmpty()) {
-                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items->toArray());
+                if (!empty($items)) {
+                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items);
                 }
                 self::updateInvoiceStatus($this->record);
             });

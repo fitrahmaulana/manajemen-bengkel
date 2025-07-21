@@ -28,12 +28,15 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        // Store the original items before they are updated
         $this->originalItems = $this->record->invoiceItems->mapWithKeys(function ($item) {
             return [$item->item_id => $item->quantity];
         })->toArray();
 
-        $services = $data['invoiceServices'] ?? [];
-        $items = $data['invoiceItems'] ?? [];
+        // Get the current state of the form data, including relationships
+        $currentData = $this->data;
+        $services = $currentData['invoiceServices'] ?? [];
+        $items = $currentData['invoiceItems'] ?? [];
 
         $servicesTotal = collect($services)->sum(function ($service) {
             return self::parseCurrencyValue($service['price'] ?? '0');
@@ -82,43 +85,36 @@ class EditInvoice extends EditRecord
         ];
     }
 
-    protected function afterSave(): void
+    protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
-        $newItems = collect($this->data['invoiceItems'] ?? []);
-        $originalItems = collect($this->originalItems);
+        $originalItems = $record->invoiceItems->mapWithKeys(function ($item) {
+            return [$item->item_id => $item->quantity];
+        });
 
-        try {
-            DB::transaction(function () use ($newItems, $originalItems) {
-                $stockService = app(InvoiceStockService::class);
+        $newItems = collect($data['invoiceItems'] ?? []);
 
-                // Calculate stock changes
-                $allItems = $originalItems->keys()->merge($newItems->pluck('item_id'))->unique();
+        DB::transaction(function () use ($record, $data, $originalItems, $newItems) {
+            $stockService = app(InvoiceStockService::class);
 
-                foreach ($allItems as $itemId) {
-                    $originalQty = $originalItems->get($itemId, 0);
-                    $newQty = $newItems->firstWhere('item_id', $itemId)['quantity'] ?? 0;
-                    $diff = $newQty - $originalQty;
+            // Calculate stock changes
+            $allItems = $originalItems->keys()->merge($newItems->pluck('item_id'))->unique();
 
-                    if ($diff != 0) {
-                        $stockService->adjustStockForItem($itemId, $diff);
-                    }
+            foreach ($allItems as $itemId) {
+                $originalQty = $originalItems->get($itemId, 0);
+                $newQty = $newItems->firstWhere('item_id', $itemId)['quantity'] ?? 0;
+                $diff = $newQty - $originalQty;
+
+                if ($diff != 0) {
+                    $stockService->adjustStockForItem($itemId, $diff);
                 }
+            }
 
-                self::updateInvoiceStatus($this->record);
-            });
+            // Let Filament handle the update after our stock logic
+            parent::handleRecordUpdate($record, $data);
 
-            Notification::make()
-                ->title('Faktur Berhasil Diperbarui')
-                ->body('Faktur dan stock telah berhasil diperbarui.')
-                ->success()
-                ->send();
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Error Memperbarui Faktur')
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
-                ->danger()
-                ->send();
-            throw $e;
-        }
+            self::updateInvoiceStatus($record);
+        });
+
+        return $record;
     }
 }
