@@ -83,7 +83,7 @@ class InvoiceFeatureTest extends TestCase
         $invoice = $this->createInvoiceForTest();
 
         // Simulate items being attached to the invoice with pivot data
-        $invoice->items()->attach($item1->id, ['quantity' => 2.35, 'price' => 100.00, 'description' => 'Desc B']);
+        $invoice->invoiceItems()->create(['item_id' => $item1->id, 'quantity' => 2.35, 'price' => 100.00, 'description' => 'Desc B']);
 
         // Manually set initial stock *before* restoration for test clarity
         $item1->stock = 3.45; // 5.80 - 2.35 = 3.45
@@ -150,9 +150,9 @@ class InvoiceFeatureTest extends TestCase
         $invoice = $this->createInvoiceForTest();
 
         // Items attached to invoice
-        $invoice->items()->attach([
-            $item1->id => ['quantity' => 1.5, 'price' => 10.00],
-            $item2->id => ['quantity' => 0.5, 'price' => 20.00],
+        $invoice->invoiceItems()->createMany([
+            ['item_id' => $item1->id, 'quantity' => 1.5, 'price' => 10.00],
+            ['item_id' => $item2->id, 'quantity' => 0.5, 'price' => 20.00],
         ]);
 
         // Simulate stock after deduction
@@ -174,18 +174,19 @@ class InvoiceFeatureTest extends TestCase
         $invoice = $this->createInvoiceForTest();
         $decimalQuantity = 3.75;
 
-        $invoice->items()->attach($item->id, [
+        $invoice->invoiceItems()->create([
+            'item_id' => $item->id,
             'quantity' => $decimalQuantity,
             'price' => 100.00,
             'description' => 'Test decimal pivot'
         ]);
 
         $invoice->refresh(); // Refresh to get relations and pivot data
-        $attachedItem = $invoice->items()->first();
+        $attachedItem = $invoice->invoiceItems()->first();
 
         $this->assertNotNull($attachedItem);
-        $this->assertEquals($decimalQuantity, $attachedItem->pivot->quantity);
+        $this->assertEquals($decimalQuantity, $attachedItem->quantity);
         // Check if it's retrieved as a float/decimal due to model casting on Invoice items()
-        $this->assertIsFloat($attachedItem->pivot->quantity);
+        $this->assertIsFloat($attachedItem->quantity);
     }
 }

@@ -22,16 +22,14 @@ class Invoice extends Model
         return $this->belongsTo(Vehicle::class);
     }
 
-    public function services()
+    public function invoiceServices()
     {
-        return $this->belongsToMany(Service::class, 'invoice_service')->withPivot('price', 'description');
+        return $this->hasMany(InvoiceService::class);
     }
 
-    public function items()
+    public function invoiceItems()
     {
-        return $this->belongsToMany(Item::class, 'invoice_item')
-            ->withPivot('quantity', 'price', 'description')
-            ->using(InvoiceItem::class);
+        return $this->hasMany(InvoiceItem::class);
     }
 
     /**

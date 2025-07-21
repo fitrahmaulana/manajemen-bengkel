@@ -103,19 +103,17 @@ class InvoiceResource extends Resource
 
             // Bagian Repeater yang sekarang dibuat lebih lebar
             Section::make('Detail Pekerjaan & Barang')->schema([
-                // Repeater Jasa - Optimized untuk mengurangi lag
-                CustomTableRepeater::make('services')
+                CustomTableRepeater::make('invoiceServices')
+                    ->relationship()
                     ->reorderAtStart()
                     ->hiddenLabel()
-                    ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at']) //
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('services'))->sum(function ($service) {
+                            'Total: ' . self::formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
                                 return self::parseCurrencyValue($service['price'] ?? '0');
                             }))
                         )
                     )
-
                     ->headers([
                         Header::make('Nama Jasa')->width('50%'),
                         Header::make('Harga Jasa')->width('30%'),
@@ -123,7 +121,6 @@ class InvoiceResource extends Resource
                     ])
                     ->label('Jasa / Layanan')
                     ->schema([
-                        // group
                         Forms\Components\Group::make()->schema([
                             Forms\Components\Select::make('service_id')
                                 ->hiddenLabel()
@@ -145,7 +142,7 @@ class InvoiceResource extends Resource
                             ->required(),
                         Forms\Components\Placeholder::make('subtotal_service')
                             ->hiddenLabel()
-                            ->dehydrated(false) // Tidak disimpan ke database
+                            ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
@@ -154,8 +151,8 @@ class InvoiceResource extends Resource
                     ])
                     ->columns(3),
 
-                // Repeater Barang
-                CustomTableRepeater::make('items')
+                CustomTableRepeater::make('invoiceItems')
+                    ->relationship()
                     ->headers([
                         Header::make('Barang / Suku Cadang')->width('45%'),
                         Header::make('Kuantitas')->width('15%'),
@@ -175,21 +172,11 @@ class InvoiceResource extends Resource
                                         ->with(['product'])
                                         ->get()
                                         ->mapWithKeys(function ($item) {
-                                            // Menampilkan nama produk + varian (jika ada) + SKU + STOK
                                             $productName = $item->product->name;
                                             $variantName = $item->name;
-
-                                            // Untuk produk tanpa varian (name kosong), tampilkan hanya nama produk
-                                            if (empty($variantName)) {
-                                                $displayName = $productName;
-                                            } else {
-                                                // Untuk produk dengan varian, tampilkan nama produk + varian
-                                                $displayName = $productName . ' ' . $variantName;
-                                            }
-
+                                            $displayName = empty($variantName) ? $productName : $productName . ' ' . $variantName;
                                             $skuInfo = $item->sku ? " (SKU: " . $item->sku . ")" : "";
                                             $stockInfo = " - Stok: {$item->stock} {$item->unit}";
-
                                             return [$item->id => $displayName . $skuInfo . $stockInfo];
                                         });
                                 })
@@ -202,29 +189,24 @@ class InvoiceResource extends Resource
                         Forms\Components\TextInput::make('quantity')
                             ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
-                            ->step('0.01') // Allow decimal input
-                            ->default(1.0) // Default to float
+                            ->step('0.01')
+                            ->default(1.0)
                             ->required()
                             ->live()
                             ->rules([
                                 function (Get $get, callable $set, $record, $operation) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
-                                        $quantityInput = (float)$value; // Ubah dari int ke float untuk mendukung desimal
+                                        $quantityInput = (float)$value;
                                         $itemId = $get('item_id');
-
                                         if ($quantityInput <= 0) {
                                             $fail("Kuantitas harus lebih dari 0.");
                                             return;
                                         }
-
                                         if (!$itemId) {
-                                            return; // Item not selected yet
+                                            return;
                                         }
-
-                                        // Use optimized validation from trait
                                         $currentInvoice = ($operation === 'edit' && $record instanceof Invoice) ? $record : null;
                                         $validation = self::validateStockAvailability($itemId, $quantityInput, $currentInvoice);
-
                                         if (!$validation['valid']) {
                                             $fail($validation['message']);
                                         }
@@ -241,10 +223,10 @@ class InvoiceResource extends Resource
                         Forms\Components\Hidden::make('unit_name'),
                         Forms\Components\Placeholder::make('subtotal_item')
                             ->hiddenLabel()
-                            ->dehydrated(false) // Tidak disimpan ke database
+                            ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
-                                $quantity = (float)($get('quantity') ?? 0); // Ubah dari int ke float
+                                $quantity = (float)($get('quantity') ?? 0);
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
                                 $total = $quantity * $price;
                                 return self::formatCurrency($total);
@@ -252,8 +234,8 @@ class InvoiceResource extends Resource
                     ])
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('items'))->sum(function ($item) {
-                                $quantity = (float)($item['quantity'] ?? 0.0); // Ensure float for consistency
+                            'Total: ' . self::formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
+                                $quantity = (float)($item['quantity'] ?? 0.0);
                                 $price = self::parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
                             }))
@@ -468,12 +450,12 @@ class InvoiceResource extends Resource
                             ->extraAttributes(['class' => 'font-bold text-xl text-white'])
                             ->content(function (Get $get) {
                                 // Hitung total dari services
-                                $servicesTotal = collect($get('services'))->sum(function ($service) {
+                                $servicesTotal = collect($get('invoiceServices'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
                                 });
 
                                 // Hitung total dari items
-                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) {
                                     $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
@@ -505,11 +487,11 @@ class InvoiceResource extends Resource
                             ->extraAttributes(['class' => 'font-bold text-xl text-green'])
                             ->Content(function (Get $get) {
                                 // Hitung subtotal
-                                $servicesTotal = collect($get('services'))->sum(function ($service) {
+                                $servicesTotal = collect($get('invoiceServices'))->sum(function ($service) {
                                     return self::parseCurrencyValue($service['price'] ?? '0');
                                 });
 
-                                $itemsTotal = collect($get('items'))->sum(function ($item) {
+                                $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) {
                                     $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;

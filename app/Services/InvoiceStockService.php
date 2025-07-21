@@ -63,16 +63,17 @@ class InvoiceStockService
     public function restoreStockForInvoiceItems(Invoice $invoice): void
     {
         // Eager load items with pivot data to avoid N+1 queries if not already loaded.
-        $invoiceItems = $invoice->items()->get();
+        $invoiceItems = $invoice->invoiceItems()->with('item')->get();
 
         if ($invoiceItems->isEmpty()) {
             return;
         }
 
         DB::transaction(function () use ($invoiceItems, $invoice) {
-            foreach ($invoiceItems as $itemModel) {
+            foreach ($invoiceItems as $invoiceItem) {
+                $itemModel = $invoiceItem->item;
                 // The quantity to restore is from the pivot table
-                $quantityToRestore = (float)($itemModel->pivot->quantity ?? 0.0);
+                $quantityToRestore = (float)($invoiceItem->quantity ?? 0.0);
 
                 if ($quantityToRestore <= 0) {
                     continue; // Skip if quantity is not positive
