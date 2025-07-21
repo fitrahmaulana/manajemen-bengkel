@@ -16,6 +16,17 @@ class CreateInvoice extends CreateRecord
 
     protected static string $resource = InvoiceResource::class;
 
+    /**
+     * Hook ini dijalankan SEBELUM data form utama dan relasi disimpan ke database.
+     * Alur:
+     * 1. Mengambil data dari repeater 'invoiceServices' dan 'invoiceItems'.
+     * 2. Menghitung total biaya dari jasa dan barang.
+     * 3. Menghitung diskon (jika ada).
+     * 4. Menghitung dan menyimpan `subtotal` dan `total_amount` ke dalam data invoice utama.
+     *
+     * @param array $data Data form saat ini.
+     * @return array Data form yang telah dimutasi.
+     */
     protected function mutateFormDataBeforeCreate(array $data): array
     {
         $services = $data['invoiceServices'] ?? [];
@@ -49,6 +60,15 @@ class CreateInvoice extends CreateRecord
         return $data;
     }
 
+    /**
+     * Hook ini dijalankan SETELAH record Invoice utama dan relasinya berhasil dibuat.
+     * Alur:
+     * 1. Mengambil data item dari form.
+     * 2. Memanggil InvoiceStockService untuk mengurangi stok barang yang terjual.
+     * 3. Memanggil trait untuk mengupdate status invoice (misal: dari 'draft' ke 'unpaid').
+     * 4. Menampilkan notifikasi sukses.
+     * 5. Jika terjadi error, transaksi di-rollback dan notifikasi error ditampilkan.
+     */
     protected function afterCreate(): void
     {
         $items = $this->data['invoiceItems'] ?? [];

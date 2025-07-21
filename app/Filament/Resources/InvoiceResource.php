@@ -103,6 +103,9 @@ class InvoiceResource extends Resource
 
             // Bagian Repeater yang sekarang dibuat lebih lebar
             Section::make('Detail Pekerjaan & Barang')->schema([
+                // REPEATER JASA
+                // Menggunakan relationship() untuk secara otomatis menghubungkan repeater dengan relasi 'invoiceServices' pada model Invoice.
+                // Filament akan menangani pembuatan, pembaruan, dan penghapusan record pada tabel 'invoice_service'.
                 CustomTableRepeater::make('invoiceServices')
                     ->relationship()
                     ->reorderAtStart()
@@ -122,6 +125,9 @@ class InvoiceResource extends Resource
                     ->label('Jasa / Layanan')
                     ->schema([
                         Forms\Components\Group::make()->schema([
+                            // SELECT SERVICE
+                            // Menggunakan relationship() untuk menghubungkan Select ke relasi 'service' pada model InvoiceService.
+                            // Ini memungkinkan pencarian dan pengambilan data service secara efisien.
                             Forms\Components\Select::make('service_id')
                                 ->hiddenLabel()
                                 ->relationship('service', 'name')
@@ -151,6 +157,8 @@ class InvoiceResource extends Resource
                     ])
                     ->columns(3),
 
+                // REPEATER BARANG
+                // Sama seperti jasa, repeater ini terhubung dengan relasi 'invoiceItems' pada model Invoice.
                 CustomTableRepeater::make('invoiceItems')
                     ->relationship()
                     ->headers([
@@ -164,6 +172,9 @@ class InvoiceResource extends Resource
                     ->cloneable()
                     ->schema([
                         Forms\Components\Group::make()->schema([
+                            // SELECT ITEM
+                            // Menggunakan getOptionLabelFromRecordUsing untuk format label yang custom (menampilkan stok, dll).
+                            // Ini lebih fleksibel daripada hanya menampilkan satu kolom dari relasi.
                             Forms\Components\Select::make('item_id')
                                 ->label('Barang')
                                 ->hiddenLabel()

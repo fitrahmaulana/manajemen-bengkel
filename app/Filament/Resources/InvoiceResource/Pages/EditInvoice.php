@@ -16,6 +16,14 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
+    /**
+     * Hook ini dijalankan SEBELUM data form utama dan relasi di-update ke database.
+     * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
+     * dihitung ulang dan disimpan dengan benar setiap kali ada perubahan.
+     *
+     * @param array $data Data form saat ini.
+     * @return array Data form yang telah dimutasi.
+     */
     protected function mutateFormDataBeforeSave(array $data): array
     {
         $services = $data['invoiceServices'] ?? [];
@@ -75,11 +83,13 @@ class EditInvoice extends EditRecord
         try {
             DB::transaction(function () use ($items) {
                 if (!empty($items)) {
-                    // Get original items with their quantities before any changes
-                    $originalItems = [];
-                    foreach ($this->record->invoiceItems as $item) {
-                        $originalItems[$item->item_id] = (float)$item->quantity;
-                    }
+                    // NOTE: The stock adjustment logic here is simplified.
+                    // It restores stock for ALL items that were previously on the invoice
+                    // and then deducts stock for ALL items currently in the form state.
+                    // This works but can be inefficient for large invoices.
+                    // A more optimized approach would be to calculate the diff between
+                    // the original and new item states and only adjust the difference.
+                    // However, for most cases, this approach is safe and reliable.
 
                     // Restore stock for all old items
                     app(InvoiceStockService::class)->restoreStockForInvoiceItems($this->record);
