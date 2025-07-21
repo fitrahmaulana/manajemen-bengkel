@@ -70,36 +70,36 @@ class ViewInvoice extends ViewRecord
                 // === BAGIAN TENGAH: DAFTAR JASA & BARANG ===
                 Infolists\Components\Section::make('Detail Jasa / Layanan')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('services')
+                        Infolists\Components\RepeatableEntry::make('invoiceServices')
                             ->hiddenLabel()
                             ->schema([
-                                Infolists\Components\TextEntry::make('name')->label('Nama Jasa')->weight('bold'),
-                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Biaya')->currency('IDR'),
+                                Infolists\Components\TextEntry::make('service.name')->label('Nama Jasa')->weight('bold'),
+                                Infolists\Components\TextEntry::make('description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
+                                Infolists\Components\TextEntry::make('price')->label('Biaya')->currency('IDR'),
                             ])->columns(3),
                     ]),
 
                 Infolists\Components\Section::make('Detail Barang / Suku Cadang')
                     ->schema([
-                        Infolists\Components\RepeatableEntry::make('items')
+                        Infolists\Components\RepeatableEntry::make('invoiceItems')
                             ->hiddenLabel()
                             ->schema([
-                                Infolists\Components\TextEntry::make('display_name')
+                                Infolists\Components\TextEntry::make('item.display_name')
                                     ->label('Nama Barang')
                                     ->weight('bold')
                                     ->columnSpan(2),
-                                Infolists\Components\TextEntry::make('pivot.quantity')
+                                Infolists\Components\TextEntry::make('quantity')
                                     ->label('Kuantitas')
                                     ->formatStateUsing(function ($record) {
-                                        $unit = $record->unit;
-                                        return ($record->pivot->quantity ?? ' ') . " $unit";
+                                        $unit = $record->item->unit;
+                                        return ($record->quantity ?? ' ') . " $unit";
                                     }),
-                                Infolists\Components\TextEntry::make('pivot.price')->label('Harga Satuan')->currency('IDR'),
+                                Infolists\Components\TextEntry::make('price')->label('Harga Satuan')->currency('IDR'),
                                 Infolists\Components\TextEntry::make('sub_total_calculated')
                                     ->label('Subtotal')
                                     ->currency('IDR')
-                                    ->state(fn($record): float => ($record->pivot->quantity ?? 0) * ($record->pivot->price ?? 0)),
-                                Infolists\Components\TextEntry::make('pivot.description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
+                                    ->state(fn($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
+                                Infolists\Components\TextEntry::make('description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
                     ]),
@@ -177,10 +177,10 @@ class ViewInvoice extends ViewRecord
                 ->icon('heroicon-o-trash')
                 ->before(function (Invoice $record) {
                     // Restore stock before deleting invoice
-                    foreach ($record->items as $itemPivot) {
-                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                    foreach ($record->invoiceItems as $invoiceItem) {
+                        $itemModel = $invoiceItem->item;
                         if ($itemModel) {
-                            $quantityToRestore = $itemPivot->pivot->quantity;
+                            $quantityToRestore = $invoiceItem->quantity;
                             $itemModel->stock += $quantityToRestore;
                             $itemModel->save();
                         }
@@ -190,10 +190,10 @@ class ViewInvoice extends ViewRecord
             Actions\RestoreAction::make()
                 ->after(function (Invoice $record) {
                     // Re-decrement stock for items on the restored invoice
-                    foreach ($record->items as $itemPivot) {
-                        $itemModel = \App\Models\Item::find($itemPivot->id);
+                    foreach ($record->invoiceItems as $invoiceItem) {
+                        $itemModel = $invoiceItem->item;
                         if ($itemModel) {
-                            $quantityToDecrement = $itemPivot->pivot->quantity;
+                            $quantityToDecrement = $invoiceItem->quantity;
 
                             // Check if stock would go negative
                             if ($itemModel->stock >= $quantityToDecrement) {
