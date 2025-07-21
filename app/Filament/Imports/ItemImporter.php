@@ -85,6 +85,7 @@ class ItemImporter extends Importer
             ImportColumn::make('name')
                 ->label('Nama Varian'),
 
+
             ImportColumn::make('sku')
                 ->label('SKU Varian')
                 ->requiredMapping()
@@ -132,6 +133,7 @@ class ItemImporter extends Importer
     /**
      * Cari Item berdasarkan SKU, atau buat baru.
      */
+
     public function resolveRecord(): ?Item
     {
         return Item::firstOrNew([
