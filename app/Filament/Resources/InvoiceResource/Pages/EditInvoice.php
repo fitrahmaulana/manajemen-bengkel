@@ -87,10 +87,7 @@ class EditInvoice extends EditRecord
 
     protected function handleRecordUpdate(\Illuminate\Database\Eloquent\Model $record, array $data): \Illuminate\Database\Eloquent\Model
     {
-        $originalItems = $record->invoiceItems->mapWithKeys(function ($item) {
-            return [$item->item_id => $item->quantity];
-        });
-
+        $originalItems = collect($this->originalItems);
         $newItems = collect($data['invoiceItems'] ?? []);
 
         DB::transaction(function () use ($record, $data, $originalItems, $newItems) {
