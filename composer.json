@@ -9,6 +9,7 @@
         "php": "^8.2",
         "ariaieboy/filament-currency": "^1.13",
         "awcodes/filament-table-repeater": "^3.1",
+        "doctrine/dbal": "^4.3",
         "filament/filament": "3.3",
         "laravel-lang/common": "^6.7",
         "laravel/framework": "^12.0",

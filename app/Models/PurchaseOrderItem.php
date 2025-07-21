@@ -11,6 +11,15 @@ class PurchaseOrderItem extends Pivot
 
     protected $table = 'purchase_order_items';
 
+    protected $casts = [
+        'quantity' => 'decimal:1',
+    ];
+
+    public function getQuantityAttribute($value)
+    {
+        return $value + 0;
+    }
+
     public function purchaseOrder(): BelongsTo
     {
         return $this->belongsTo(PurchaseOrder::class);

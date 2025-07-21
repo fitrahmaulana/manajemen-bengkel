@@ -31,7 +31,7 @@ class Invoice extends Model
     {
         return $this->belongsToMany(Item::class, 'invoice_item')
             ->withPivot('quantity', 'price', 'description')
-            ->withCasts(['quantity' => 'decimal:2']);
+            ->using(InvoiceItem::class);
     }
 
     /**
