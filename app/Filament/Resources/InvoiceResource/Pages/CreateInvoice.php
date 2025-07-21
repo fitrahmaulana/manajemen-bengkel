@@ -71,12 +71,12 @@ class CreateInvoice extends CreateRecord
      */
     protected function afterCreate(): void
     {
-        $items = $this->data['invoiceItems'] ?? [];
+        $items = $this->record->invoiceItems()->get();
 
         try {
             DB::transaction(function () use ($items) {
-                if (!empty($items)) {
-                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items);
+                if ($items->isNotEmpty()) {
+                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items->toArray());
                 }
                 self::updateInvoiceStatus($this->record);
             });

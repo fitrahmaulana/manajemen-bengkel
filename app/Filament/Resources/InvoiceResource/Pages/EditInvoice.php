@@ -78,25 +78,28 @@ class EditInvoice extends EditRecord
 
     protected function afterSave(): void
     {
-        $items = $this->data['invoiceItems'] ?? [];
+        $newItems = collect($this->data['invoiceItems'] ?? []);
+        $originalItems = collect($this->record->invoiceItems->mapWithKeys(function ($item) {
+            return [$item->item_id => $item->quantity];
+        }));
 
         try {
-            DB::transaction(function () use ($items) {
-                if (!empty($items)) {
-                    // NOTE: The stock adjustment logic here is simplified.
-                    // It restores stock for ALL items that were previously on the invoice
-                    // and then deducts stock for ALL items currently in the form state.
-                    // This works but can be inefficient for large invoices.
-                    // A more optimized approach would be to calculate the diff between
-                    // the original and new item states and only adjust the difference.
-                    // However, for most cases, this approach is safe and reliable.
+            DB::transaction(function () use ($newItems, $originalItems) {
+                $stockService = app(InvoiceStockService::class);
 
-                    // Restore stock for all old items
-                    app(InvoiceStockService::class)->restoreStockForInvoiceItems($this->record);
+                // Calculate stock changes
+                $allItems = $originalItems->keys()->merge($newItems->pluck('item_id'))->unique();
 
-                    // Deduct stock for the new set of items
-                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items);
+                foreach ($allItems as $itemId) {
+                    $originalQty = $originalItems->get($itemId, 0);
+                    $newQty = $newItems->firstWhere('item_id', $itemId)['quantity'] ?? 0;
+                    $diff = $newQty - $originalQty;
+
+                    if ($diff !== 0) {
+                        $stockService->adjustStockForItem($itemId, $diff);
+                    }
                 }
+
                 self::updateInvoiceStatus($this->record);
             });
 
