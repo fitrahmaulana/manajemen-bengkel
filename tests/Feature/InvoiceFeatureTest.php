@@ -8,7 +8,7 @@ use App\Models\Item;
 use App\Models\Product;
 use App\Models\User;
 use App\Models\Vehicle;
-use App\Services\InvoiceStockService;
+use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -16,7 +16,7 @@ class InvoiceFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected InvoiceStockService $stockService;
+    protected InventoryService $inventoryService;
     protected User $user;
     protected Product $product;
     protected Customer $customer;
@@ -25,7 +25,7 @@ class InvoiceFeatureTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        $this->stockService = app(InvoiceStockService::class);
+        $this->inventoryService = app(InventoryService::class);
         $this->user = User::factory()->create(); // For potential ownership context if service needs it
 
         $this->product = Product::factory()->create(['name' => 'Test Product']);
@@ -69,7 +69,7 @@ class InvoiceFeatureTest extends TestCase
         ];
 
         // Act
-        $this->stockService->deductStockForInvoiceItems($invoice, $rawItemsData);
+        $this->inventoryService->deductStockForInvoiceItems($invoice, $rawItemsData);
 
         // Assert
         $item1->refresh();
@@ -91,7 +91,7 @@ class InvoiceFeatureTest extends TestCase
         $this->assertEquals('3.45', $item1->fresh()->stock);
 
         // Act
-        $this->stockService->restoreStockForInvoiceItems($invoice);
+        $this->inventoryService->restoreStockForInvoiceItems($invoice);
 
         // Assert
         $item1->refresh();
@@ -105,7 +105,7 @@ class InvoiceFeatureTest extends TestCase
         $item1 = $this->createItem('Item C', 'SKU-C', 12.00);
 
         // Act: Deduct 2.75
-        $this->stockService->adjustStockForItem($item1->id, 2.75);
+        $this->inventoryService->adjustStockForItem($item1->id, 2.75);
 
         // Assert
         $item1->refresh();
@@ -118,7 +118,7 @@ class InvoiceFeatureTest extends TestCase
         $item1 = $this->createItem('Item D', 'SKU-D', 8.50);
 
         // Act: Restore 3.20 (by passing negative value for deduction)
-        $this->stockService->adjustStockForItem($item1->id, -3.20);
+        $this->inventoryService->adjustStockForItem($item1->id, -3.20);
 
         // Assert
         $item1->refresh();
@@ -136,7 +136,7 @@ class InvoiceFeatureTest extends TestCase
             ['item_id' => $item2->id, 'quantity' => 1.25, 'price' => 20.00],
         ];
 
-        $this->stockService->deductStockForInvoiceItems($invoice, $rawItemsData);
+        $this->inventoryService->deductStockForInvoiceItems($invoice, $rawItemsData);
 
         $this->assertEquals(sprintf('%.2f', 20.00 - 2.5), $item1->fresh()->stock); // 17.50
         $this->assertEquals(sprintf('%.2f', 15.00 - 1.25), $item2->fresh()->stock); // 13.75
@@ -161,7 +161,7 @@ class InvoiceFeatureTest extends TestCase
         $item2->stock = 5.00 - 0.5;  // 4.50
         $item2->save();
 
-        $this->stockService->restoreStockForInvoiceItems($invoice);
+        $this->inventoryService->restoreStockForInvoiceItems($invoice);
 
         $this->assertEquals(sprintf('%.2f', 8.50 + 1.5), $item1->fresh()->stock); // Should be 10.00
         $this->assertEquals(sprintf('%.2f', 4.50 + 0.5), $item2->fresh()->stock); // Should be 5.00
@@ -200,7 +200,7 @@ class InvoiceFeatureTest extends TestCase
         $quantityDifference = $newQuantity - $initialQuantity; // 3.0
 
         // Simulate initial creation and stock deduction
-        $this->stockService->deductStockForInvoiceItems($invoice, [['item_id' => $item->id, 'quantity' => $initialQuantity]]);
+        $this->inventoryService->deductStockForInvoiceItems($invoice, [['item_id' => $item->id, 'quantity' => $initialQuantity]]);
         $this->assertEquals(15.00, $item->fresh()->stock);
 
         // Simulate editing the invoice
@@ -210,7 +210,7 @@ class InvoiceFeatureTest extends TestCase
         });
         $newItemsData = [['item_id' => $item->id, 'quantity' => $newQuantity]];
 
-        $stockService = app(InvoiceStockService::class);
+        $inventoryService = app(InventoryService::class);
         $allItems = $originalItems->keys()->merge(collect($newItemsData)->pluck('item_id'))->unique();
 
         foreach ($allItems as $itemId) {
@@ -219,7 +219,7 @@ class InvoiceFeatureTest extends TestCase
             $diff = $newQty - $originalQty;
 
             if ($diff != 0) {
-                $stockService->adjustStockForItem($itemId, $diff);
+                $inventoryService->adjustStockForItem($itemId, $diff);
             }
         }
 

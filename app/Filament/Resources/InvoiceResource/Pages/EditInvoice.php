@@ -4,7 +4,7 @@ namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
 use App\Services\InvoiceService;
-use App\Services\InvoiceStockService;
+use App\Services\InventoryService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
@@ -64,11 +64,11 @@ class EditInvoice extends EditRecord
             Actions\DeleteAction::make(),
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make()
-                ->after(function (InvoiceStockService $stockService) {
+                ->after(function (InventoryService $inventoryService) {
                     $itemsData = $this->record->invoiceItems->map(function ($item) {
                         return ['item_id' => $item->item_id, 'quantity' => $item->quantity];
                     })->toArray();
-                    $stockService->deductStockForInvoiceItems($this->record, $itemsData);
+                    $inventoryService->deductStockForInvoiceItems($this->record, $itemsData);
                     app(InvoiceService::class)->updateInvoiceStatus($this->record);
                 }),
         ];

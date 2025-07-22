@@ -6,7 +6,6 @@ use App\Filament\Resources\InvoiceResource;
 use App\Services\InvoiceService;
 use Filament\Resources\Pages\CreateRecord;
 
-use App\Services\InvoiceStockService;
 use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 
@@ -65,7 +64,7 @@ class CreateInvoice extends CreateRecord
      * Hook ini dijalankan SETELAH record Invoice utama dan relasinya berhasil dibuat.
      * Alur:
      * 1. Mengambil data item dari form.
-     * 2. Memanggil InvoiceStockService untuk mengurangi stok barang yang terjual.
+     * 2. Memanggil InventoryService untuk mengurangi stok barang yang terjual.
      * 3. Memanggil trait untuk mengupdate status invoice (misal: dari 'draft' ke 'unpaid').
      * 4. Menampilkan notifikasi sukses.
      * 5. Jika terjadi error, transaksi di-rollback dan notifikasi error ditampilkan.

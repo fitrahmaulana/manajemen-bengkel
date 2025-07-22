@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Services\InvoiceStockService;
+use App\Services\InventoryService;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
@@ -21,8 +21,8 @@ class InvoiceItem extends Pivot
             // This logic runs AFTER the record has been deleted.
             // We use a negative quantity to restore the stock.
             if ($invoiceItem->item_id && $invoiceItem->quantity > 0) {
-                $stockService = app(InvoiceStockService::class);
-                $stockService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
+                $inventoryService = app(InventoryService::class);
+                $inventoryService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
             }
         });
     }

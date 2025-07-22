@@ -9,7 +9,6 @@ use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
 use App\Services\InvoiceService;
-use App\Services\InvoiceStockService;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
@@ -175,17 +174,17 @@ class InvoiceResource extends Resource
                     ->reorderAtStart()
                     ->cloneable()
                     ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
-                        $stockService = app(InvoiceStockService::class);
-                        $stockService->adjustStockForItem($data['item_id'], $data['quantity']);
+                        $inventoryService = app(InventoryService::class);
+                        $inventoryService->adjustStockForItem($data['item_id'], $data['quantity']);
                         return $data;
                     })
                     ->mutateRelationshipDataBeforeSaveUsing(function (array $data, $record): array {
-                        $stockService = app(InvoiceStockService::class);
+                        $inventoryService = app(InventoryService::class);
                         $originalQty = $record->quantity;
                         $newQty = $data['quantity'];
                         $diff = $newQty - $originalQty;
                         if ($diff != 0) {
-                            $stockService->adjustStockForItem($data['item_id'], $diff);
+                            $inventoryService->adjustStockForItem($data['item_id'], $diff);
                         }
                         return $data;
                     })
@@ -576,29 +575,29 @@ class InvoiceResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make()
                         ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            $stockService = app(\App\Services\InvoiceStockService::class);
+                            $inventoryService = app(InventoryService::class);
                             foreach ($records as $record) {
-                                $stockService->restoreStockForInvoiceItems($record);
+                                $inventoryService->restoreStockForInvoiceItems($record);
                             }
                         }),
                     ForceDeleteBulkAction::make()
                         ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
                             // Optional: Restore stock if business logic requires it for force delete
-                            // $stockService = app(\App\Services\InvoiceStockService::class);
+                            // $inventoryService = app(InventoryService::class);
                             // foreach ($records as $record) {
-                            //    $stockService->restoreStockForInvoiceItems($record);
+                            //    $inventoryService->restoreStockForInvoiceItems($record);
                             // }
                         }),
                     RestoreBulkAction::make()
                         ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            $stockService = app(\App\Services\InvoiceStockService::class);
+                            $inventoryService = app(InventoryService::class);
                             foreach ($records as $record) {
                                 // Need to ensure items are loaded if they aren't by default on restored records in bulk
                                 $record->loadMissing('items');
                                 $itemsData = $record->items->map(function ($item) {
                                     return ['item_id' => $item->id, 'quantity' => $item->pivot->quantity];
                                 })->toArray();
-                                $stockService->deductStockForInvoiceItems($record, $itemsData);
+                                $inventoryService->deductStockForInvoiceItems($record, $itemsData);
                                 // Also update status
                                 app(InvoiceService::class)->updateInvoiceStatus($record);
                             }
