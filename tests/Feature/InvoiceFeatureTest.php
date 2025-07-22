@@ -59,45 +59,6 @@ class InvoiceFeatureTest extends TestCase
         ]);
     }
 
-    /** @test */
-    public function stock_service_can_deduct_decimal_stock_for_invoice_items(): void
-    {
-        $item1 = $this->createItem('Item A', 'SKU-A', 10.75);
-        $invoice = $this->createInvoiceForTest();
-        $rawItemsData = [
-            ['item_id' => $item1->id, 'quantity' => 1.55, 'price' => 100.00, 'description' => 'Desc A'],
-        ];
-
-        // Act
-        $this->inventoryService->deductStockForInvoiceItems($invoice, $rawItemsData);
-
-        // Assert
-        $item1->refresh();
-        $this->assertEquals(sprintf('%.2f', 10.75 - 1.55), $item1->stock); // 9.20
-    }
-
-    /** @test */
-    public function stock_service_can_restore_decimal_stock_for_invoice_items(): void
-    {
-        $item1 = $this->createItem('Item B', 'SKU-B', 5.80);
-        $invoice = $this->createInvoiceForTest();
-
-        // Simulate items being attached to the invoice with pivot data
-        $invoice->invoiceItems()->create(['item_id' => $item1->id, 'quantity' => 2.35, 'price' => 100.00, 'description' => 'Desc B']);
-
-        // Manually set initial stock *before* restoration for test clarity
-        $item1->stock = 3.45; // 5.80 - 2.35 = 3.45
-        $item1->save();
-        $this->assertEquals('3.45', $item1->fresh()->stock);
-
-        // Act
-        $this->inventoryService->restoreStockForInvoiceItems($invoice);
-
-        // Assert
-        $item1->refresh();
-        // Stock should be original 3.45 + 2.35 (from pivot) = 5.80
-        $this->assertEquals(sprintf('%.2f', 3.45 + 2.35), $item1->stock);
-    }
 
     /** @test */
     public function stock_service_adjust_stock_for_item_deducts_correctly(): void
@@ -125,47 +86,6 @@ class InvoiceFeatureTest extends TestCase
         $this->assertEquals(sprintf('%.2f', 8.50 + 3.20), $item1->stock); // 11.70
     }
 
-    /** @test */
-    public function stock_service_deduct_handles_multiple_items(): void
-    {
-        $item1 = $this->createItem('Item E', 'SKU-E', 20.00);
-        $item2 = $this->createItem('Item F', 'SKU-F', 15.00);
-        $invoice = $this->createInvoiceForTest();
-        $rawItemsData = [
-            ['item_id' => $item1->id, 'quantity' => 2.5, 'price' => 10.00],
-            ['item_id' => $item2->id, 'quantity' => 1.25, 'price' => 20.00],
-        ];
-
-        $this->inventoryService->deductStockForInvoiceItems($invoice, $rawItemsData);
-
-        $this->assertEquals(sprintf('%.2f', 20.00 - 2.5), $item1->fresh()->stock); // 17.50
-        $this->assertEquals(sprintf('%.2f', 15.00 - 1.25), $item2->fresh()->stock); // 13.75
-    }
-
-    /** @test */
-    public function stock_service_restore_handles_multiple_items(): void
-    {
-        $item1 = $this->createItem('Item G', 'SKU-G', 10.00); // Initial stock before any transaction
-        $item2 = $this->createItem('Item H', 'SKU-H', 5.00);  // Initial stock before any transaction
-        $invoice = $this->createInvoiceForTest();
-
-        // Items attached to invoice
-        $invoice->invoiceItems()->createMany([
-            ['item_id' => $item1->id, 'quantity' => 1.5, 'price' => 10.00],
-            ['item_id' => $item2->id, 'quantity' => 0.5, 'price' => 20.00],
-        ]);
-
-        // Simulate stock after deduction
-        $item1->stock = 10.00 - 1.5; // 8.50
-        $item1->save();
-        $item2->stock = 5.00 - 0.5;  // 4.50
-        $item2->save();
-
-        $this->inventoryService->restoreStockForInvoiceItems($invoice);
-
-        $this->assertEquals(sprintf('%.2f', 8.50 + 1.5), $item1->fresh()->stock); // Should be 10.00
-        $this->assertEquals(sprintf('%.2f', 4.50 + 0.5), $item2->fresh()->stock); // Should be 5.00
-    }
 
     /** @test */
     public function quantity_in_invoice_item_pivot_is_decimal(): void

@@ -559,30 +559,31 @@ class InvoiceResource extends Resource
                     Tables\Actions\DeleteBulkAction::make()
                         ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
                             $inventoryService = app(InventoryService::class);
-                            foreach ($records as $record) {
-                                $inventoryService->restoreStockForInvoiceItems($record);
+                            foreach ($records as $invoice) {
+                                foreach ($invoice->invoiceItems as $invoiceItem) {
+                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
+                                }
                             }
                         }),
                     ForceDeleteBulkAction::make()
                         ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
                             // Optional: Restore stock if business logic requires it for force delete
-                            // $inventoryService = app(InventoryService::class);
-                            // foreach ($records as $record) {
-                            //    $inventoryService->restoreStockForInvoiceItems($record);
-                            // }
+                            // This logic remains the same as DeleteBulkAction
+                            $inventoryService = app(InventoryService::class);
+                            foreach ($records as $invoice) {
+                                foreach ($invoice->invoiceItems as $invoiceItem) {
+                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
+                                }
+                            }
                         }),
                     RestoreBulkAction::make()
                         ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
                             $inventoryService = app(InventoryService::class);
-                            foreach ($records as $record) {
-                                // Need to ensure items are loaded if they aren't by default on restored records in bulk
-                                $record->loadMissing('items');
-                                $itemsData = $record->items->map(function ($item) {
-                                    return ['item_id' => $item->id, 'quantity' => $item->pivot->quantity];
-                                })->toArray();
-                                $inventoryService->deductStockForInvoiceItems($record, $itemsData);
-                                // Also update status
-                                app(InvoiceService::class)->updateInvoiceStatus($record);
+                            foreach ($records as $invoice) {
+                                foreach ($invoice->invoiceItems as $invoiceItem) {
+                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, $invoiceItem->quantity);
+                                }
+                                app(InvoiceService::class)->updateInvoiceStatus($invoice);
                             }
                         }),
                 ]),
