@@ -141,35 +141,33 @@ class InvoiceService
      */
     public function validateStockAvailability(
         int $itemId,
-        float $quantity, // Ubah dari int ke float untuk mendukung desimal
+        float $quantity,
         ?Invoice $currentInvoice = null
     ): array {
-        $item = \App\Models\Item::find($itemId);
+        $item = Item::find($itemId);
 
         if (! $item) {
-            return [
-                'valid' => false,
-                'message' => 'Item tidak valid.',
-            ];
+            return ['valid' => false, 'message' => 'Item tidak valid.'];
         }
 
+        // Kuantitas lama jika invoice sedang diedit
         $originalQuantity = 0;
         if ($currentInvoice) {
-            $originalItem = $currentInvoice->items()->where('item_id', $itemId)->first();
-            if ($originalItem) {
-                $originalQuantity = $originalItem->pivot->quantity;
+            $originalLine = $currentInvoice->relationLoaded('invoiceItems')
+                ? $currentInvoice->invoiceItems->firstWhere('item_id', $itemId)
+                : $currentInvoice->invoiceItems()->where('item_id', $itemId)->first();
+
+            if ($originalLine) {
+                $originalQuantity = (float) $originalLine->quantity;
             }
         }
 
-        $neededStock = $currentInvoice ? max(0, $quantity - $originalQuantity) : $quantity;
-
-        if ($neededStock > 0 && $item->stock < $neededStock) {
-            // Periksa apakah ada item lain dalam produk yang sama yang bisa dipecah
+        // Validasi: qty baru tidak boleh melebihi stok sekarang + qty lama (yang bisa direstore)
+        if ($quantity > ($item->stock + $originalQuantity)) {
             $hasSplitOption = Item::where('product_id', $item->product_id)
                 ->where('id', '!=', $item->id)
                 ->where('stock', '>', 0)
                 ->when($item->volume_value && $item->base_volume_unit, function ($query) use ($item) {
-                    // Hanya tampilkan item yang memiliki volume lebih besar dan satuan volume sama
                     $query->where('volume_value', '>', $item->volume_value)
                         ->where('base_volume_unit', $item->base_volume_unit);
                 })
@@ -178,16 +176,16 @@ class InvoiceService
             if ($hasSplitOption) {
                 return [
                     'valid' => false,
-                    'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
+                    'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$quantity} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
                     'can_split' => true,
                 ];
-            } else {
-                return [
-                    'valid' => false,
-                    'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
-                    'can_split' => false,
-                ];
             }
+
+            return [
+                'valid' => false,
+                'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
+                'can_split' => false,
+            ];
         }
 
         return ['valid' => true];

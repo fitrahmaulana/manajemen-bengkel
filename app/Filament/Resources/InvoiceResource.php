@@ -5,6 +5,7 @@ namespace App\Filament\Resources;
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Forms\Components\CustomTableRepeater;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
@@ -212,7 +213,14 @@ class InvoiceResource extends Resource
                                         if (! $itemId) {
                                             return;
                                         }
-                                        $currentInvoice = ($operation === 'edit' && $record instanceof Invoice) ? $record : null;
+                                        $currentInvoice = null;
+                                        if ($operation === 'edit') {
+                                            if ($record instanceof Invoice) {
+                                                $currentInvoice = $record;
+                                            } elseif ($record instanceof InvoiceItem) {
+                                                $currentInvoice = $record->invoice; // relasi invoice di InvoiceItem
+                                            }
+                                        }
                                         $validation = app(InvoiceService::class)->validateStockAvailability($itemId, $quantityInput, $currentInvoice);
                                         if (! $validation['valid']) {
                                             $fail($validation['message']);
