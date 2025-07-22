@@ -598,7 +598,7 @@ class InvoiceResource extends Resource
     public function printInvoice(Invoice $record)
     {
         // Eager load relationships to prevent N+1 queries in the Blade view
-        $record->load(['customer', 'vehicle', 'services', 'items.product']);
+        $record->load(['customer', 'vehicle', 'invoiceItems.item', 'invoiceServices.service']);
         return view('filament.resources.invoices.print', ['invoice' => $record]);
     }
 }

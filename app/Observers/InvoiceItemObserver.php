@@ -24,17 +24,31 @@ class InvoiceItemObserver
      */
     public function updated(InvoiceItem $invoiceItem): void
     {
-        if ($invoiceItem->isDirty('quantity')) {
-            $originalQuantity = $invoiceItem->getOriginal('quantity', 0);
-            $newQuantity = $invoiceItem->quantity;
-            $difference = $newQuantity - $originalQuantity;
+        $oldQty    = $invoiceItem->getOriginal('quantity') ?? 0;
+        $oldItemId = $invoiceItem->getOriginal('item_id') ?? $invoiceItem->item_id;
 
-            if ($difference != 0) {
-                $inventoryService = app(InventoryService::class);
-                $inventoryService->adjustStockForItem($invoiceItem->item_id, $difference);
-            }
+        $newQty    = $invoiceItem->quantity;
+        $newItemId = $invoiceItem->item_id;
+
+        // Kalau tidak ada perubahan qty & item_id, berhenti
+        if ($oldQty == $newQty && $oldItemId == $newItemId) {
+            return;
+        }
+
+        $inventoryService = app(InventoryService::class);
+
+        // 1. Kembalikan stok lama ke item lama
+        //    (oldQty sudah mengurangi stok saat pertama dibuat)
+        if ($oldQty > 0) {
+            $inventoryService->adjustStockForItem($oldItemId, -$oldQty);
+        }
+
+        // 2. Kurangi stok item baru sesuai qty baru
+        if ($newQty > 0) {
+            $inventoryService->adjustStockForItem($newItemId, $newQty);
         }
     }
+
 
     /**
      * Handle the InvoiceItem "deleted" event.

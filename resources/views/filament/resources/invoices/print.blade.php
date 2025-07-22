@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="id">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -8,29 +9,41 @@
         /* CSS ini dirancang khusus untuk printer dot-matrix */
         @page {
             size: auto;
-            margin: 1cm 0.5cm; /* Margin atas-bawah dan kiri-kanan */
+            margin: 1cm 0.5cm;
+            /* Margin atas-bawah dan kiri-kanan */
         }
 
         body {
             /* WAJIB: Gunakan font monospace agar semua karakter sama lebar */
             font-family: 'Courier New', Courier, monospace;
-            font-size: 10pt; /* Ukuran standar untuk keterbacaan di kertas kontinu */
+            font-size: 10pt;
+            /* Ukuran standar untuk keterbacaan di kertas kontinu */
             color: #000;
             background-color: #fff;
-            line-height: 1.3; /* Sedikit spasi antar baris */
+            line-height: 1.3;
+            /* Sedikit spasi antar baris */
             margin: 0;
             padding: 0;
         }
 
         .container {
             width: 100%;
-            max-width: 80ch; /* Batasi lebar sekitar 80 karakter */
+            max-width: 80ch;
+            /* Batasi lebar sekitar 80 karakter */
             margin: 0 auto;
         }
 
-        .text-center { text-align: center; }
-        .text-right { text-align: right; }
-        .font-bold { font-weight: bold; }
+        .text-center {
+            text-align: center;
+        }
+
+        .text-right {
+            text-align: right;
+        }
+
+        .font-bold {
+            font-weight: bold;
+        }
 
         .info-grid {
             display: grid;
@@ -50,7 +63,8 @@
             margin-bottom: 1ch;
         }
 
-        .items-table th, .items-table td {
+        .items-table th,
+        .items-table td {
             padding: 2px 4px;
             text-align: left;
         }
@@ -77,18 +91,33 @@
         }
 
         .totals-table td {
-            padding: 1px 0; /* Padding vertikal minimal, tanpa padding horizontal */
+            padding: 1px 0;
+            /* Padding vertikal minimal, tanpa padding horizontal */
         }
 
         /* Mengatur lebar kolom agar rapi */
-        .totals-table .label { width: auto; } /* Kolom label, lebar otomatis */
-        .totals-table .currency { width: 3ch; } /* Kolom 'Rp', lebar tetap */
-        .totals-table .amount { width: 13ch; text-align: right; } /* Kolom angka, rata kanan */
+        .totals-table .label {
+            width: auto;
+        }
+
+        /* Kolom label, lebar otomatis */
+        .totals-table .currency {
+            width: 3ch;
+        }
+
+        /* Kolom 'Rp', lebar tetap */
+        .totals-table .amount {
+            width: 13ch;
+            text-align: right;
+        }
+
+        /* Kolom angka, rata kanan */
 
         .line-top {
             border-top: 1px solid #000;
             padding-top: 4px !important;
         }
+
         /* --- AKHIR PERUBAHAN CSS --- */
 
 
@@ -101,7 +130,8 @@
         }
 
         .signatures .signature-area {
-            margin-top: 8ch; /* Jarak untuk tanda tangan */
+            margin-top: 8ch;
+            /* Jarak untuk tanda tangan */
         }
 
         /* Menghilangkan tombol saat print */
@@ -109,15 +139,18 @@
             .no-print {
                 display: none;
             }
+
             body {
                 margin: 0;
             }
+
             .container {
                 max-width: none;
             }
         }
     </style>
 </head>
+
 <body>
     <div class="container">
 
@@ -133,14 +166,14 @@
 
         <div class="info-grid" style="margin-top: 2ch;">
             <div class="info-col">
-                <p>No. Faktur  : {{ $invoice->invoice_number }}</p>
-                <p>Tanggal     : {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('d/m/Y') }}</p>
+                <p>No. Faktur : {{ $invoice->invoice_number }}</p>
+                <p>Tanggal : {{ \Carbon\Carbon::parse($invoice->invoice_date)->format('d/m/Y') }}</p>
                 <p>Jatuh Tempo : {{ \Carbon\Carbon::parse($invoice->due_date)->format('d/m/Y') }}</p>
             </div>
             <div class="info-col">
-                <p>Pelanggan   : {{ $invoice->customer->name }}</p>
-                <p>No. Polisi  : {{ $invoice->vehicle->license_plate }}</p>
-                <p>Kendaraan   : {{ $invoice->vehicle->brand }} {{ $invoice->vehicle->model }}</p>
+                <p>Pelanggan : {{ $invoice->customer->name }}</p>
+                <p>No. Polisi : {{ $invoice->vehicle->license_plate }}</p>
+                <p>Kendaraan : {{ $invoice->vehicle->brand }} {{ $invoice->vehicle->model }}</p>
             </div>
         </div>
 
@@ -156,33 +189,45 @@
                 </tr>
             </thead>
             <tbody>
-                @foreach ($invoice->services as $service)
-                <tr>
-                    <td>{{ $service->name }}</td>
-                    <td class="text-center">1</td>
-                    <td class="text-right">{{ number_format($service->pivot->price, 0, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($service->pivot->price, 0, ',', '.') }}</td>
-                </tr>
+                @foreach ($invoice->invoiceServices as $line)
+                    <tr>
+                        <td>{{ $line->service->name }}
+                            @if ($line->description)
+                                (<small class="text-muted">{{ $line->description }}</small>)
+                            @endif
+                        </td>
+                        <td class="text-center">1</td>
+                        <td class="text-right">{{ number_format($line->price, 0, ',', '.') }}</td>
+                        <td class="text-right">{{ number_format($line->price, 0, ',', '.') }}</td>
+                    </tr>
                 @endforeach
-                @foreach ($invoice->items as $item)
-                <tr>
-                    <td>
-                        @if ($item->product)
-                            {{ $item->product->name }}
-                        @endif
-                        {{ $item->name == 'Eceran' ? '' : $item->name }}
-                        @if ($item->pivot->description)
-                            <br><small class="text-muted">{{ $item->pivot->description }}</small>
-                        @endif
-                    </td>
-                    <td class="text-center">{{ $item->pivot->quantity }}</td>
-                    <td class="text-right">{{ number_format($item->pivot->price, 0, ',', '.') }}</td>
-                    <td class="text-right">{{ number_format($item->pivot->quantity * $item->pivot->price, 0, ',', '.') }}</td>
-                </tr>
+                @foreach ($invoice->invoiceItems as $line)
+                    @php
+                        $productName = optional(optional($line->item)->product)->name;
+                        $lineName = $line->name === 'Eceran' ? '' : $line->name;
+                        $displayName = $productName ?: $lineName;
+                    @endphp
+                    <tr>
+                        <td>
+                            {{ $displayName }}
+                            @if ($line->description)
+                                (<small class="text-muted">{{ $line->description }}</small>)
+                            @endif
+                        </td>
+                        <td class="text-center">{{ $line->quantity }}</td>
+                        <td class="text-right">{{ number_format($line->price, 0, ',', '.') }}</td>
+                        <td class="text-right">{{ number_format($line->quantity * $line->price, 0, ',', '.') }}</td>
+                    </tr>
                 @endforeach
+
             </tbody>
             <tfoot>
-                <tr><td></td><td></td><td></td><td></td></tr>
+                <tr>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                    <td></td>
+                </tr>
             </tfoot>
         </table>
 
@@ -199,7 +244,10 @@
                         <td class="currency">Rp</td>
                         <td class="amount">
                             @php
-                                $discountAmount = ($invoice->discount_type === 'percentage') ? ($invoice->subtotal * $invoice->discount_value) / 100 : $invoice->discount_value;
+                                $discountAmount =
+                                    $invoice->discount_type === 'percentage'
+                                        ? ($invoice->subtotal * $invoice->discount_value) / 100
+                                        : $invoice->discount_value;
                                 echo number_format($discountAmount, 0, ',', '.');
                             @endphp
                         </td>
@@ -215,27 +263,27 @@
                         <td class="amount">{{ number_format($invoice->total_paid_amount, 0, ',', '.') }}</td>
                     </tr>
                     @if ($invoice->balance_due > 0)
-                    <tr class="font-bold">
-                        <td class="label">Sisa Tagihan</td>
-                        <td class="currency">Rp</td>
-                        <td class="amount">{{ number_format($invoice->balance_due, 0, ',', '.') }}</td>
-                    </tr>
+                        <tr class="font-bold">
+                            <td class="label">Sisa Tagihan</td>
+                            <td class="currency">Rp</td>
+                            <td class="amount">{{ number_format($invoice->balance_due, 0, ',', '.') }}</td>
+                        </tr>
                     @endif
                     @if ($invoice->overpayment > 0)
-                    <tr class="font-bold">
-                        <td class="label">Kembalian</td>
-                        <td class="currency">Rp</td>
-                        <td class="amount">{{ number_format($invoice->overpayment, 0, ',', '.') }}</td>
-                    </tr>
+                        <tr class="font-bold">
+                            <td class="label">Kembalian</td>
+                            <td class="currency">Rp</td>
+                            <td class="amount">{{ number_format($invoice->overpayment, 0, ',', '.') }}</td>
+                        </tr>
                     @endif
                 </tbody>
             </table>
         </div>
         @if ($invoice->terms)
-        <div style="margin-top: 3ch; border-top: 1px solid #000; padding-top: 1ch;">
-            <p style="margin: 0;" class="font-bold">Syarat & Ketentuan:</p>
-            <p style="margin: 0;">{{ $invoice->terms }}</p>
-        </div>
+            <div style="margin-top: 3ch; border-top: 1px solid #000; padding-top: 1ch;">
+                <p style="margin: 0;" class="font-bold">Syarat & Ketentuan:</p>
+                <p style="margin: 0;">{{ $invoice->terms }}</p>
+            </div>
         @endif
 
         <div class="signatures">
@@ -256,8 +304,10 @@
     </div>
 
     <div class="no-print" style="text-align: center; margin-top: 20px;">
-        <button onclick="window.print()" style="padding: 8px 15px; font-size: 14px; cursor: pointer;">Cetak Faktur</button>
+        <button onclick="window.print()" style="padding: 8px 15px; font-size: 14px; cursor: pointer;">Cetak
+            Faktur</button>
         <button onclick="window.close()" style="padding: 8px 15px; font-size: 14px; cursor: pointer;">Tutup</button>
     </div>
 </body>
+
 </html>
