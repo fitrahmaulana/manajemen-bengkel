@@ -556,33 +556,11 @@ class InvoiceResource extends Resource
             ])
             ->bulkActions([
                 Tables\Actions\BulkActionGroup::make([
-                    Tables\Actions\DeleteBulkAction::make()
-                        ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            $inventoryService = app(InventoryService::class);
-                            foreach ($records as $invoice) {
-                                foreach ($invoice->invoiceItems as $invoiceItem) {
-                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
-                                }
-                            }
-                        }),
-                    ForceDeleteBulkAction::make()
-                        ->before(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            // Optional: Restore stock if business logic requires it for force delete
-                            // This logic remains the same as DeleteBulkAction
-                            $inventoryService = app(InventoryService::class);
-                            foreach ($records as $invoice) {
-                                foreach ($invoice->invoiceItems as $invoiceItem) {
-                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
-                                }
-                            }
-                        }),
+                    Tables\Actions\DeleteBulkAction::make(),
+                    ForceDeleteBulkAction::make(),
                     RestoreBulkAction::make()
                         ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            $inventoryService = app(InventoryService::class);
                             foreach ($records as $invoice) {
-                                foreach ($invoice->invoiceItems as $invoiceItem) {
-                                    $inventoryService->adjustStockForItem($invoiceItem->item_id, $invoiceItem->quantity);
-                                }
                                 app(InvoiceService::class)->updateInvoiceStatus($invoice);
                             }
                         }),

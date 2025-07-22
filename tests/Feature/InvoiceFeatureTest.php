@@ -143,4 +143,46 @@ class InvoiceFeatureTest extends TestCase
         // Final stock should be 12 + 1 = 13.
         $this->assertEquals(13.00, $item->fresh()->stock);
     }
+
+    /** @test */
+    public function deleting_invoice_restores_stock_for_all_its_items_via_observer(): void
+    {
+        $item1 = $this->createItem('Item To Restore 1', 'SKU-RESTORE-1', 10.00);
+        $item2 = $this->createItem('Item To Restore 2', 'SKU-RESTORE-2', 15.00);
+        $invoice = $this->createInvoiceForTest();
+
+        // Attach items and simulate initial stock deduction via 'created' observer
+        $invoice->invoiceItems()->create(['item_id' => $item1->id, 'quantity' => 2.00, 'price' => 100]);
+        $invoice->invoiceItems()->create(['item_id' => $item2->id, 'quantity' => 5.00, 'price' => 100]);
+
+        // Check stock after deduction
+        $this->assertEquals(8.00, $item1->fresh()->stock); // 10 - 2
+        $this->assertEquals(10.00, $item2->fresh()->stock); // 15 - 5
+
+        // Act: Delete the entire invoice
+        $invoice->delete();
+
+        // Assert: Stock should be restored to original values
+        $this->assertEquals(10.00, $item1->fresh()->stock);
+        $this->assertEquals(15.00, $item2->fresh()->stock);
+    }
+
+    /** @test */
+    public function restoring_soft_deleted_invoice_deducts_stock_again_via_observer(): void
+    {
+        $item = $this->createItem('Item To Restore', 'SKU-RESTORE', 20.00);
+        $invoice = $this->createInvoiceForTest();
+
+        // 1. Create item, stock is deducted: 20 - 5 = 15
+        $invoice->invoiceItems()->create(['item_id' => $item->id, 'quantity' => 5.00, 'price' => 100]);
+        $this->assertEquals(15.00, $item->fresh()->stock);
+
+        // 2. Soft delete the invoice, stock is restored: 15 + 5 = 20
+        $invoice->delete();
+        $this->assertEquals(20.00, $item->fresh()->stock);
+
+        // 3. Restore the invoice, stock should be deducted again: 20 - 5 = 15
+        $invoice->restore();
+        $this->assertEquals(15.00, $item->fresh()->stock);
+    }
 }
