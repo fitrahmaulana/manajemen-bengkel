@@ -191,38 +191,36 @@ class InvoiceFeatureTest extends TestCase
     }
 
     /** @test */
-    public function stock_is_adjusted_correctly_when_invoice_item_quantity_is_edited(): void
+    public function stock_is_adjusted_correctly_when_invoice_item_quantity_is_edited_via_observer(): void
     {
         $item = $this->createItem('Item Edit Test', 'SKU-EDIT', 20.00);
         $invoice = $this->createInvoiceForTest();
         $initialQuantity = 5.0;
         $newQuantity = 8.0;
-        $quantityDifference = $newQuantity - $initialQuantity; // 3.0
 
-        // Simulate initial creation and stock deduction
-        $this->inventoryService->deductStockForInvoiceItems($invoice, [['item_id' => $item->id, 'quantity' => $initialQuantity]]);
+        // 1. Create the initial invoice item. The 'created' observer will fire.
+        $invoiceItem = $invoice->invoiceItems()->create([
+            'item_id' => $item->id,
+            'quantity' => $initialQuantity,
+            'price' => 100.00
+        ]);
+
+        // After creation, stock should be 20 - 5 = 15
         $this->assertEquals(15.00, $item->fresh()->stock);
 
-        // Simulate editing the invoice
-        $invoice->invoiceItems()->create(['item_id' => $item->id, 'quantity' => $initialQuantity, 'price' => 100.00]);
-        $originalItems = $invoice->invoiceItems->mapWithKeys(function ($item) {
-            return [$item->item_id => $item->quantity];
-        });
-        $newItemsData = [['item_id' => $item->id, 'quantity' => $newQuantity]];
+        // 2. Update the quantity. The 'updated' observer should fire.
+        $invoiceItem->update(['quantity' => $newQuantity]);
 
-        $inventoryService = app(InventoryService::class);
-        $allItems = $originalItems->keys()->merge(collect($newItemsData)->pluck('item_id'))->unique();
+        // The difference is 8 - 5 = 3. Stock should be further deducted by 3.
+        // Final stock should be 15 - 3 = 12.
+        $this->assertEquals(12.00, $item->fresh()->stock);
 
-        foreach ($allItems as $itemId) {
-            $originalQty = $originalItems->get($itemId, 0);
-            $newQty = collect($newItemsData)->firstWhere('item_id', $itemId)['quantity'] ?? 0;
-            $diff = $newQty - $originalQty;
+        // 3. Test reducing the quantity
+        $finalQuantity = 7.0;
+        $invoiceItem->update(['quantity' => $finalQuantity]);
 
-            if ($diff != 0) {
-                $inventoryService->adjustStockForItem($itemId, $diff);
-            }
-        }
-
-        $this->assertEquals(15.00 - $quantityDifference, $item->fresh()->stock); // 15.00 - 3.0 = 12.00
+        // The difference is 7 - 8 = -1. Stock should be restored by 1.
+        // Final stock should be 12 + 1 = 13.
+        $this->assertEquals(13.00, $item->fresh()->stock);
     }
 }

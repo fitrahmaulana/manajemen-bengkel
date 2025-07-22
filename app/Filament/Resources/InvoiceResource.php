@@ -171,21 +171,6 @@ class InvoiceResource extends Resource
                     ->hiddenLabel()
                     ->reorderAtStart()
                     ->cloneable()
-                    ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
-                        $inventoryService = app(InventoryService::class);
-                        $inventoryService->adjustStockForItem($data['item_id'], $data['quantity']);
-                        return $data;
-                    })
-                    ->mutateRelationshipDataBeforeSaveUsing(function (array $data, $record): array {
-                        $inventoryService = app(InventoryService::class);
-                        $originalQty = $record->quantity;
-                        $newQty = $data['quantity'];
-                        $diff = $newQty - $originalQty;
-                        if ($diff != 0) {
-                            $inventoryService->adjustStockForItem($data['item_id'], $diff);
-                        }
-                        return $data;
-                    })
                     ->schema([
                         Forms\Components\Group::make()->schema([
                             // SELECT ITEM
