@@ -3,10 +3,10 @@
 namespace Tests\Unit;
 
 use App\Models\Item;
-use App\Services\ItemUnitConversionService;
+use App\Services\InventoryService;
 use PHPUnit\Framework\TestCase;
 
-class ItemUnitConversionServiceTest extends TestCase
+class InventoryServiceUnitTest extends TestCase
 {
     // Made it an instance method, can now use $this->createMock
     private function createItemMock(
@@ -44,7 +44,7 @@ class ItemUnitConversionServiceTest extends TestCase
             $targetItemParams[2]  // unitName
         );
 
-        $calculated = ItemUnitConversionService::calculateTargetQuantity(
+        $calculated = InventoryService::calculateTargetQuantity(
             $sourceItem,
             $targetItem,
             $sourceQuantity

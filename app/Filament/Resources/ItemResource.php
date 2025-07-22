@@ -18,13 +18,12 @@ use Filament\Tables;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Services\StockConversionService;
+use App\Services\InventoryService;
 use Filament\Notifications\Notification;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput as FormsTextInput;
 use Filament\Forms\Components\Textarea;
 use Illuminate\Support\Facades\Auth;
-use App\Services\ItemUnitConversionService; // Added import
 
 use function Laravel\Prompts\text;
 use function Livewire\on;
@@ -239,7 +238,7 @@ class ItemResource extends Resource
                                 $fromItem = $fromItemId ? Item::find($fromItemId) : null;
 
                                 if ($fromItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                    $calculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
+                                    $calculated = InventoryService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
                                     $set('calculated_to_quantity', $calculated);
                                 } else {
                                     $set('calculated_to_quantity', null);
@@ -253,7 +252,7 @@ class ItemResource extends Resource
                                     if ($get('from_quantity') > $fromItem->stock) {
                                         $set('from_quantity', $fromItem->stock);
                                         // Recalculate if capped
-                                        $recalculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromItem->stock);
+                                        $recalculated = InventoryService::calculateTargetQuantity($fromItem, $record, (float)$fromItem->stock);
                                         $set('calculated_to_quantity', $recalculated);
                                     }
                                 } else {
@@ -278,7 +277,7 @@ class ItemResource extends Resource
                                 $fromItem = $fromItemId ? Item::find($fromItemId) : null;
 
                                 if ($fromItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                    $calculated = ItemUnitConversionService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
+                                    $calculated = InventoryService::calculateTargetQuantity($fromItem, $record, (float)$fromQuantityInput);
                                     $set('calculated_to_quantity', $calculated);
                                 } else {
                                     $set('calculated_to_quantity', null);
@@ -299,7 +298,7 @@ class ItemResource extends Resource
                             ->label('Catatan (Opsional)')
                             ->rows(3),
                     ])
-                    ->action(function (array $data, Item $record, StockConversionService $stockConversionService) {
+                    ->action(function (array $data, Item $record, InventoryService $inventoryService) {
                         $calculatedToQuantity = $data['calculated_to_quantity'];
 
                         if (is_null($calculatedToQuantity) || $calculatedToQuantity <= 0) {
@@ -312,7 +311,7 @@ class ItemResource extends Resource
                         }
 
                         try {
-                            $conversion = $stockConversionService->convertStock(
+                            $conversion = $inventoryService->convertStock(
                                 fromItemId: $data['from_item_id'],
                                 toItemId: $record->id, // Current item is the target
                                 fromQuantity: $data['from_quantity'],
