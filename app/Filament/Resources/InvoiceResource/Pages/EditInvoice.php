@@ -16,8 +16,6 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
-    public array $originalItems = [];
-
     /**
      * Hook ini dijalankan SEBELUM data form utama dan relasi di-update ke database.
      * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
@@ -28,11 +26,6 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
-        // Store the original items before they are updated
-        $this->originalItems = $this->record->invoiceItems->mapWithKeys(function ($item) {
-            return [$item->item_id => $item->quantity];
-        })->toArray();
-
         // Get the current state of the form data, including relationships
         $currentData = $this->data;
         $services = $currentData['invoiceServices'] ?? [];

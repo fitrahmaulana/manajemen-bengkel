@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
+use App\Services\InvoiceStockService;
 use App\Traits\InvoiceCalculationTrait;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
@@ -197,7 +198,7 @@ class InvoiceResource extends Resource
                                 ->label('Barang')
                                 ->hiddenLabel()
                                 ->relationship('item', 'name')
-                                ->getOptionLabelFromRecordUsing(fn (Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
+                                ->getOptionLabelFromRecordUsing(fn(Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
                                 ->searchable()
                                 ->preload()
                                 ->required()
@@ -260,15 +261,6 @@ class InvoiceResource extends Resource
                             }))
                         )
                     )
-                    ->deleteAction(
-                        fn (Action $action) => $action->before(function (Action $action) {
-                            $invoiceItem = $action->getRecord();
-                            if ($invoiceItem) {
-                                $stockService = app(InvoiceStockService::class);
-                                $stockService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
-                            }
-                        })
-                    )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
                             ->label('Pecah Stok')
@@ -299,7 +291,7 @@ class InvoiceResource extends Resource
                                 return [
                                     Forms\Components\Placeholder::make('child_item_info')
                                         ->label('Item yang Akan Ditambah Stoknya')
-                                        ->content(fn () => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
+                                        ->content(fn() => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
 
                                     Forms\Components\Select::make('from_item_id')
                                         ->label('Pilih Item Sumber (Induk)')
@@ -350,7 +342,7 @@ class InvoiceResource extends Resource
                                         ->default(1)
                                         ->required()
                                         ->minValue(1)
-                                        ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null)
+                                        ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null)
                                         ->live()
                                         ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
                                             $fromItemId = $get('from_item_id');
@@ -368,7 +360,7 @@ class InvoiceResource extends Resource
 
                                     Forms\Components\Placeholder::make('to_quantity_display')
                                         ->label('Jumlah Item yang Akan Dihasilkan')
-                                        ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
+                                        ->content(fn(Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
 
                                     Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
                                     Forms\Components\Hidden::make('to_quantity_unit_suffix')->default(null),
