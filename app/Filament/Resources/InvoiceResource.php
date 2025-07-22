@@ -188,10 +188,6 @@ class InvoiceResource extends Resource
                         }
                         return $data;
                     })
-                    ->beforeRelationshipDetached(function ($record) {
-                        $stockService = app(InvoiceStockService::class);
-                        $stockService->adjustStockForItem($record->item_id, -$record->quantity);
-                    })
                     ->schema([
                         Forms\Components\Group::make()->schema([
                             // SELECT ITEM
@@ -263,6 +259,14 @@ class InvoiceResource extends Resource
                                 return $quantity * $price;
                             }))
                         )
+                    )
+                    ->deleteAction(
+                        fn (Action $action) => $action->before(function (CustomTableRepeater $component, $record) {
+                            if ($record) {
+                                $stockService = app(InvoiceStockService::class);
+                                $stockService->adjustStockForItem($record->item_id, -$record->quantity);
+                            }
+                        }),
                     )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
