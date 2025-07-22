@@ -8,6 +8,7 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
+use App\Services\InventoryService;
 use App\Services\InvoiceService;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
@@ -29,7 +30,6 @@ use Filament\Notifications\Notification;
 use Illuminate\Support\Facades\DB;
 use Filament\Forms\Components\Actions\Action;
 use Illuminate\Support\HtmlString;
-use App\Services\InventoryService;
 
 class InvoiceResource extends Resource
 {
@@ -46,8 +46,6 @@ class InvoiceResource extends Resource
 
     public static function form(Form $form): Form
     {
-        $invoiceService = app(InvoiceService::class);
-
         // Optimized price update functions
         $updateServicePrice = function (Set $set, Get $get, $state) {
             if ($state) {
@@ -312,7 +310,7 @@ class InvoiceResource extends Resource
                                             $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
 
                                             if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                                $calculated = InventoryService::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
                                                 $set('calculated_to_quantity', $calculated);
                                             } else {
                                                 $set('calculated_to_quantity', null);
@@ -325,7 +323,7 @@ class InvoiceResource extends Resource
                                                 if ($get('from_quantity') > $sourceItem->stock) {
                                                     $set('from_quantity', $sourceItem->stock);
                                                     // Recalculate if capped
-                                                    $recalculated = InventoryService::calculateTargetQuantity($sourceItem, $childItem, (float)$sourceItem->stock);
+                                                    $recalculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$sourceItem->stock);
                                                     $set('calculated_to_quantity', $recalculated);
                                                 }
                                             } else {
@@ -349,7 +347,7 @@ class InvoiceResource extends Resource
                                             $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
 
                                             if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                                $calculated = InventoryService::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
                                                 $set('calculated_to_quantity', $calculated);
                                             } else {
                                                 $set('calculated_to_quantity', null);
