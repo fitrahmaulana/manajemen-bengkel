@@ -174,18 +174,7 @@ class ViewInvoice extends ViewRecord
                 ->openUrlInNewTab(),
             Actions\DeleteAction::make()
                 ->label('Hapus Faktur')
-                ->icon('heroicon-o-trash')
-                ->before(function (Invoice $record) {
-                    // Restore stock before deleting invoice
-                    foreach ($record->invoiceItems as $invoiceItem) {
-                        $itemModel = $invoiceItem->item;
-                        if ($itemModel) {
-                            $quantityToRestore = $invoiceItem->quantity;
-                            $itemModel->stock += $quantityToRestore;
-                            $itemModel->save();
-                        }
-                    }
-                }),
+                ->icon('heroicon-o-trash'),
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make()
                 ->after(function (Invoice $record) {

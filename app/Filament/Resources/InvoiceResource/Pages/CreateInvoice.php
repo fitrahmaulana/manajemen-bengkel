@@ -73,29 +73,14 @@ class CreateInvoice extends CreateRecord
      */
     protected function afterCreate(): void
     {
-        // Access the repeater data from the form's state
-        $items = $this->data['invoiceItems'] ?? [];
+        // The stock adjustment logic is now handled by the repeater's mutation hooks.
+        // This hook is now only responsible for updating the invoice status.
+        self::updateInvoiceStatus($this->record);
 
-        try {
-            DB::transaction(function () use ($items) {
-                if (!empty($items)) {
-                    app(InvoiceStockService::class)->deductStockForInvoiceItems($this->record, $items);
-                }
-                self::updateInvoiceStatus($this->record);
-            });
-
-            Notification::make()
-                ->title('Faktur Berhasil Dibuat')
-                ->body('Faktur dan stock telah berhasil diperbarui.')
-                ->success()
-                ->send();
-        } catch (\Exception $e) {
-            Notification::make()
-                ->title('Error Membuat Faktur')
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
-                ->danger()
-                ->send();
-            throw $e;
-        }
+        Notification::make()
+            ->title('Faktur Berhasil Dibuat')
+            ->body('Faktur dan stock telah berhasil diperbarui.')
+            ->success()
+            ->send();
     }
 }

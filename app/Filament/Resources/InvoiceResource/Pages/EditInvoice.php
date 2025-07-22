@@ -16,6 +16,8 @@ class EditInvoice extends EditRecord
 
     protected static string $resource = InvoiceResource::class;
 
+    public array $originalItems = [];
+
     /**
      * Hook ini dijalankan SEBELUM data form utama dan relasi di-update ke database.
      * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
@@ -26,6 +28,11 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        // Store the original items before they are updated
+        $this->originalItems = $this->record->invoiceItems->mapWithKeys(function ($item) {
+            return [$item->item_id => $item->quantity];
+        })->toArray();
+
         // Get the current state of the form data, including relationships
         $currentData = $this->data;
         $services = $currentData['invoiceServices'] ?? [];
@@ -62,10 +69,7 @@ class EditInvoice extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\DeleteAction::make()
-                ->before(function (InvoiceStockService $stockService) {
-                    $stockService->restoreStockForInvoiceItems($this->record);
-                }),
+            Actions\DeleteAction::make(),
             Actions\ForceDeleteAction::make(),
             Actions\RestoreAction::make()
                 ->after(function (InvoiceStockService $stockService) {
@@ -76,5 +80,12 @@ class EditInvoice extends EditRecord
                     self::updateInvoiceStatus($this->record);
                 }),
         ];
+    }
+
+    protected function afterSave(): void
+    {
+        // The stock adjustment logic is now handled by the repeater's mutation hooks.
+        // This hook is now only responsible for updating the invoice status.
+        self::updateInvoiceStatus($this->record);
     }
 }

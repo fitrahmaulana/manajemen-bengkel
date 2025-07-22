@@ -173,6 +173,25 @@ class InvoiceResource extends Resource
                     ->hiddenLabel()
                     ->reorderAtStart()
                     ->cloneable()
+                    ->mutateRelationshipDataBeforeCreateUsing(function (array $data): array {
+                        $stockService = app(InvoiceStockService::class);
+                        $stockService->adjustStockForItem($data['item_id'], $data['quantity']);
+                        return $data;
+                    })
+                    ->mutateRelationshipDataBeforeSaveUsing(function (array $data, $record): array {
+                        $stockService = app(InvoiceStockService::class);
+                        $originalQty = $record->quantity;
+                        $newQty = $data['quantity'];
+                        $diff = $newQty - $originalQty;
+                        if ($diff != 0) {
+                            $stockService->adjustStockForItem($data['item_id'], $diff);
+                        }
+                        return $data;
+                    })
+                    ->beforeRelationshipDetached(function ($record) {
+                        $stockService = app(InvoiceStockService::class);
+                        $stockService->adjustStockForItem($record->item_id, -$record->quantity);
+                    })
                     ->schema([
                         Forms\Components\Group::make()->schema([
                             // SELECT ITEM
