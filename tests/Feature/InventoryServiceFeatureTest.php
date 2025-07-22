@@ -5,15 +5,16 @@ namespace Tests\Feature;
 use App\Models\Item;
 use App\Models\User;
 use App\Services\InventoryService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Exception;
 
 class InventoryServiceFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
     protected InventoryService $inventoryService;
+
     protected User $user;
 
     protected function setUp(): void
@@ -130,11 +131,12 @@ class InventoryServiceFeatureTest extends TestCase
             static $callCount = 0;
             if ($callCount === 0) {
                 $callCount++;
+
                 return $itemA; // Return the real item A
             }
+
             return $mockedItemB; // Return the mocked item B for the second findOrFail
         });
-
 
         // A more direct way to test transaction, if possible, is to mock DB::transaction
         // or ensure an exception is thrown by one of the operations *inside* the transaction closure.
@@ -167,8 +169,8 @@ class InventoryServiceFeatureTest extends TestCase
 
         $this->app->offsetUnset(Item::class); // Unbind the mock
 
-        $this->assertEquals($initialStockA, $itemA->fresh()->stock, "Stock A should be rolled back.");
-        $this->assertEquals($initialStockB, $itemB->fresh()->stock, "Stock B should not have changed if toItem failed.");
+        $this->assertEquals($initialStockA, $itemA->fresh()->stock, 'Stock A should be rolled back.');
+        $this->assertEquals($initialStockB, $itemB->fresh()->stock, 'Stock B should not have changed if toItem failed.');
         $this->assertDatabaseMissing('item_stock_conversions', [
             'from_item_id' => $itemA->id,
         ]);

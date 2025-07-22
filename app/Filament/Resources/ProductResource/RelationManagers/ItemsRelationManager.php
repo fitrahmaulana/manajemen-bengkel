@@ -3,8 +3,6 @@
 namespace App\Filament\Resources\ProductResource\RelationManagers;
 
 use App\Filament\Resources\ItemResource;
-use App\Models\Item;
-use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
@@ -13,15 +11,15 @@ use Filament\Tables\Table;
 class ItemsRelationManager extends RelationManager
 {
     protected static string $relationship = 'items';
+
     protected static ?string $recordTitleAttribute = 'name';
+
     protected static ?string $title = 'Daftar Varian';
 
     public static function canViewForRecord(\Illuminate\Database\Eloquent\Model $ownerRecord, string $pageClass): bool
     {
         return $ownerRecord->has_variants;
     }
-
-
 
     public function form(Form $form): Form
     {

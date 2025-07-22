@@ -22,7 +22,7 @@ class InvoiceService
 
         // Calculate subtotal from services
         foreach ($servicesData as $service) {
-            if (!empty($service['service_id']) && isset($service['price'])) {
+            if (! empty($service['service_id']) && isset($service['price'])) {
                 $price = $this->parseCurrencyValue($service['price']);
                 $subtotal += $price;
             }
@@ -30,9 +30,9 @@ class InvoiceService
 
         // Calculate subtotal from items
         foreach ($itemsData as $item) {
-            if (!empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
+            if (! empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
                 $price = $this->parseCurrencyValue($item['price']);
-                $quantity = (float)($item['quantity'] ?? 1.0); // Changed to float
+                $quantity = (float) ($item['quantity'] ?? 1.0); // Changed to float
                 $subtotal += $price * $quantity;
             }
         }
@@ -58,12 +58,14 @@ class InvoiceService
      */
     public function parseCurrencyValue($value): float
     {
-        if (!$value) return 0;
+        if (! $value) {
+            return 0;
+        }
 
-        return (float)str_replace(
+        return (float) str_replace(
             ['Rp. ', '.', ','],
             ['', '', '.'],
-            (string)$value
+            (string) $value
         );
     }
 
@@ -72,7 +74,7 @@ class InvoiceService
      */
     public function formatCurrency($value): string
     {
-        return 'Rp. ' . number_format($value, 0, ',', '.');
+        return 'Rp. '.number_format($value, 0, ',', '.');
     }
 
     /**
@@ -83,12 +85,12 @@ class InvoiceService
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
 
-        //jika tidak ada pembayaran, statusnya unpaid atau overdue
+        // jika tidak ada pembayaran, statusnya unpaid atau overdue
         if ($totalPaid <= 0) {
             $status = $invoice->due_date < now() ? 'overdue' : 'unpaid';
-        } elseif ($totalPaid >= $totalAmount) { //jika sudah terbayar penuh
+        } elseif ($totalPaid >= $totalAmount) { // jika sudah terbayar penuh
             $status = 'paid'; // POS style: overpayment is still "paid"
-        } else { //jika ada pembayaran tapi belum penuh
+        } else { // jika ada pembayaran tapi belum penuh
             $status = $invoice->due_date < now() ? 'overdue' : 'partially_paid';
         }
 
@@ -144,10 +146,10 @@ class InvoiceService
     ): array {
         $item = \App\Models\Item::find($itemId);
 
-        if (!$item) {
+        if (! $item) {
             return [
                 'valid' => false,
-                'message' => 'Item tidak valid.'
+                'message' => 'Item tidak valid.',
             ];
         }
 
@@ -169,7 +171,7 @@ class InvoiceService
                 ->when($item->volume_value && $item->base_volume_unit, function ($query) use ($item) {
                     // Hanya tampilkan item yang memiliki volume lebih besar dan satuan volume sama
                     $query->where('volume_value', '>', $item->volume_value)
-                          ->where('base_volume_unit', $item->base_volume_unit);
+                        ->where('base_volume_unit', $item->base_volume_unit);
                 })
                 ->exists();
 
@@ -177,13 +179,13 @@ class InvoiceService
                 return [
                     'valid' => false,
                     'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
-                    'can_split' => true
+                    'can_split' => true,
                 ];
             } else {
                 return [
                     'valid' => false,
                     'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
-                    'can_split' => false
+                    'can_split' => false,
                 ];
             }
         }

@@ -74,7 +74,7 @@ class Item extends Model
      */
     public function getDisplayNameAttribute(): string
     {
-        if (!$this->product) {
+        if (! $this->product) {
             return 'Unknown Product';
         }
 
@@ -87,8 +87,6 @@ class Item extends Model
         }
 
         // Jika produk dengan varian, tampilkan nama produk + varian
-        return $productName . ' ' . $variantName;
+        return $productName.' '.$variantName;
     }
-
-
 }

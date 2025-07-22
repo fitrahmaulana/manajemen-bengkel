@@ -2,25 +2,28 @@
 
 namespace App\Filament\Pages;
 
-use Filament\Pages\Page;
 use App\Models\Item;
-use Filament\Tables\Contracts\HasTable;
-use Filament\Tables\Concerns\InteractsWithTable;
-use Filament\Tables\Table;
+use Filament\Forms\Components\Select as FormSelect;
+use Filament\Pages\Page;
 use Filament\Tables\Columns\TextColumn;
-use Filament\Tables\Columns\IconColumn;
-use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Concerns\InteractsWithTable;
+use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
-use Filament\Forms\Components\Select as FormSelect; // Alias for form component select
+use Filament\Tables\Filters\SelectFilter;
+use Filament\Tables\Table; // Alias for form component select
 
 class KasirItemPricelistPage extends Page implements HasTable
 {
     use InteractsWithTable;
 
     protected static ?string $navigationIcon = 'heroicon-o-list-bullet';
+
     protected static ?string $navigationLabel = 'Pricelist Kasir';
+
     protected static ?string $navigationGroup = 'Operasional Kasir'; // New group for cashier specific pages
+
     protected static ?string $title = 'Daftar Harga & Stok Barang';
+
     protected static ?int $navigationSort = 1;
 
     protected static string $view = 'filament.pages.kasir-item-pricelist-page';
@@ -47,13 +50,14 @@ class KasirItemPricelistPage extends Page implements HasTable
                         $productName = $record->product->name;
                         $variantName = $record->name; // Item's own name is the variant spec
 
-                        if ($variantName && $variantName !== 'Standard' && !is_null($variantName)) {
-                            return $productName . ' - ' . $variantName;
+                        if ($variantName && $variantName !== 'Standard' && ! is_null($variantName)) {
+                            return $productName.' - '.$variantName;
                         }
+
                         // If item's name is null, 'Standard', or empty, just show product name
                         return $productName;
                     })
-                    ->description(fn(Item $record) => $record->product->brand ? "Merek: {$record->product->brand}" : ''),
+                    ->description(fn (Item $record) => $record->product->brand ? "Merek: {$record->product->brand}" : ''),
 
                 TextColumn::make('sku')
                     ->label('SKU')
@@ -85,8 +89,8 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->alignCenter()
                     ->sortable()
                     ->badge()
-                    ->color(fn($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
-                    ->formatStateUsing(fn($state, Item $record) => $state . ' ' . $record->unit),
+                    ->color(fn ($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
+                    ->formatStateUsing(fn ($state, Item $record) => $state.' '.$record->unit),
             ])
             ->filters([
                 SelectFilter::make('type_item_id')
@@ -115,6 +119,7 @@ class KasirItemPricelistPage extends Page implements HasTable
                         if (empty($data['stock_type'])) {
                             return $query;
                         }
+
                         return match ($data['stock_type']) {
                             'available' => $query->where('items.stock', '>', 20),
                             'low_stock' => $query->where('items.stock', '>', 0)->where('items.stock', '<=', 20),

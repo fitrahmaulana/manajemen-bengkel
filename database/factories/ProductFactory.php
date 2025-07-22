@@ -17,7 +17,7 @@ class ProductFactory extends Factory
     public function definition(): array
     {
         return [
-            'name' => $this->faker->company . ' ' . $this->faker->sentence(3), // e.g., "Stark Industries Nano Gauntlet"
+            'name' => $this->faker->company.' '.$this->faker->sentence(3), // e.g., "Stark Industries Nano Gauntlet"
             'brand' => $this->faker->company,
             'description' => $this->faker->realText(),
             'type_item_id' => null, // Or \App\Models\TypeItem::factory() if you have it and it's required

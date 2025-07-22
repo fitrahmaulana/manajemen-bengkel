@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\Pivot;
 class InvoiceService extends Pivot
 {
     public $timestamps = false;
+
     public $incrementing = true;
 
     protected $table = 'invoice_service';

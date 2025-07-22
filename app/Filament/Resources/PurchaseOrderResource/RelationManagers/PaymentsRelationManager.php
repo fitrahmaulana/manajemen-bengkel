@@ -51,6 +51,7 @@ class PaymentsRelationManager extends RelationManager
 
         if ($owner instanceof \App\Models\PurchaseOrder) {
             $totalPaid = $owner->payments()->sum('amount_paid');
+
             return $owner->total_amount > $totalPaid;
         }
 

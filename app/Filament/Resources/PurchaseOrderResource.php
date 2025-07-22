@@ -4,36 +4,38 @@ namespace App\Filament\Resources;
 
 use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers;
-use App\Models\PurchaseOrder;
-use Filament\Forms;
-use Filament\Forms\Form;
-use Filament\Resources\Resource;
-use Filament\Tables;
-use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Actions\Action;
-use App\Models\Item;
-use Filament\Notifications\Notification;
 use App\Forms\Components\CustomTableRepeater;
+use App\Models\Item;
+use App\Models\PurchaseOrder;
 use Awcodes\TableRepeater\Header;
+use Filament\Forms;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
+use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
+use Filament\Resources\Resource;
+use Filament\Tables;
+use Filament\Tables\Actions\Action;
+use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Support\HtmlString;
 
 class PurchaseOrderResource extends Resource
 {
     protected static ?string $model = PurchaseOrder::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-shopping-cart';
+
     protected static ?string $navigationGroup = 'Manajemen Stok';
+
     protected static ?string $navigationLabel = 'Pesanan Pembelian';
+
     protected static ?string $modelLabel = 'Pesanan Pembelian';
+
     protected static ?string $pluralModelLabel = 'Daftar Pesanan Pembelian';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
@@ -50,8 +52,8 @@ class PurchaseOrderResource extends Resource
                             ->required(),
                     ]),
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('po_number')->label('Nomor PO')->default('PO-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed',])->default('draft')->required()->disabled(fn(string $operation): bool => $operation !== 'create'),
+                        Forms\Components\TextInput::make('po_number')->label('Nomor PO')->default('PO-'.date('Ymd-His'))->required(),
+                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed'])->default('draft')->required()->disabled(fn (string $operation): bool => $operation !== 'create'),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('order_date')->label('Tanggal PO')->default(now())->required(),
@@ -77,7 +79,7 @@ class PurchaseOrderResource extends Resource
                                 ->label('Barang')
                                 ->hiddenLabel()
                                 ->relationship('item', 'name')
-                                ->getOptionLabelFromRecordUsing(fn(Model $record) => $record->display_name)
+                                ->getOptionLabelFromRecordUsing(fn (Model $record) => $record->display_name)
                                 ->searchable()
                                 ->preload()
                                 ->required()
@@ -91,15 +93,15 @@ class PurchaseOrderResource extends Resource
                                         }
                                     }
                                 }),
-                            Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1)
+                            Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1),
                         ]),
                         Forms\Components\TextInput::make('quantity')
-                            ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
+                            ->label(fn (Get $get) => 'Kuantitas'.($get('unit_name') ? ' ('.$get('unit_name').')' : ''))
                             ->numeric()
                             ->default(1.0)
                             ->required()
                             ->live()
-                            ->suffix(fn(Get $get) => $get('unit_name') ? ' ' . $get('unit_name') : ''),
+                            ->suffix(fn (Get $get) => $get('unit_name') ? ' '.$get('unit_name') : ''),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -112,13 +114,14 @@ class PurchaseOrderResource extends Resource
                             ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
-                                $quantity = (float)($get('quantity') ?? 0);
+                                $quantity = (float) ($get('quantity') ?? 0);
                                 $price = self::parseCurrencyValue($get('price') ?? '0');
                                 $total = $quantity * $price;
+
                                 return self::formatCurrency($total);
                             }),
                     ])
-                    ->columns(4)
+                    ->columns(4),
             ]),
 
             Section::make()->schema([
@@ -133,10 +136,12 @@ class PurchaseOrderResource extends Resource
                             ->extraAttributes(['class' => 'font-bold text-xl text-white'])
                             ->content(function (Get $get) {
                                 $itemsTotal = collect($get('purchaseOrderItems'))->sum(function ($item) {
-                                    $quantity = (float)($item['quantity'] ?? 0.0);
+                                    $quantity = (float) ($item['quantity'] ?? 0.0);
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
+
                                     return $quantity * $price;
                                 });
+
                                 return self::formatCurrency($itemsTotal);
                             })
                             ->helperText('Total sebelum diskon & pajak.'),
@@ -151,7 +156,7 @@ class PurchaseOrderResource extends Resource
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->prefix(fn (Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
                                 ->live(),
                         ]),
 
@@ -160,8 +165,9 @@ class PurchaseOrderResource extends Resource
                             ->extraAttributes(['class' => 'font-bold text-xl text-green'])
                             ->Content(function (Get $get) {
                                 $itemsTotal = collect($get('purchaseOrderItems'))->sum(function ($item) {
-                                    $quantity = (float)($item['quantity'] ?? 0);
+                                    $quantity = (float) ($item['quantity'] ?? 0);
                                     $price = self::parseCurrencyValue($item['price'] ?? '0');
+
                                     return $quantity * $price;
                                 });
 
@@ -176,6 +182,7 @@ class PurchaseOrderResource extends Resource
                                 }
 
                                 $totalAmount = $itemsTotal - $discountAmount;
+
                                 return self::formatCurrency($totalAmount);
                             }),
                     ]),
@@ -184,7 +191,6 @@ class PurchaseOrderResource extends Resource
         ])->columns(1);
     }
 
-
     public static function table(Table $table): Table
     {
         return $table
@@ -192,10 +198,10 @@ class PurchaseOrderResource extends Resource
                 Tables\Columns\TextColumn::make('po_number')->label('No. PO')->searchable(),
                 Tables\Columns\TextColumn::make('supplier.name')->label('Supplier')->searchable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
                         'draft' => 'Draft',
                         'completed' => 'Selesai',
-                    })->badge()->color(fn(string $state): string => match ($state) {
+                    })->badge()->color(fn (string $state): string => match ($state) {
                         'draft' => 'gray',
                         'completed' => 'success',
                     })->searchable(),
@@ -210,7 +216,7 @@ class PurchaseOrderResource extends Resource
                         };
                     })
                     ->badge()
-                    ->color(fn(string $state): string => match ($state) {
+                    ->color(fn (string $state): string => match ($state) {
                         'unpaid' => 'danger',
                         'partial' => 'info',
                         'paid' => 'success',
@@ -235,6 +241,7 @@ class PurchaseOrderResource extends Resource
                                     ->body('Purchase order is already completed.')
                                     ->danger()
                                     ->send();
+
                                 return;
                             }
 
@@ -255,7 +262,7 @@ class PurchaseOrderResource extends Resource
                         ->requiresConfirmation()
                         ->color('success')
                         ->icon('heroicon-o-check-circle')
-                        ->visible(fn(PurchaseOrder $record) => $record->status === 'draft'),
+                        ->visible(fn (PurchaseOrder $record) => $record->status === 'draft'),
                     Action::make('revert')
                         ->label('Kembalikan ke Draft')
                         ->action(function (PurchaseOrder $record) {
@@ -265,6 +272,7 @@ class PurchaseOrderResource extends Resource
                                     ->body('Purchase order must be completed before reverting.')
                                     ->danger()
                                     ->send();
+
                                 return;
                             }
                             foreach ($record->purchaseOrderItems as $item) {
@@ -279,7 +287,7 @@ class PurchaseOrderResource extends Resource
                         ->requiresConfirmation()
                         ->color('warning')
                         ->icon('heroicon-o-arrow-uturn-left')
-                        ->visible(fn(PurchaseOrder $record) => $record->status === 'completed'),
+                        ->visible(fn (PurchaseOrder $record) => $record->status === 'completed'),
                 ]),
             ])
             ->bulkActions([
@@ -313,16 +321,17 @@ class PurchaseOrderResource extends Resource
 
     public static function formatCurrency($value): string
     {
-        return 'Rp ' . number_format($value, 0, ',', '.');
+        return 'Rp '.number_format($value, 0, ',', '.');
     }
 
     public static function calculateTotals(array $data): array
     {
         // Hitung Subtotal dari semua item
         $subtotal = collect($data['purchaseOrderItems'] ?? [])->sum(function ($item) {
-            $quantity = (float)($item['quantity'] ?? 0);
+            $quantity = (float) ($item['quantity'] ?? 0);
             // Gunakan metode parseCurrencyValue dari resource ini
             $price = self::parseCurrencyValue($item['price'] ?? '0');
+
             return $quantity * $price;
         });
 

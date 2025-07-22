@@ -17,9 +17,13 @@ class InvoiceFeatureTest extends TestCase
     use RefreshDatabase;
 
     protected InventoryService $inventoryService;
+
     protected User $user;
+
     protected Product $product;
+
     protected Customer $customer;
+
     protected Vehicle $vehicle;
 
     protected function setUp(): void
@@ -50,7 +54,7 @@ class InvoiceFeatureTest extends TestCase
         return Invoice::factory()->create([
             'customer_id' => $this->customer->id,
             'vehicle_id' => $this->vehicle->id,
-            'invoice_number' => 'INV-' . uniqid(),
+            'invoice_number' => 'INV-'.uniqid(),
             'invoice_date' => now()->toDateString(),
             'due_date' => now()->addDays(7)->toDateString(),
             'status' => 'unpaid',
@@ -58,7 +62,6 @@ class InvoiceFeatureTest extends TestCase
             'total_amount' => 0, // Will be set by actual invoice creation logic
         ]);
     }
-
 
     /** @test */
     public function stock_service_adjust_stock_for_item_deducts_correctly(): void
@@ -86,7 +89,6 @@ class InvoiceFeatureTest extends TestCase
         $this->assertEquals(sprintf('%.2f', 8.50 + 3.20), $item1->stock); // 11.70
     }
 
-
     /** @test */
     public function quantity_in_invoice_item_pivot_is_decimal(): void
     {
@@ -98,7 +100,7 @@ class InvoiceFeatureTest extends TestCase
             'item_id' => $item->id,
             'quantity' => $decimalQuantity,
             'price' => 100.00,
-            'description' => 'Test decimal pivot'
+            'description' => 'Test decimal pivot',
         ]);
 
         $invoice->refresh(); // Refresh to get relations and pivot data
@@ -122,7 +124,7 @@ class InvoiceFeatureTest extends TestCase
         $invoiceItem = $invoice->invoiceItems()->create([
             'item_id' => $item->id,
             'quantity' => $initialQuantity,
-            'price' => 100.00
+            'price' => 100.00,
         ]);
 
         // After creation, stock should be 20 - 5 = 15

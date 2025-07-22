@@ -3,12 +3,10 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
-use App\Services\InvoiceService;
 use App\Services\InventoryService;
+use App\Services\InvoiceService;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
 
 class EditInvoice extends EditRecord
 {
@@ -19,7 +17,7 @@ class EditInvoice extends EditRecord
      * Fungsinya sama dengan di halaman Create, yaitu memastikan `subtotal` dan `total_amount`
      * dihitung ulang dan disimpan dengan benar setiap kali ada perubahan.
      *
-     * @param array $data Data form saat ini.
+     * @param  array  $data  Data form saat ini.
      * @return array Data form yang telah dimutasi.
      */
     protected function mutateFormDataBeforeSave(array $data): array
@@ -35,8 +33,9 @@ class EditInvoice extends EditRecord
         });
 
         $itemsTotal = collect($items)->sum(function ($item) use ($invoiceService) {
-            $quantity = (float)($item['quantity'] ?? 0.0);
+            $quantity = (float) ($item['quantity'] ?? 0.0);
             $price = $invoiceService->parseCurrencyValue($item['price'] ?? '0');
+
             return $quantity * $price;
         });
 

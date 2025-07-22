@@ -12,23 +12,22 @@ use App\Services\InventoryService;
 use App\Services\InvoiceService;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
+use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Group;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
+use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Tables;
+use Filament\Tables\Actions\ForceDeleteBulkAction;
+use Filament\Tables\Actions\RestoreBulkAction;
+use Filament\Tables\Filters\TrashedFilter;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\SoftDeletingScope;
-use Filament\Tables\Filters\TrashedFilter;
-use Filament\Tables\Actions\ForceDeleteBulkAction;
-use Filament\Tables\Actions\RestoreBulkAction;
-use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
-use Filament\Forms\Components\Actions\Action;
 use Illuminate\Support\HtmlString;
 
 class InvoiceResource extends Resource
@@ -36,10 +35,15 @@ class InvoiceResource extends Resource
     protected static ?string $model = Invoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
+
     protected static ?string $navigationGroup = 'Transaksi';
+
     protected static ?string $navigationLabel = 'Faktur';
+
     protected static ?string $modelLabel = 'Faktur';
+
     protected static ?string $pluralModelLabel = 'Daftar Faktur';
+
     protected static ?int $navigationSort = 1;
 
     // Removed private static function calculateToQuantityForInvoice(...)
@@ -66,7 +70,6 @@ class InvoiceResource extends Resource
             }
         };
 
-
         return $form->schema([
             // Bagian atas untuk detail invoice dan pelanggan
             Section::make()->schema([
@@ -83,18 +86,18 @@ class InvoiceResource extends Resource
                                 // Reset vehicle_id when customer changes
                                 $set('vehicle_id', null);
                             }),
-                        Forms\Components\Select::make('vehicle_id')->label('Kendaraan (No. Polisi)')->options(fn(Get $get) => Vehicle::query()->where('customer_id', $get('customer_id'))->pluck('license_plate', 'id'))->searchable()->preload()->required(),
+                        Forms\Components\Select::make('vehicle_id')->label('Kendaraan (No. Polisi)')->options(fn (Get $get) => Vehicle::query()->where('customer_id', $get('customer_id'))->pluck('license_plate', 'id'))->searchable()->preload()->required(),
                     ]),
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['unpaid' => 'Belum Dibayar', 'partially_paid' => 'Sebagian Dibayar', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo',])->default('unpaid')->required(),
+                        Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-'.date('Ymd-His'))->required(),
+                        Forms\Components\Select::make('status')->options(['unpaid' => 'Belum Dibayar', 'partially_paid' => 'Sebagian Dibayar', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo'])->default('unpaid')->required(),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('invoice_date')->label('Tanggal Invoice')->default(now())->required(),
                         Forms\Components\DatePicker::make('due_date')
                             ->label('Tanggal Jatuh Tempo')
                             ->default(now()->addDays(7))
-                            ->required()
+                            ->required(),
                     ]),
                 ]),
             ]),
@@ -110,8 +113,8 @@ class InvoiceResource extends Resource
                     ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at', 'updated_at'])
                     ->hiddenLabel()
                     ->footerItem(
-                        fn(Get $get) => new HtmlString(
-                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
+                        fn (Get $get) => new HtmlString(
+                            'Total: '.app(InvoiceService::class)->formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
                                 return app(InvoiceService::class)->parseCurrencyValue($service['price'] ?? '0');
                             }))
                         )
@@ -152,6 +155,7 @@ class InvoiceResource extends Resource
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
                                 $price = app(InvoiceService::class)->parseCurrencyValue($get('price') ?? '0');
+
                                 return app(InvoiceService::class)->formatCurrency($price);
                             }),
                     ])
@@ -180,16 +184,16 @@ class InvoiceResource extends Resource
                                 ->label('Barang')
                                 ->hiddenLabel()
                                 ->relationship('item', 'name')
-                                ->getOptionLabelFromRecordUsing(fn(Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
+                                ->getOptionLabelFromRecordUsing(fn (Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
                                 ->searchable()
                                 ->preload()
                                 ->required()
                                 ->live()
                                 ->afterStateUpdated($updateItemData),
-                            Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1)
+                            Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1),
                         ]),
                         Forms\Components\TextInput::make('quantity')
-                            ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
+                            ->label(fn (Get $get) => 'Kuantitas'.($get('unit_name') ? ' ('.$get('unit_name').')' : ''))
                             ->numeric()
                             ->step('0.01')
                             ->default(1.0)
@@ -198,24 +202,25 @@ class InvoiceResource extends Resource
                             ->rules([
                                 function (Get $get, callable $set, $record, $operation) {
                                     return function (string $attribute, $value, \Closure $fail) use ($get, $record, $operation) {
-                                        $quantityInput = (float)$value;
+                                        $quantityInput = (float) $value;
                                         $itemId = $get('item_id');
                                         if ($quantityInput <= 0) {
-                                            $fail("Kuantitas harus lebih dari 0.");
+                                            $fail('Kuantitas harus lebih dari 0.');
+
                                             return;
                                         }
-                                        if (!$itemId) {
+                                        if (! $itemId) {
                                             return;
                                         }
                                         $currentInvoice = ($operation === 'edit' && $record instanceof Invoice) ? $record : null;
                                         $validation = app(InvoiceService::class)->validateStockAvailability($itemId, $quantityInput, $currentInvoice);
-                                        if (!$validation['valid']) {
+                                        if (! $validation['valid']) {
                                             $fail($validation['message']);
                                         }
                                     };
                                 },
                             ])
-                            ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
+                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -228,17 +233,19 @@ class InvoiceResource extends Resource
                             ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
-                                $quantity = (float)($get('quantity') ?? 0);
+                                $quantity = (float) ($get('quantity') ?? 0);
                                 $price = app(InvoiceService::class)->parseCurrencyValue($get('price') ?? '0');
                                 $total = $quantity * $price;
+
                                 return app(InvoiceService::class)->formatCurrency($total);
                             }),
                     ])
                     ->footerItem(
-                        fn(Get $get) => new HtmlString(
-                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
-                                $quantity = (float)($item['quantity'] ?? 0.0);
+                        fn (Get $get) => new HtmlString(
+                            'Total: '.app(InvoiceService::class)->formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
+                                $quantity = (float) ($item['quantity'] ?? 0.0);
                                 $price = app(InvoiceService::class)->parseCurrencyValue($item['price'] ?? '0');
+
                                 return $quantity * $price;
                             }))
                         )
@@ -255,7 +262,8 @@ class InvoiceResource extends Resource
                             ->modalHeading(function (array $arguments, Forms\Components\Repeater $component) {
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
-                                return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
+
+                                return 'Pecah Stok untuk '.($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
                             })
                             ->modalWidth('lg')
                             ->form(function (array $arguments, Forms\Components\Repeater $component) {
@@ -263,17 +271,18 @@ class InvoiceResource extends Resource
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
                                 $childItem = $childItemId ? Item::find($childItemId) : null;
 
-                                if (!$childItem) {
+                                if (! $childItem) {
                                     return [
                                         Forms\Components\Placeholder::make('error_child_item_not_found')
                                             ->label('Error')
                                             ->content('Item eceran yang dipilih tidak ditemukan atau belum dipilih.'),
                                     ];
                                 }
+
                                 return [
                                     Forms\Components\Placeholder::make('child_item_info')
                                         ->label('Item yang Akan Ditambah Stoknya')
-                                        ->content(fn() => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
+                                        ->content(fn () => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
 
                                     Forms\Components\Select::make('from_item_id')
                                         ->label('Pilih Item Sumber (Induk)')
@@ -294,8 +303,8 @@ class InvoiceResource extends Resource
                                             $fromQuantityInput = $get('from_quantity');
                                             $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
 
-                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float) $fromQuantityInput > 0) {
+                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float) $fromQuantityInput);
                                                 $set('calculated_to_quantity', $calculated);
                                             } else {
                                                 $set('calculated_to_quantity', null);
@@ -308,7 +317,7 @@ class InvoiceResource extends Resource
                                                 if ($get('from_quantity') > $sourceItem->stock) {
                                                     $set('from_quantity', $sourceItem->stock);
                                                     // Recalculate if capped
-                                                    $recalculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$sourceItem->stock);
+                                                    $recalculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float) $sourceItem->stock);
                                                     $set('calculated_to_quantity', $recalculated);
                                                 }
                                             } else {
@@ -324,15 +333,15 @@ class InvoiceResource extends Resource
                                         ->default(1)
                                         ->required()
                                         ->minValue(1)
-                                        ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null)
+                                        ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null)
                                         ->live()
                                         ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
                                             $fromItemId = $get('from_item_id');
                                             $fromQuantityInput = $state;
                                             $sourceItem = $fromItemId ? Item::find($fromItemId) : null;
 
-                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float)$fromQuantityInput > 0) {
-                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float)$fromQuantityInput);
+                                            if ($sourceItem && $childItem && $fromQuantityInput && is_numeric($fromQuantityInput) && (float) $fromQuantityInput > 0) {
+                                                $calculated = app(InventoryService::class)::calculateTargetQuantity($sourceItem, $childItem, (float) $fromQuantityInput);
                                                 $set('calculated_to_quantity', $calculated);
                                             } else {
                                                 $set('calculated_to_quantity', null);
@@ -342,7 +351,7 @@ class InvoiceResource extends Resource
 
                                     Forms\Components\Placeholder::make('to_quantity_display')
                                         ->label('Jumlah Item yang Akan Dihasilkan')
-                                        ->content(fn(Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
+                                        ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity').' '.$get('to_quantity_unit_suffix') : '-'),
 
                                     Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
                                     Forms\Components\Hidden::make('to_quantity_unit_suffix')->default(null),
@@ -357,15 +366,16 @@ class InvoiceResource extends Resource
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItem = Item::find($itemRepeaterState['item_id']);
                                 $sourceParentItem = Item::find($data['from_item_id']);
-                                $fromQuantity = (float)$data['from_quantity'];
+                                $fromQuantity = (float) $data['from_quantity'];
                                 $calculatedToQuantity = $data['calculated_to_quantity'];
 
-                                if (!$childItem || !$sourceParentItem) {
+                                if (! $childItem || ! $sourceParentItem) {
                                     Notification::make()
                                         ->title('Error')
                                         ->body('Item tidak ditemukan.')
                                         ->danger()
                                         ->send();
+
                                     return;
                                 }
 
@@ -375,6 +385,7 @@ class InvoiceResource extends Resource
                                         ->danger()
                                         ->body('Jumlah item yang dihasilkan tidak valid atau tidak dapat dihitung. Pastikan data volume item sumber dan tujuan sudah benar dan satuan volume standar sama.')
                                         ->send();
+
                                     return;
                                 }
 
@@ -387,7 +398,7 @@ class InvoiceResource extends Resource
                                         toItemId: $childItem->id,
                                         fromQuantity: $fromQuantity,
                                         toQuantity: $calculatedToQuantity,
-                                        notes: $data['notes'] ?? "Pecah stok untuk invoice"
+                                        notes: $data['notes'] ?? 'Pecah stok untuk invoice'
                                     );
 
                                     // Success notification
@@ -402,7 +413,7 @@ class InvoiceResource extends Resource
                                 } catch (\Exception $e) {
                                     Notification::make()
                                         ->title('Gagal Pecah Stok')
-                                        ->body('Terjadi kesalahan: ' . $e->getMessage())
+                                        ->body('Terjadi kesalahan: '.$e->getMessage())
                                         ->danger()
                                         ->send();
                                 }
@@ -410,18 +421,26 @@ class InvoiceResource extends Resource
                                 try {
                                     // Dapatkan UUID item dari arguments
                                     $itemUuid = $arguments['item'] ?? null;
-                                    if (!$itemUuid) return false;
+                                    if (! $itemUuid) {
+                                        return false;
+                                    }
 
                                     // Gunakan component yang diteruskan sebagai parameter
-                                    if (!$component) return false;
+                                    if (! $component) {
+                                        return false;
+                                    }
 
                                     // Dapatkan state item berdasarkan UUID
                                     $itemRepeaterState = $component->getRawItemState($itemUuid);
                                     $itemId = $itemRepeaterState['item_id'] ?? null;
-                                    if (!$itemId) return false;
+                                    if (! $itemId) {
+                                        return false;
+                                    }
 
                                     $item = Item::find($itemId);
-                                    if (!$item) return false;
+                                    if (! $item) {
+                                        return false;
+                                    }
 
                                     // Periksa apakah ada item lain dalam produk yang sama dengan stok > 0
                                     return Item::where('product_id', $item->product_id)
@@ -432,9 +451,9 @@ class InvoiceResource extends Resource
                                     // Jika terjadi error, sembunyikan tombol
                                     return false;
                                 }
-                            })
+                            }),
                     ])
-                    ->columns(4) // Sesuaikan jumlah kolom jika perlu
+                    ->columns(4), // Sesuaikan jumlah kolom jika perlu
 
             ]),
 
@@ -458,8 +477,9 @@ class InvoiceResource extends Resource
 
                                 // Hitung total dari items
                                 $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) {
-                                    $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
+                                    $quantity = (float) ($item['quantity'] ?? 0.0); // Changed to float
                                     $price = app(InvoiceService::class)->parseCurrencyValue($item['price'] ?? '0');
+
                                     return $quantity * $price;
                                 });
 
@@ -478,10 +498,9 @@ class InvoiceResource extends Resource
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->prefix(fn (Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
                                 ->live(), // Added debounce to reduce server load
                         ]),
-
 
                         // Total Akhir
                         Forms\Components\Placeholder::make('total_amount')
@@ -495,8 +514,9 @@ class InvoiceResource extends Resource
                                 });
 
                                 $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) use ($invoiceService) {
-                                    $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
+                                    $quantity = (float) ($item['quantity'] ?? 0); // Ubah dari int ke float
                                     $price = $invoiceService->parseCurrencyValue($item['price'] ?? '0');
+
                                     return $quantity * $price;
                                 });
 
@@ -514,6 +534,7 @@ class InvoiceResource extends Resource
                                 }
 
                                 $totalAmount = $subtotal - $discountAmount;
+
                                 return $invoiceService->formatCurrency($totalAmount);
                             }),
                     ]),
@@ -523,7 +544,6 @@ class InvoiceResource extends Resource
         ])->columns(1); // <-- KUNCI UTAMA: Mengubah layout menjadi 1 kolom
     }
 
-
     public static function table(Table $table): Table
     {
         return $table
@@ -531,12 +551,12 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
+                    ->formatStateUsing(fn (string $state): string => match ($state) {
                         'unpaid' => 'Belum Dibayar',
                         'partially_paid' => 'Sebagian Dibayar',
                         'paid' => 'Lunas',
                         'overdue' => 'Terlambat',
-                    })->badge()->color(fn(string $state): string => match ($state) {
+                    })->badge()->color(fn (string $state): string => match ($state) {
                         'unpaid' => 'gray',
                         'partially_paid' => 'info',
                         'paid' => 'success',
@@ -599,6 +619,7 @@ class InvoiceResource extends Resource
     {
         // Eager load relationships to prevent N+1 queries in the Blade view
         $record->load(['customer', 'vehicle', 'invoiceItems.item', 'invoiceServices.service']);
+
         return view('filament.resources.invoices.print', ['invoice' => $record]);
     }
 }

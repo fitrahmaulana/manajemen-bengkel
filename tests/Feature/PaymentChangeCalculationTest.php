@@ -2,11 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Models\PurchaseOrder;
+use App\Filament\Resources\PaymentResource;
 use App\Models\Payment;
+use App\Models\PurchaseOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use App\Filament\Resources\PaymentResource;
 
 class PaymentChangeCalculationTest extends TestCase
 {

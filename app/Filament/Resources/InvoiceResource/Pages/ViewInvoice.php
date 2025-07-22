@@ -4,22 +4,13 @@ namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
-use Filament\Actions;
-use Filament\Resources\Pages\ViewRecord;
-use Filament\Forms\Components\DatePicker;
-use Filament\Forms\Components\TextInput;
-use Filament\Forms\Components\Select;
-use Filament\Forms\Components\Textarea;
-use Filament\Forms\Components\Placeholder;
-use Filament\Forms\Components\Hidden;
-use App\Models\Payment;
 use App\Models\Invoice;
-use Filament\Forms\Components\ToggleButtons;
-use Filament\Notifications\Notification;
-use Illuminate\Validation\ValidationException;
-use Filament\Infolists\Infolist; // Added for infolist method
-use Filament\Infolists; // Added for components namespace
-use Filament\Support\Enums\MaxWidth;
+use App\Models\Payment;
+use Filament\Actions;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
+use Filament\Notifications\Notification; // Added for infolist method
+use Filament\Resources\Pages\ViewRecord; // Added for components namespace
 
 class ViewInvoice extends ViewRecord
 {
@@ -47,13 +38,13 @@ class ViewInvoice extends ViewRecord
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
                                     Infolists\Components\TextEntry::make('status')
-                                        ->formatStateUsing(fn(string $state): string => match ($state) {
+                                        ->formatStateUsing(fn (string $state): string => match ($state) {
                                             'unpaid' => 'Belum Dibayar',
                                             'partially_paid' => 'Sebagian Dibayar',
                                             'paid' => 'Lunas',
                                             'overdue' => 'Terlambat',
                                         })
-                                        ->badge()->color(fn(string $state): string => match ($state) {
+                                        ->badge()->color(fn (string $state): string => match ($state) {
                                             'unpaid' => 'gray',
                                             'partially_paid' => 'info',
                                             'paid' => 'success',
@@ -92,13 +83,14 @@ class ViewInvoice extends ViewRecord
                                     ->label('Kuantitas')
                                     ->formatStateUsing(function ($record) {
                                         $unit = $record->item->unit;
-                                        return ($record->quantity ?? ' ') . " $unit";
+
+                                        return ($record->quantity ?? ' ')." $unit";
                                     }),
                                 Infolists\Components\TextEntry::make('price')->label('Harga Satuan')->currency('IDR'),
                                 Infolists\Components\TextEntry::make('sub_total_calculated')
                                     ->label('Subtotal')
                                     ->currency('IDR')
-                                    ->state(fn($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
+                                    ->state(fn ($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
                                 Infolists\Components\TextEntry::make('description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -120,10 +112,11 @@ class ViewInvoice extends ViewRecord
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
                                             if ($record->discount_type === 'percentage') {
-                                                return ($record->discount_value ?? 0) . '%';
+                                                return ($record->discount_value ?? 0).'%';
                                             }
+
                                             // For fixed discount, format as currency
-                                            return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
+                                            return 'Rp. '.number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
 
                                 ]),
@@ -134,25 +127,25 @@ class ViewInvoice extends ViewRecord
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->state(fn ($record) => $record->total_paid_amount)
                                         ->weight('semibold'),
                                     Infolists\Components\TextEntry::make('balance_due')
                                         ->label('Sisa Tagihan')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due)
+                                        ->state(fn ($record) => $record->balance_due)
                                         ->weight('bold')
                                         ->color('danger') // Red untuk urgent
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->visible(fn ($record) => $record->balance_due > 0)
                                         ->icon('heroicon-o-exclamation-triangle'),
                                     Infolists\Components\TextEntry::make('overpayment')
                                         ->label('Kembalian')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->overpayment)
+                                        ->state(fn ($record) => $record->overpayment)
                                         ->weight('bold')
                                         ->color('success') // Green untuk positive
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->overpayment > 0)
+                                        ->visible(fn ($record) => $record->overpayment > 0)
                                         ->icon('heroicon-o-banknotes'),
                                 ]),
                             ]),
@@ -170,7 +163,7 @@ class ViewInvoice extends ViewRecord
                 ->label('Cetak Faktur')
                 ->icon('heroicon-o-printer')
                 ->color('info')
-                ->url(fn(Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
+                ->url(fn (Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
                 ->openUrlInNewTab(),
             Actions\DeleteAction::make()
                 ->label('Hapus Faktur')
@@ -201,6 +194,7 @@ class ViewInvoice extends ViewRecord
                 }),
         ];
     }
+
     public function getRelationManagers(): array
     {
         // Hanya tampilkan PaymentsRelationManager di halaman ini

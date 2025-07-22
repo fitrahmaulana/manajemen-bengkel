@@ -3,25 +3,24 @@
 namespace App\Filament\Resources\InvoiceResource\RelationManagers;
 
 use App\Filament\Resources\PaymentResource;
-use Filament\Forms;
+use App\Models\Invoice;
+use App\Models\Payment;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Model;
-use App\Models\Invoice;
-use App\Models\Payment;
 
 class PaymentsRelationManager extends RelationManager
 {
     protected static string $relationship = 'payments';
+
     protected static ?string $recordTitleAttribute = 'payment_date';
+
     protected static ?string $title = 'Riwayat Pembayaran';
 
     protected $listeners = [
         'refresh' => '$refresh',
     ];
-
 
     public function form(Form $form): Form
     {
@@ -39,7 +38,7 @@ class PaymentsRelationManager extends RelationManager
                         $data['invoice_id'] = $this->getOwnerRecord()->id;
 
                         // Pastikan payment_date ada jika tidak diisi
-                        if (!isset($data['payment_date']) || empty($data['payment_date'])) {
+                        if (! isset($data['payment_date']) || empty($data['payment_date'])) {
                             $data['payment_date'] = now()->toDateString();
                         }
 
@@ -89,9 +88,10 @@ class PaymentsRelationManager extends RelationManager
     {
         /** @var Invoice $invoice */
         $invoice = $this->getOwnerRecord();
-        if (!$invoice) {
+        if (! $invoice) {
             return false;
         }
+
         return $invoice->balance_due > 0;
     }
 }

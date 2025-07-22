@@ -4,10 +4,8 @@ namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
 use App\Services\InvoiceService;
-use Filament\Resources\Pages\CreateRecord;
-
 use Filament\Notifications\Notification;
-use Illuminate\Support\Facades\DB;
+use Filament\Resources\Pages\CreateRecord;
 
 class CreateInvoice extends CreateRecord
 {
@@ -21,7 +19,7 @@ class CreateInvoice extends CreateRecord
      * 3. Menghitung diskon (jika ada).
      * 4. Menghitung dan menyimpan `subtotal` dan `total_amount` ke dalam data invoice utama.
      *
-     * @param array $data Data form saat ini.
+     * @param  array  $data  Data form saat ini.
      * @return array Data form yang telah dimutasi.
      */
     protected function mutateFormDataBeforeCreate(array $data): array
@@ -37,8 +35,9 @@ class CreateInvoice extends CreateRecord
         });
 
         $itemsTotal = collect($items)->sum(function ($item) use ($invoiceService) {
-            $quantity = (float)($item['quantity'] ?? 0.0);
+            $quantity = (float) ($item['quantity'] ?? 0.0);
             $price = $invoiceService->parseCurrencyValue($item['price'] ?? '0');
+
             return $quantity * $price;
         });
 

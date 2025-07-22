@@ -10,17 +10,21 @@ use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class CustomerResource extends Resource
 {
     protected static ?string $model = Customer::class;
+
     protected static ?string $navigationIcon = 'heroicon-o-user-group';
+
     protected static ?string $navigationLabel = 'Pelanggan';
+
     protected static ?string $modelLabel = 'Pelanggan';
+
     protected static ?string $pluralModelLabel = 'Daftar Pelanggan';
+
     protected static ?string $navigationGroup = 'Customer Management';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form

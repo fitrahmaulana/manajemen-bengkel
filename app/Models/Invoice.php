@@ -42,8 +42,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the total amount paid.
-     *
-     * @return float
      */
     public function getTotalPaidAmountAttribute(): float
     {
@@ -52,8 +50,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the balance due.
-     *
-     * @return float
      */
     public function getBalanceDueAttribute(): float
     {
@@ -62,8 +58,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the overpayment amount.
-     *
-     * @return float
      */
     public function getOverpaymentAttribute(): float
     {

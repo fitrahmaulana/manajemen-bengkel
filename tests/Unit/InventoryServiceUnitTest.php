@@ -21,13 +21,14 @@ class InventoryServiceUnitTest extends TestCase
             ['base_volume_unit', $baseVolumeUnit],
             ['unit', $unitName], // Though 'unit' isn't used by service, good for consistency
         ]);
+
         return $item;
     }
 
     /**
      * @dataProvider conversionScenariosProvider
      */
-    public function testCalculateTargetQuantity(
+    public function test_calculate_target_quantity(
         array $sourceItemParams, // Now accepts array of params
         array $targetItemParams, // Now accepts array of params
         float $sourceQuantity,

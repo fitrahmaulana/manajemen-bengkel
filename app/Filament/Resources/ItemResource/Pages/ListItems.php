@@ -14,7 +14,7 @@ class ListItems extends ListRecords
     {
         return [
             Actions\CreateAction::make()
-            ->label('Tambah Item')
+                ->label('Tambah Item')
                 ->icon('heroicon-o-plus')
                 ->color('primary')
                 ->tooltip('Tambah item baru')

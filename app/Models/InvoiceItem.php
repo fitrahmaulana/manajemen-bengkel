@@ -2,17 +2,16 @@
 
 namespace App\Models;
 
-use App\Services\InvoiceStockService;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
 class InvoiceItem extends Pivot
 {
     public $timestamps = false;
+
     public $incrementing = true;
 
     protected $table = 'invoice_item';
-
 
     public function invoice(): BelongsTo
     {

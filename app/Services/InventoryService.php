@@ -4,11 +4,10 @@ namespace App\Services;
 
 use App\Models\Item;
 use App\Models\ItemStockConversion;
-use Illuminate\Support\Facades\DB;
-use App\Models\Invoice;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
 use Exception;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class InventoryService
 {
@@ -18,9 +17,9 @@ class InventoryService
      * This method assumes that both items belong to the same product and have compatible
      * volume units for conversion.
      *
-     * @param Item $sourceItem The item from which stock is being converted.
-     * @param Item $targetItem The item to which stock is being converted.
-     * @param float $sourceQuantity The quantity of the source item being converted.
+     * @param  Item  $sourceItem  The item from which stock is being converted.
+     * @param  Item  $targetItem  The item to which stock is being converted.
+     * @param  float  $sourceQuantity  The quantity of the source item being converted.
      * @return float|null The calculated quantity of the target item, or null if conversion is not possible or results in zero/negative.
      */
     public static function calculateTargetQuantity(Item $sourceItem, Item $targetItem, float $sourceQuantity): ?float
@@ -31,8 +30,8 @@ class InventoryService
 
         // Ensure items have necessary volume information for conversion
         if (
-            !$sourceItem->volume_value || !$sourceItem->base_volume_unit ||
-            !$targetItem->volume_value || !$targetItem->base_volume_unit
+            ! $sourceItem->volume_value || ! $sourceItem->base_volume_unit ||
+            ! $targetItem->volume_value || ! $targetItem->base_volume_unit
         ) {
             // Missing volume information for one or both items
             return null;
@@ -72,13 +71,9 @@ class InventoryService
     /**
      * Perform a stock conversion between two items.
      *
-     * @param int $fromItemId
-     * @param int $toItemId
-     * @param float $fromQuantity - Ubah ke float untuk mendukung desimal
-     * @param float $toQuantity - Ubah ke float untuk mendukung desimal
-     * @param string|null $notes
-     * @param int|null $userId
-     * @return ItemStockConversion
+     * @param  float  $fromQuantity  - Ubah ke float untuk mendukung desimal
+     * @param  float  $toQuantity  - Ubah ke float untuk mendukung desimal
+     *
      * @throws Exception
      */
     public function convertStock(
@@ -133,8 +128,7 @@ class InventoryService
     /**
      * Adjust stock for a single item.
      *
-     * @param int $itemId
-     * @param float $quantityChange Positive to deduct, negative to restore.
+     * @param  float  $quantityChange  Positive to deduct, negative to restore.
      */
     public function adjustStockForItem(int $itemId, float $quantityChange): void
     {
@@ -156,5 +150,4 @@ class InventoryService
             Log::warning("ADJUST FAILED: Item ID {$itemId} not found.");
         }
     }
-
 }

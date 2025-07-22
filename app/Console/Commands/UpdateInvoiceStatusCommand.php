@@ -33,6 +33,7 @@ class UpdateInvoiceStatusCommand extends Command
 
         if ($invoices->isEmpty()) {
             $this->info('No overdue invoices found.');
+
             return;
         }
 

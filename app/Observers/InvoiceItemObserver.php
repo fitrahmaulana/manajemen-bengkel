@@ -24,10 +24,10 @@ class InvoiceItemObserver
      */
     public function updated(InvoiceItem $invoiceItem): void
     {
-        $oldQty    = $invoiceItem->getOriginal('quantity') ?? 0;
+        $oldQty = $invoiceItem->getOriginal('quantity') ?? 0;
         $oldItemId = $invoiceItem->getOriginal('item_id') ?? $invoiceItem->item_id;
 
-        $newQty    = $invoiceItem->quantity;
+        $newQty = $invoiceItem->quantity;
         $newItemId = $invoiceItem->item_id;
 
         // Kalau tidak ada perubahan qty & item_id, berhenti
@@ -48,7 +48,6 @@ class InvoiceItemObserver
             $inventoryService->adjustStockForItem($newItemId, $newQty);
         }
     }
-
 
     /**
      * Handle the InvoiceItem "deleted" event.
