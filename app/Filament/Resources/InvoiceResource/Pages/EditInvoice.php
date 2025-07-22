@@ -3,8 +3,8 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
+use App\Services\InvoiceService;
 use App\Services\InvoiceStockService;
-use App\Traits\InvoiceCalculationTrait;
 use Filament\Actions;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Notifications\Notification;
@@ -12,8 +12,6 @@ use Illuminate\Support\Facades\DB;
 
 class EditInvoice extends EditRecord
 {
-    use InvoiceCalculationTrait;
-
     protected static string $resource = InvoiceResource::class;
 
     /**
@@ -26,18 +24,19 @@ class EditInvoice extends EditRecord
      */
     protected function mutateFormDataBeforeSave(array $data): array
     {
+        $invoiceService = app(InvoiceService::class);
         // Get the current state of the form data, including relationships
         $currentData = $this->data;
         $services = $currentData['invoiceServices'] ?? [];
         $items = $currentData['invoiceItems'] ?? [];
 
-        $servicesTotal = collect($services)->sum(function ($service) {
-            return self::parseCurrencyValue($service['price'] ?? '0');
+        $servicesTotal = collect($services)->sum(function ($service) use ($invoiceService) {
+            return $invoiceService->parseCurrencyValue($service['price'] ?? '0');
         });
 
-        $itemsTotal = collect($items)->sum(function ($item) {
+        $itemsTotal = collect($items)->sum(function ($item) use ($invoiceService) {
             $quantity = (float)($item['quantity'] ?? 0.0);
-            $price = self::parseCurrencyValue($item['price'] ?? '0');
+            $price = $invoiceService->parseCurrencyValue($item['price'] ?? '0');
             return $quantity * $price;
         });
 
@@ -45,7 +44,7 @@ class EditInvoice extends EditRecord
         $data['subtotal'] = $subtotal;
 
         $discountType = $data['discount_type'] ?? 'fixed';
-        $discountValue = self::parseCurrencyValue($data['discount_value'] ?? '0');
+        $discountValue = $invoiceService->parseCurrencyValue($data['discount_value'] ?? '0');
 
         if ($discountType === 'percentage') {
             $discountAmount = ($subtotal * $discountValue) / 100;
@@ -70,7 +69,7 @@ class EditInvoice extends EditRecord
                         return ['item_id' => $item->item_id, 'quantity' => $item->quantity];
                     })->toArray();
                     $stockService->deductStockForInvoiceItems($this->record, $itemsData);
-                    self::updateInvoiceStatus($this->record);
+                    app(InvoiceService::class)->updateInvoiceStatus($this->record);
                 }),
         ];
     }
@@ -79,6 +78,6 @@ class EditInvoice extends EditRecord
     {
         // The stock adjustment logic is now handled by the repeater's mutation hooks.
         // This hook is now only responsible for updating the invoice status.
-        self::updateInvoiceStatus($this->record);
+        app(InvoiceService::class)->updateInvoiceStatus($this->record);
     }
 }

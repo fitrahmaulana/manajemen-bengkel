@@ -8,8 +8,8 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\Service;
 use App\Models\Vehicle;
+use App\Services\InvoiceService;
 use App\Services\InvoiceStockService;
-use App\Traits\InvoiceCalculationTrait;
 use Awcodes\TableRepeater\Header;
 use Filament\Forms;
 use Filament\Forms\Components\Grid;
@@ -34,8 +34,6 @@ use App\Services\InventoryService;
 
 class InvoiceResource extends Resource
 {
-    use InvoiceCalculationTrait; // Use the optimized calculation trait
-
     protected static ?string $model = Invoice::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-credit-card';
@@ -49,6 +47,8 @@ class InvoiceResource extends Resource
 
     public static function form(Form $form): Form
     {
+        $invoiceService = app(InvoiceService::class);
+
         // Optimized price update functions
         $updateServicePrice = function (Set $set, Get $get, $state) {
             if ($state) {
@@ -114,8 +114,8 @@ class InvoiceResource extends Resource
                     ->hiddenLabel()
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
-                                return self::parseCurrencyValue($service['price'] ?? '0');
+                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
+                                return app(InvoiceService::class)->parseCurrencyValue($service['price'] ?? '0');
                             }))
                         )
                     )
@@ -154,8 +154,8 @@ class InvoiceResource extends Resource
                             ->dehydrated(false)
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
-                                $price = self::parseCurrencyValue($get('price') ?? '0');
-                                return self::formatCurrency($price);
+                                $price = app(InvoiceService::class)->parseCurrencyValue($get('price') ?? '0');
+                                return app(InvoiceService::class)->formatCurrency($price);
                             }),
                     ])
                     ->columns(3),
@@ -226,7 +226,7 @@ class InvoiceResource extends Resource
                                             return;
                                         }
                                         $currentInvoice = ($operation === 'edit' && $record instanceof Invoice) ? $record : null;
-                                        $validation = self::validateStockAvailability($itemId, $quantityInput, $currentInvoice);
+                                        $validation = app(InvoiceService::class)->validateStockAvailability($itemId, $quantityInput, $currentInvoice);
                                         if (!$validation['valid']) {
                                             $fail($validation['message']);
                                         }
@@ -247,16 +247,16 @@ class InvoiceResource extends Resource
                             ->extraAttributes(['class' => 'text-left md:text-center'])
                             ->content(function (Get $get) {
                                 $quantity = (float)($get('quantity') ?? 0);
-                                $price = self::parseCurrencyValue($get('price') ?? '0');
+                                $price = app(InvoiceService::class)->parseCurrencyValue($get('price') ?? '0');
                                 $total = $quantity * $price;
-                                return self::formatCurrency($total);
+                                return app(InvoiceService::class)->formatCurrency($total);
                             }),
                     ])
                     ->footerItem(
                         fn(Get $get) => new HtmlString(
-                            'Total: ' . self::formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
+                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
                                 $quantity = (float)($item['quantity'] ?? 0.0);
-                                $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                $price = app(InvoiceService::class)->parseCurrencyValue($item['price'] ?? '0');
                                 return $quantity * $price;
                             }))
                         )
@@ -471,17 +471,17 @@ class InvoiceResource extends Resource
                             ->content(function (Get $get) {
                                 // Hitung total dari services
                                 $servicesTotal = collect($get('invoiceServices'))->sum(function ($service) {
-                                    return self::parseCurrencyValue($service['price'] ?? '0');
+                                    return app(InvoiceService::class)->parseCurrencyValue($service['price'] ?? '0');
                                 });
 
                                 // Hitung total dari items
                                 $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) {
                                     $quantity = (float)($item['quantity'] ?? 0.0); // Changed to float
-                                    $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                    $price = app(InvoiceService::class)->parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
                                 });
 
-                                return self::formatCurrency($servicesTotal + $itemsTotal);
+                                return app(InvoiceService::class)->formatCurrency($servicesTotal + $itemsTotal);
                             })
                             ->helperText('Total sebelum diskon & pajak.'),
 
@@ -506,14 +506,15 @@ class InvoiceResource extends Resource
                             ->label('Total Akhir')
                             ->extraAttributes(['class' => 'font-bold text-xl text-green'])
                             ->Content(function (Get $get) {
+                                $invoiceService = app(InvoiceService::class);
                                 // Hitung subtotal
-                                $servicesTotal = collect($get('invoiceServices'))->sum(function ($service) {
-                                    return self::parseCurrencyValue($service['price'] ?? '0');
+                                $servicesTotal = collect($get('invoiceServices'))->sum(function ($service) use ($invoiceService) {
+                                    return $invoiceService->parseCurrencyValue($service['price'] ?? '0');
                                 });
 
-                                $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) {
+                                $itemsTotal = collect($get('invoiceItems'))->sum(function ($item) use ($invoiceService) {
                                     $quantity = (float)($item['quantity'] ?? 0); // Ubah dari int ke float
-                                    $price = self::parseCurrencyValue($item['price'] ?? '0');
+                                    $price = $invoiceService->parseCurrencyValue($item['price'] ?? '0');
                                     return $quantity * $price;
                                 });
 
@@ -521,7 +522,7 @@ class InvoiceResource extends Resource
 
                                 // Hitung diskon
                                 $discountType = $get('discount_type') ?? 'fixed';
-                                $discountValue = self::parseCurrencyValue($get('discount_value') ?? '0');
+                                $discountValue = $invoiceService->parseCurrencyValue($get('discount_value') ?? '0');
 
                                 $discountAmount = 0;
                                 if ($discountType === 'percentage') {
@@ -531,7 +532,7 @@ class InvoiceResource extends Resource
                                 }
 
                                 $totalAmount = $subtotal - $discountAmount;
-                                return self::formatCurrency($totalAmount);
+                                return $invoiceService->formatCurrency($totalAmount);
                             }),
                     ]),
                 ]),
@@ -599,7 +600,7 @@ class InvoiceResource extends Resource
                                 })->toArray();
                                 $stockService->deductStockForInvoiceItems($record, $itemsData);
                                 // Also update status
-                                \App\Traits\InvoiceCalculationTrait::updateInvoiceStatus($record);
+                                app(InvoiceService::class)->updateInvoiceStatus($record);
                             }
                         }),
                 ]),

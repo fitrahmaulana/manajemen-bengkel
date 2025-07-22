@@ -3,15 +3,13 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Filament\Resources\InvoiceResource;
-use App\Traits\InvoiceCalculationTrait; // Use the trait for consistency
+use App\Services\InvoiceService;
 use Filament\Actions;
 use Filament\Resources\Pages\ListRecords;
 use Filament\Notifications\Notification;
 
 class ListInvoices extends ListRecords
 {
-    use InvoiceCalculationTrait; // Use the trait for consistency
-
     protected static string $resource = InvoiceResource::class;
 
     protected function getHeaderActions(): array

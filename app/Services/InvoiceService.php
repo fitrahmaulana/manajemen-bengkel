@@ -1,29 +1,29 @@
 <?php
 
-namespace App\Traits;
+namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\Item;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 
-trait InvoiceCalculationTrait
+class InvoiceService
 {
     /**
      * Calculate invoice totals with optimized performance
      * Reduces server load by doing minimal processing
      */
-    public static function calculateInvoiceTotals(Get $get, Set $set): void
+    public function calculateInvoiceTotals(Get $get, Set $set): void
     {
-        $servicesData = $get('services') ?? [];
-        $itemsData = $get('items') ?? [];
+        $servicesData = $get('invoiceServices') ?? [];
+        $itemsData = $get('invoiceItems') ?? [];
 
         $subtotal = 0;
 
         // Calculate subtotal from services
         foreach ($servicesData as $service) {
             if (!empty($service['service_id']) && isset($service['price'])) {
-                $price = self::parseCurrencyValue($service['price']);
+                $price = $this->parseCurrencyValue($service['price']);
                 $subtotal += $price;
             }
         }
@@ -31,14 +31,14 @@ trait InvoiceCalculationTrait
         // Calculate subtotal from items
         foreach ($itemsData as $item) {
             if (!empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
-                $price = self::parseCurrencyValue($item['price']);
+                $price = $this->parseCurrencyValue($item['price']);
                 $quantity = (float)($item['quantity'] ?? 1.0); // Changed to float
                 $subtotal += $price * $quantity;
             }
         }
 
         // Calculate discount
-        $discountValue = self::parseCurrencyValue($get('discount_value') ?? '0');
+        $discountValue = $this->parseCurrencyValue($get('discount_value') ?? '0');
         $finalDiscount = 0;
 
         if ($get('discount_type') === 'percentage' && $discountValue > 0) {
@@ -56,7 +56,7 @@ trait InvoiceCalculationTrait
     /**
      * Parse currency value from masked input
      */
-    public static function parseCurrencyValue($value): float
+    public function parseCurrencyValue($value): float
     {
         if (!$value) return 0;
 
@@ -70,7 +70,7 @@ trait InvoiceCalculationTrait
     /**
      * Format currency for display
      */
-    public static function formatCurrency($value): string
+    public function formatCurrency($value): string
     {
         return 'Rp. ' . number_format($value, 0, ',', '.');
     }
@@ -78,7 +78,7 @@ trait InvoiceCalculationTrait
     /**
      * Update invoice status based on payments (POS style logic)
      */
-    public static function updateInvoiceStatus(Invoice $invoice): void
+    public function updateInvoiceStatus(Invoice $invoice): void
     {
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
@@ -98,7 +98,7 @@ trait InvoiceCalculationTrait
     /**
      * Get payment status details for display
      */
-    public static function getPaymentStatusDetails(Invoice $invoice): array
+    public function getPaymentStatusDetails(Invoice $invoice): array
     {
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
@@ -119,7 +119,7 @@ trait InvoiceCalculationTrait
     /**
      * Create optimized afterStateUpdated function for price fields
      */
-    public static function createDebouncedCalculation(): callable
+    public function createDebouncedCalculation(): callable
     {
         return function (Get $get, Set $set) {
             // Only calculate if we have meaningful data
@@ -130,14 +130,14 @@ trait InvoiceCalculationTrait
                 return; // Skip calculation if no items/services
             }
 
-            self::calculateInvoiceTotals($get, $set);
+            $this->calculateInvoiceTotals($get, $set);
         };
     }
 
     /**
      * Validation helper for stock checking
      */
-    public static function validateStockAvailability(
+    public function validateStockAvailability(
         int $itemId,
         float $quantity, // Ubah dari int ke float untuk mendukung desimal
         ?Invoice $currentInvoice = null

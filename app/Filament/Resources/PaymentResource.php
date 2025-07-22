@@ -8,7 +8,7 @@ use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelati
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
-use App\Traits\InvoiceCalculationTrait;
+use App\Services\InvoiceService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -18,8 +18,6 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentResource extends Resource
 {
-    use InvoiceCalculationTrait;
-
     protected static ?string $model = Payment::class;
     protected static bool $shouldRegisterNavigation = false;
 
@@ -85,9 +83,9 @@ class PaymentResource extends Resource
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
                                 if ($payable) {
                                     if ($record) {
-                                        return '🧾 ' . self::formatCurrency($payable->total_amount);
+                                        return '🧾 ' . app(InvoiceService::class)->formatCurrency($payable->total_amount);
                                     }
-                                    return '🧾 ' . self::formatCurrency($payable->balance_due ?? $payable->total_amount);
+                                    return '🧾 ' . app(InvoiceService::class)->formatCurrency($payable->balance_due ?? $payable->total_amount);
                                 }
                                 return '🧾 Pilih tagihan terlebih dahulu';
                             })
@@ -206,7 +204,7 @@ class PaymentResource extends Resource
 
                                 $change = self::calculateChange($amountPaid, $payable, $record);
 
-                                return '💵 ' . self::formatCurrency($change);
+                                return '💵 ' . app(InvoiceService::class)->formatCurrency($change);
                             })
                             ->extraAttributes(function (Forms\Get $get, $record, $livewire) {
                                 $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
@@ -309,7 +307,7 @@ class PaymentResource extends Resource
 
                             foreach ($payables as $payable) {
                                 if ($payable instanceof Invoice) {
-                                    self::updateInvoiceStatus($payable);
+                                    app(InvoiceService::class)->updateInvoiceStatus($payable);
                                 }
                             }
                         }),
@@ -346,7 +344,7 @@ class PaymentResource extends Resource
         $payable = $payment->payable;
 
         if ($payable instanceof Invoice) {
-            self::updateInvoiceStatus($payable);
+            app(InvoiceService::class)->updateInvoiceStatus($payable);
             $payable->refresh();
 
             $newStatus = $payable->status;
