@@ -261,12 +261,13 @@ class InvoiceResource extends Resource
                         )
                     )
                     ->deleteAction(
-                        fn (Action $action) => $action->before(function (CustomTableRepeater $component, $record) {
-                            if ($record) {
+                        fn (Action $action) => $action->before(function (Action $action) {
+                            $invoiceItem = $action->getRecord();
+                            if ($invoiceItem) {
                                 $stockService = app(InvoiceStockService::class);
-                                $stockService->adjustStockForItem($record->item_id, -$record->quantity);
+                                $stockService->adjustStockForItem($invoiceItem->item_id, -$invoiceItem->quantity);
                             }
-                        }),
+                        })
                     )
                     ->extraItemActions([ // Menggunakan extraItemActions untuk action per item
                         Action::make('triggerSplitStockModal')
