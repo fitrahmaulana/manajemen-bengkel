@@ -5,6 +5,7 @@ namespace App\Filament\Pages;
 use App\Models\Item;
 use Filament\Forms\Components\Select as FormSelect;
 use Filament\Pages\Page;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
@@ -46,18 +47,14 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->searchable(['products.name', 'products.brand', 'items.name']) // Searchable on related fields
                     ->sortable(['products.name']) // Sortable by product name
                     ->weight('bold')
-                    ->getStateUsing(function (Item $record) {
-                        $productName = $record->product->name;
-                        $variantName = $record->name; // Item's own name is the variant spec
+                    ->getStateUsing(function (Item $record): string {
+                        $variantName = $record->name;
 
-                        if ($variantName && $variantName !== 'Standard' && ! is_null($variantName)) {
-                            return $productName.' - '.$variantName;
-                        }
-
-                        // If item's name is null, 'Standard', or empty, just show product name
-                        return $productName;
+                        return $variantName && $variantName !== 'Standard'
+                            ? "{$record->product->name} - {$variantName}"
+                            : $record->product->name;
                     })
-                    ->description(fn (Item $record) => $record->product->brand ? "Merek: {$record->product->brand}" : ''),
+                    ->description(fn (Item $record): ?string => $record->product->brand ? "Merek: {$record->product->brand}" : null),
 
                 TextColumn::make('sku')
                     ->label('SKU')
@@ -67,13 +64,8 @@ class KasirItemPricelistPage extends Page implements HasTable
 
                 TextColumn::make('product.typeItem.name')
                     ->label('Kategori')
-                    ->searchable(query: function ($query, string $search) {
-                        // Custom search for relationship
-                        return $query->whereHas('product.typeItem', function ($q) use ($search) {
-                            $q->where('name', 'like', "%{$search}%");
-                        });
-                    })
-                    ->sortable() // Make sure alias or actual column name is sortable
+                    ->searchable(isIndividual: true, isGlobal: false)
+                    ->sortable()
                     ->badge()
                     ->color('success'),
 
@@ -89,25 +81,12 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->alignCenter()
                     ->sortable()
                     ->badge()
-                    ->color(function ($state, Item $record) {
-                        if ($state > $record->stock_minimum) {
-                            return 'success';
-                        }
-                        if ($state > 0) {
-                            return 'warning';
-                        }
-
-                        return 'danger';
+                    ->color(fn (int $state, Item $record): string => match (true) {
+                        $state > $record->minimum_stock => 'success',
+                        $state > 0 => 'warning',
+                        default => 'danger',
                     })
-                    ->formatStateUsing(fn ($state, Item $record) => $state.' '.$record->unit),
-
-                TextColumn::make('stock_minimum')
-                    ->label('Stok Min.')
-                    ->sortable()
-                    ->alignCenter()
-                    ->badge()
-                    ->color('gray')
-                    ->formatStateUsing(fn ($state, Item $record) => $state.' '.$record->unit),
+                    ->formatStateUsing(fn (int $state, Item $record): string => "{$state} {$record->unit}"),
 
             ])
             ->filters([
@@ -139,8 +118,8 @@ class KasirItemPricelistPage extends Page implements HasTable
                         }
 
                         return match ($data['stock_type']) {
-                            'available' => $query->whereColumn('items.stock', '>', 'items.stock_minimum'),
-                            'low_stock' => $query->whereColumn('items.stock', '<=', 'items.stock_minimum')->where('items.stock', '>', 0),
+                            'available' => $query->whereColumn('items.stock', '>', 'items.minimum_stock'),
+                            'low_stock' => $query->whereColumn('items.stock', '<=', 'items.minimum_stock')->where('items.stock', '>', 0),
                             'out_of_stock' => $query->where('items.stock', '<=', 0),
                             default => $query,
                         };
