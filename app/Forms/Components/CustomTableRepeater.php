@@ -88,7 +88,8 @@ class CustomTableRepeater extends TableRepeater
     {
         parent::setUp();
 
-        $this->minItems(1);
+        $this->minItems(0);
+        $this->default([]);
 
         $this->stackAt(MaxWidth::Large);
 

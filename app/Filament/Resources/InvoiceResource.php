@@ -85,11 +85,8 @@ class InvoiceResource extends Resource
                             ->searchable()
                             ->preload()
                             ->live()
-                            ->afterStateUpdated(function (Set $set, Get $get, $state) {
-                                // Reset vehicle_id when customer changes
-                                $set('vehicle_id', null);
-                            })
-                            ->createOptionForm(fn (Form $form) => CustomerResource::form($form))
+                            ->afterStateUpdated(fn(Set $set) => $set('vehicle_id', null))
+                            ->createOptionForm(fn(Form $form) => CustomerResource::form($form))
                             ->default(function () {
                                 $generalCustomer = Customer::firstOrCreate(
                                     ['name' => 'Umum'],
@@ -99,25 +96,25 @@ class InvoiceResource extends Resource
                             }),
                         Forms\Components\Select::make('vehicle_id')
                             ->label('Kendaraan (No. Polisi)')
-                            ->options(function (Get $get) {
-                                $customerId = $get('customer_id');
-                                if (empty($customerId)) {
-                                    return [];
-                                }
-                                return Vehicle::query()->where('customer_id', $customerId)->pluck('license_plate', 'id');
-                            })
+                            ->relationship(
+                                name: 'vehicle',
+                                titleAttribute: 'license_plate',
+                                modifyQueryUsing: fn(Builder $query, Get $get) => $query->where('customer_id', $get('customer_id')),
+                            )
                             ->searchable()
                             ->preload()
-                            ->createOptionForm(function (Get $get) {
-                                $customer_id = $get('customer_id');
-                                $form = VehicleResource::getFormSchema();
-                                array_unshift($form, Forms\Components\Hidden::make('customer_id')->default($customer_id));
-                                return $form;
+
+                            ->createOptionForm(fn(Form $form) => $form->schema(VehicleResource::getFormSchema()))
+                            ->createOptionUsing(function (array $data, Get $get): int {
+                                // Automatically associate the new vehicle with the selected customer
+                                $data['customer_id'] = $get('customer_id');
+                                return Vehicle::create($data)->id;
                             })
-                            ->visible(fn (Get $get) => !empty($get('customer_id'))),
+                            ->disabled(fn(Get $get) => empty($get('customer_id')))
+                            ->placeholder('Pilih pelanggan terlebih dahulu'),
                     ]),
                     Group::make()->schema([
-                        Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-'.date('Ymd-His'))->required(),
+                        Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
                         Forms\Components\Select::make('status')->options(['unpaid' => 'Belum Dibayar', 'partially_paid' => 'Sebagian Dibayar', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo'])->default('unpaid')->required(),
                     ]),
                     Group::make()->schema([
@@ -141,8 +138,8 @@ class InvoiceResource extends Resource
                     ->excludeAttributesForCloning(['id', 'invoice_id', 'created_at', 'updated_at'])
                     ->hiddenLabel()
                     ->footerItem(
-                        fn (Get $get) => new HtmlString(
-                            'Total: '.app(InvoiceService::class)->formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
+                        fn(Get $get) => new HtmlString(
+                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceServices'))->sum(function ($service) {
                                 return app(InvoiceService::class)->parseCurrencyValue($service['price'] ?? '0');
                             }))
                         )
@@ -212,7 +209,7 @@ class InvoiceResource extends Resource
                                 ->label('Barang')
                                 ->hiddenLabel()
                                 ->relationship('item', 'name')
-                                ->getOptionLabelFromRecordUsing(fn (Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
+                                ->getOptionLabelFromRecordUsing(fn(Item $record) => "{$record->display_name} (SKU: {$record->sku}) - Stok: {$record->stock} {$record->unit}")
                                 ->searchable()
                                 ->preload()
                                 ->required()
@@ -221,7 +218,7 @@ class InvoiceResource extends Resource
                             Forms\Components\Textarea::make('description')->hiddenLabel()->placeholder('Masukkan deskripsi barang')->rows(1),
                         ]),
                         Forms\Components\TextInput::make('quantity')
-                            ->label(fn (Get $get) => 'Kuantitas'.($get('unit_name') ? ' ('.$get('unit_name').')' : ''))
+                            ->label(fn(Get $get) => 'Kuantitas' . ($get('unit_name') ? ' (' . $get('unit_name') . ')' : ''))
                             ->numeric()
                             ->step('0.01')
                             ->default(1.0)
@@ -255,7 +252,7 @@ class InvoiceResource extends Resource
                                     };
                                 },
                             ])
-                            ->suffix(fn (Get $get) => $get('unit_name') ? $get('unit_name') : null),
+                            ->suffix(fn(Get $get) => $get('unit_name') ? $get('unit_name') : null),
                         Forms\Components\TextInput::make('price')
                             ->label('Harga Satuan')
                             ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
@@ -276,8 +273,8 @@ class InvoiceResource extends Resource
                             }),
                     ])
                     ->footerItem(
-                        fn (Get $get) => new HtmlString(
-                            'Total: '.app(InvoiceService::class)->formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
+                        fn(Get $get) => new HtmlString(
+                            'Total: ' . app(InvoiceService::class)->formatCurrency(collect($get('invoiceItems'))->sum(function ($item) {
                                 $quantity = (float) ($item['quantity'] ?? 0.0);
                                 $price = app(InvoiceService::class)->parseCurrencyValue($item['price'] ?? '0');
 
@@ -298,7 +295,7 @@ class InvoiceResource extends Resource
                                 $itemRepeaterState = $component->getRawItemState($arguments['item']);
                                 $childItemId = $itemRepeaterState['item_id'] ?? null;
 
-                                return 'Pecah Stok untuk '.($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
+                                return 'Pecah Stok untuk ' . ($childItemId ? Item::find($childItemId)?->name : 'Item Belum Dipilih');
                             })
                             ->modalWidth('lg')
                             ->form(function (array $arguments, Forms\Components\Repeater $component) {
@@ -317,7 +314,7 @@ class InvoiceResource extends Resource
                                 return [
                                     Forms\Components\Placeholder::make('child_item_info')
                                         ->label('Item yang Akan Ditambah Stoknya')
-                                        ->content(fn () => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
+                                        ->content(fn() => "{$childItem->display_name} (Stok: {$childItem->stock} {$childItem->unit})"),
 
                                     Forms\Components\Select::make('from_item_id')
                                         ->label('Pilih Item Sumber (Induk)')
@@ -368,7 +365,7 @@ class InvoiceResource extends Resource
                                         ->default(1)
                                         ->required()
                                         ->minValue(1)
-                                        ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null)
+                                        ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null)
                                         ->live()
                                         ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state) use ($childItem) {
                                             $fromItemId = $get('from_item_id');
@@ -386,7 +383,7 @@ class InvoiceResource extends Resource
 
                                     Forms\Components\Placeholder::make('to_quantity_display')
                                         ->label('Jumlah Item yang Akan Dihasilkan')
-                                        ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity').' '.$get('to_quantity_unit_suffix') : '-'),
+                                        ->content(fn(Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
 
                                     Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
                                     Forms\Components\Hidden::make('to_quantity_unit_suffix')->default(null),
@@ -448,7 +445,7 @@ class InvoiceResource extends Resource
                                 } catch (\Exception $e) {
                                     Notification::make()
                                         ->title('Gagal Pecah Stok')
-                                        ->body('Terjadi kesalahan: '.$e->getMessage())
+                                        ->body('Terjadi kesalahan: ' . $e->getMessage())
                                         ->danger()
                                         ->send();
                                 }
@@ -533,7 +530,7 @@ class InvoiceResource extends Resource
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix(fn (Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
                                 ->live(), // Added debounce to reduce server load
                         ]),
 
@@ -586,12 +583,12 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
+                    ->formatStateUsing(fn(string $state): string => match ($state) {
                         'unpaid' => 'Belum Dibayar',
                         'partially_paid' => 'Sebagian Dibayar',
                         'paid' => 'Lunas',
                         'overdue' => 'Terlambat',
-                    })->badge()->color(fn (string $state): string => match ($state) {
+                    })->badge()->color(fn(string $state): string => match ($state) {
                         'unpaid' => 'gray',
                         'partially_paid' => 'info',
                         'paid' => 'success',
