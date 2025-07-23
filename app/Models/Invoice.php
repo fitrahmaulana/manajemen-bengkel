@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\InvoiceStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory; // Import HasFactory
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes; // Import SoftDeletes
@@ -11,6 +12,10 @@ class Invoice extends Model
     use HasFactory, SoftDeletes; // Use HasFactory and SoftDeletes trait
 
     protected $fillable = ['customer_id', 'vehicle_id', 'invoice_number', 'invoice_date', 'due_date', 'status', 'subtotal', 'discount_type', 'discount_value', 'total_amount', 'terms'];
+
+    protected $casts = [
+        'status' => InvoiceStatus::class,
+    ];
 
     public function customer()
     {
@@ -64,14 +69,4 @@ class Invoice extends Model
         return max(0, $this->total_paid_amount - $this->total_amount);
     }
 
-    /**
-     * Scope a query to only include overdue invoices.
-     *
-     * @param  \Illuminate\Database\Eloquent\Builder  $query
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeOverdue($query)
-    {
-        return $query->where('status', 'Overdue');
-    }
 }

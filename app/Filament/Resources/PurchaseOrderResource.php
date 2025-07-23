@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers;
 use App\Forms\Components\CustomTableRepeater;
@@ -53,7 +55,11 @@ class PurchaseOrderResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('po_number')->label('Nomor PO')->default('PO-'.date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['draft' => 'Draft', 'completed' => 'Completed'])->default('draft')->required()->disabled(fn (string $operation): bool => $operation !== 'create'),
+                        Forms\Components\Select::make('status')
+                            ->options(collect(PurchaseOrderStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->getLabel()]))
+                            ->default(PurchaseOrderStatus::DRAFT)
+                            ->required()
+                            ->disabled(fn (string $operation): bool => $operation !== 'create'),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('order_date')->label('Tanggal PO')->default(now())->required(),
@@ -198,30 +204,11 @@ class PurchaseOrderResource extends Resource
                 Tables\Columns\TextColumn::make('po_number')->label('No. PO')->searchable(),
                 Tables\Columns\TextColumn::make('supplier.name')->label('Supplier')->searchable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(fn (string $state): string => match ($state) {
-                        'draft' => 'Draft',
-                        'completed' => 'Selesai',
-                    })->badge()->color(fn (string $state): string => match ($state) {
-                        'draft' => 'gray',
-                        'completed' => 'success',
-                    })->searchable(),
+                    ->badge()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('payment_status')
                     ->label('Status Pembayaran')
-                    ->formatStateUsing(function (string $state): string {
-                        return match ($state) {
-                            'unpaid' => 'Belum Dibayar',
-                            'partial' => 'Sebagian Dibayar',
-                            'paid' => 'Lunas',
-                            default => $state,
-                        };
-                    })
-                    ->badge()
-                    ->color(fn (string $state): string => match ($state) {
-                        'unpaid' => 'danger',
-                        'partial' => 'info',
-                        'paid' => 'success',
-                        default => 'gray',
-                    }),
+                    ->badge(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('order_date')->label('Tanggal PO')->date('d M Y')->sortable(),
             ])
@@ -235,7 +222,7 @@ class PurchaseOrderResource extends Resource
                     Action::make('complete')
                         ->label('Complete')
                         ->action(function (PurchaseOrder $record) {
-                            if ($record->status === 'completed') {
+                            if ($record->status === PurchaseOrderStatus::COMPLETED) {
                                 Notification::make()
                                     ->title('Error')
                                     ->body('Purchase order is already completed.')
@@ -250,7 +237,7 @@ class PurchaseOrderResource extends Resource
                                 $item->item->save();
                             }
 
-                            $record->status = 'completed';
+                            $record->status = PurchaseOrderStatus::COMPLETED;
                             $record->save();
 
                             Notification::make()
@@ -262,11 +249,11 @@ class PurchaseOrderResource extends Resource
                         ->requiresConfirmation()
                         ->color('success')
                         ->icon('heroicon-o-check-circle')
-                        ->visible(fn (PurchaseOrder $record) => $record->status === 'draft'),
+                        ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::DRAFT),
                     Action::make('revert')
                         ->label('Kembalikan ke Draft')
                         ->action(function (PurchaseOrder $record) {
-                            if ($record->status !== 'completed') {
+                            if ($record->status !== PurchaseOrderStatus::COMPLETED) {
                                 Notification::make()
                                     ->title('Error')
                                     ->body('Purchase order must be completed before reverting.')
@@ -279,7 +266,7 @@ class PurchaseOrderResource extends Resource
                                 $item->item->decrement('stock', $item->quantity);
                             }
 
-                            $record->status = 'draft';
+                            $record->status = PurchaseOrderStatus::DRAFT;
                             $record->save();
 
                             Notification::make()->title('Sukses')->body('Pesanan dikembalikan ke draft dan stok telah disesuaikan.')->success()->send();
@@ -287,7 +274,7 @@ class PurchaseOrderResource extends Resource
                         ->requiresConfirmation()
                         ->color('warning')
                         ->icon('heroicon-o-arrow-uturn-left')
-                        ->visible(fn (PurchaseOrder $record) => $record->status === 'completed'),
+                        ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::COMPLETED),
                 ]),
             ])
             ->bulkActions([

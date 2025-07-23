@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Enums\PaymentStatus;
+use App\Enums\PurchaseOrderStatus;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -21,6 +23,11 @@ class PurchaseOrder extends Model
         'discount_value',
         'discount_type',
         'notes',
+    ];
+
+    protected $casts = [
+        'status' => PurchaseOrderStatus::class,
+        'payment_status' => PaymentStatus::class,
     ];
 
     public function supplier()
@@ -62,11 +69,11 @@ class PurchaseOrder extends Model
         $totalPaid = $this->total_paid_amount;
 
         if ($totalPaid <= 0) {
-            $this->payment_status = 'unpaid';
+            $this->payment_status = PaymentStatus::UNPAID;
         } elseif ($totalPaid < $this->total_amount) {
-            $this->payment_status = 'partial';
+            $this->payment_status = PaymentStatus::PARTIAL;
         } else {
-            $this->payment_status = 'paid';
+            $this->payment_status = PaymentStatus::PAID;
         }
 
         $this->save();

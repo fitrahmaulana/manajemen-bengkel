@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CustomerResource;
+use App\Enums\InvoiceStatus;
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Filament\Resources\VehicleResource;
 use App\Forms\Components\CustomTableRepeater;
@@ -115,7 +116,10 @@ class InvoiceResource extends Resource
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
-                        Forms\Components\Select::make('status')->options(['unpaid' => 'Belum Dibayar', 'partially_paid' => 'Sebagian Dibayar', 'paid' => 'Lunas', 'overdue' => 'Jatuh Tempo'])->default('unpaid')->required(),
+                        Forms\Components\Select::make('status')
+                            ->options(collect(InvoiceStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->getLabel()]))
+                            ->default(InvoiceStatus::UNPAID)
+                            ->required(),
                     ]),
                     Group::make()->schema([
                         Forms\Components\DatePicker::make('invoice_date')->label('Tanggal Invoice')->default(now())->required(),
@@ -583,17 +587,8 @@ class InvoiceResource extends Resource
                 Tables\Columns\TextColumn::make('invoice_number')->label('No. Invoice')->searchable(),
                 Tables\Columns\TextColumn::make('customer.name')->label('Pelanggan')->searchable(),
                 Tables\Columns\TextColumn::make('status')
-                    ->formatStateUsing(fn(string $state): string => match ($state) {
-                        'unpaid' => 'Belum Dibayar',
-                        'partially_paid' => 'Sebagian Dibayar',
-                        'paid' => 'Lunas',
-                        'overdue' => 'Terlambat',
-                    })->badge()->color(fn(string $state): string => match ($state) {
-                        'unpaid' => 'gray',
-                        'partially_paid' => 'info',
-                        'paid' => 'success',
-                        'overdue' => 'danger',
-                    })->searchable(),
+                    ->badge()
+                    ->searchable(),
                 Tables\Columns\TextColumn::make('total_amount')->label('Total Biaya')->currency('IDR')->sortable(),
                 Tables\Columns\TextColumn::make('invoice_date')->label('Tanggal Invoice')->date('d M Y')->sortable(),
                 Tables\Columns\TextColumn::make('due_date')->label('Jatuh Tempo')->date('d M Y')->sortable(),

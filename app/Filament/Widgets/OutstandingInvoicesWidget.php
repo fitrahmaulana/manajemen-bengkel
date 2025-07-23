@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
@@ -13,11 +14,15 @@ class OutstandingInvoicesWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $outstandingInvoices = Invoice::whereIn('status', ['unpaid', 'partially_paid', 'overdue'])->get();
+        $outstandingInvoices = Invoice::whereIn('status', [
+            InvoiceStatus::UNPAID,
+            InvoiceStatus::PARTIALLY_PAID,
+            InvoiceStatus::OVERDUE
+        ])->get();
 
         $outstandingInvoicesCount = $outstandingInvoices->count();
         $totalOutstandingAmount = $outstandingInvoices->sum('balance_due');
-        $overdueInvoicesCount = $outstandingInvoices->where('status', 'overdue')->count();
+        $overdueInvoicesCount = $outstandingInvoices->where('status', InvoiceStatus::OVERDUE)->count();
 
         return [
             Stat::make('Invoice Belum Dibayar', $outstandingInvoicesCount)
