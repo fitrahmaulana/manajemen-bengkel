@@ -3,14 +3,12 @@
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
 use App\Filament\Resources\PurchaseOrderResource;
-use Filament\Actions;
-use Filament\Resources\Pages\ViewRecord;
-
-use Filament\Infolists\Infolist;
-use Filament\Infolists;
-
 use App\Models\PurchaseOrder;
+use Filament\Actions;
+use Filament\Infolists;
+use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
+use Filament\Resources\Pages\ViewRecord;
 
 class ViewPurchaseOrder extends ViewRecord
 {
@@ -33,6 +31,7 @@ class ViewPurchaseOrder extends ViewRecord
                             ->body('Purchase order is already completed.')
                             ->danger()
                             ->send();
+
                         return;
                     }
 
@@ -53,7 +52,7 @@ class ViewPurchaseOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('success')
                 ->icon('heroicon-o-check-circle')
-                ->visible(fn(PurchaseOrder $record) => $record->status === 'draft'),
+                ->visible(fn (PurchaseOrder $record) => $record->status === 'draft'),
             Actions\Action::make('revert')
                 ->label('Kembalikan ke Draft')
                 ->action(function (PurchaseOrder $record) {
@@ -63,6 +62,7 @@ class ViewPurchaseOrder extends ViewRecord
                             ->body('Purchase order must be completed before reverting.')
                             ->danger()
                             ->send();
+
                         return;
                     }
                     foreach ($record->purchaseOrderItems as $item) {
@@ -77,7 +77,7 @@ class ViewPurchaseOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('warning')
                 ->icon('heroicon-o-arrow-uturn-left')
-                ->visible(fn(PurchaseOrder $record) => $record->status === 'completed'),
+                ->visible(fn (PurchaseOrder $record) => $record->status === 'completed'),
         ];
     }
 
@@ -95,11 +95,11 @@ class ViewPurchaseOrder extends ViewRecord
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('po_number')->label('No. PO'),
                                     Infolists\Components\TextEntry::make('status')
-                                        ->formatStateUsing(fn(string $state): string => match ($state) {
+                                        ->formatStateUsing(fn (string $state): string => match ($state) {
                                             'draft' => 'Draft',
                                             'completed' => 'Selesai',
                                         })
-                                        ->badge()->color(fn(string $state): string => match ($state) {
+                                        ->badge()->color(fn (string $state): string => match ($state) {
                                             'draft' => 'gray',
                                             'completed' => 'success',
                                         }),
@@ -118,7 +118,7 @@ class ViewPurchaseOrder extends ViewRecord
                                             }
                                         })
                                         ->badge()
-                                        ->color(fn(string $state): string => match ($state) {
+                                        ->color(fn (string $state): string => match ($state) {
                                             'Belum Dibayar' => 'gray',
                                             'Sebagian Dibayar' => 'info',
                                             'Lunas' => 'success',
@@ -140,13 +140,14 @@ class ViewPurchaseOrder extends ViewRecord
                                     ->label('Kuantitas')
                                     ->formatStateUsing(function ($record) {
                                         $unit = $record->item->unit;
-                                        return ($record->quantity ?? ' ') . " $unit";
+
+                                        return ($record->quantity ?? ' ')." $unit";
                                     }),
                                 Infolists\Components\TextEntry::make('price')->label('Harga Satuan')->currency('IDR'),
                                 Infolists\Components\TextEntry::make('sub_total_calculated')
                                     ->label('Subtotal')
                                     ->currency('IDR')
-                                    ->state(fn($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
+                                    ->state(fn ($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
                                 Infolists\Components\TextEntry::make('description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -167,9 +168,10 @@ class ViewPurchaseOrder extends ViewRecord
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
                                             if ($record->discount_type === 'percentage') {
-                                                return ($record->discount_value ?? 0) . '%';
+                                                return ($record->discount_value ?? 0).'%';
                                             }
-                                            return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
+
+                                            return 'Rp. '.number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
                                 ]),
                                 Infolists\Components\Group::make()->schema([
@@ -179,25 +181,25 @@ class ViewPurchaseOrder extends ViewRecord
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->state(fn ($record) => $record->total_paid_amount)
                                         ->weight('semibold'),
                                     Infolists\Components\TextEntry::make('balance_due')
                                         ->label('Sisa Tagihan')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due)
+                                        ->state(fn ($record) => $record->balance_due)
                                         ->weight('bold')
                                         ->color('danger') // Red untuk urgent
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->visible(fn ($record) => $record->balance_due > 0)
                                         ->icon('heroicon-o-exclamation-triangle'),
                                     Infolists\Components\TextEntry::make('overpayment')
                                         ->label('Kembalian')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->overpayment)
+                                        ->state(fn ($record) => $record->overpayment)
                                         ->weight('bold')
                                         ->color('success') // Green untuk positive
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->overpayment > 0)
+                                        ->visible(fn ($record) => $record->overpayment > 0)
                                         ->icon('heroicon-o-banknotes'),
                                 ]),
                             ]),

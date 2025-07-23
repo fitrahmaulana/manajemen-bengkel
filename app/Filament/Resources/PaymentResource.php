@@ -8,7 +8,7 @@ use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelati
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
-use App\Traits\InvoiceCalculationTrait;
+use App\Services\InvoiceService;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
@@ -18,16 +18,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class PaymentResource extends Resource
 {
-    use InvoiceCalculationTrait;
-
     protected static ?string $model = Payment::class;
+
     protected static bool $shouldRegisterNavigation = false;
 
     protected static ?string $navigationIcon = 'heroicon-o-banknotes';
+
     protected static ?string $navigationGroup = 'Transaksi';
+
     protected static ?string $navigationLabel = 'Pembayaran';
+
     protected static ?string $modelLabel = 'Pembayaran';
+
     protected static ?string $pluralModelLabel = 'Daftar Pembayaran';
+
     protected static ?int $navigationSort = 2;
 
     private static function getPayableFromContext(Forms\Get $get, $record, $livewire): ?Model
@@ -85,15 +89,17 @@ class PaymentResource extends Resource
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
                                 if ($payable) {
                                     if ($record) {
-                                        return '🧾 ' . self::formatCurrency($payable->total_amount);
+                                        return '🧾 '.app(InvoiceService::class)->formatCurrency($payable->total_amount);
                                     }
-                                    return '🧾 ' . self::formatCurrency($payable->balance_due ?? $payable->total_amount);
+
+                                    return '🧾 '.app(InvoiceService::class)->formatCurrency($payable->balance_due ?? $payable->total_amount);
                                 }
+
                                 return '🧾 Pilih tagihan terlebih dahulu';
                             })
                             ->extraAttributes([
                                 'class' => 'border border-200 rounded-lg p-3 font-bold',
-                                'style' => 'margin: 8px 0;'
+                                'style' => 'margin: 8px 0;',
                             ]),
 
                         Forms\Components\TextInput::make('amount_paid')
@@ -108,7 +114,7 @@ class PaymentResource extends Resource
                             ->afterStateUpdated(function ($state, $set, $get, $record, $livewire) {
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
                                 if ($payable) {
-                                    $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)$state);
+                                    $amountPaid = (float) str_replace(['Rp. ', '.'], ['', ''], (string) $state);
                                     $balanceDue = $payable->balance_due ?? $payable->total_amount;
 
                                     if ($amountPaid > $balanceDue) {
@@ -132,6 +138,7 @@ class PaymentResource extends Resource
                                     if ($payable) {
                                         return $payable->balance_due ?? $payable->total_amount;
                                     }
+
                                     return null;
                                 }
                             }),
@@ -140,24 +147,24 @@ class PaymentResource extends Resource
                             ->label('Pilihan Cepat Pembayaran')
                             ->helperText('Klik salah satu tombol untuk mengisi jumlah bayar secara otomatis.')
                             ->live()
-                            ->afterStateUpdated(fn($state, $set) => $set('amount_paid', $state))
-                            ->visible(fn(string $operation) => $operation === 'create')
+                            ->afterStateUpdated(fn ($state, $set) => $set('amount_paid', $state))
+                            ->visible(fn (string $operation) => $operation === 'create')
                             ->options(function (Forms\Get $get, $livewire): array {
                                 $payable = self::getPayableFromContext($get, null, $livewire);
 
-                                if (!$payable) {
+                                if (! $payable) {
                                     return [];
                                 }
 
                                 $totalBill = $payable->balance_due ?? $payable->total_amount;
-                                if (!$totalBill || $totalBill <= 0) {
+                                if (! $totalBill || $totalBill <= 0) {
                                     return [];
                                 }
 
                                 $options = [];
                                 $suggestions = [];
 
-                                $options[(string)$totalBill] = '💰 Uang Pas';
+                                $options[(string) $totalBill] = '💰 Uang Pas';
 
                                 $roundingBases = [10000, 20000, 50000, 100000];
 
@@ -186,7 +193,7 @@ class PaymentResource extends Resource
 
                                 foreach ($finalSuggestions as $s) {
                                     if ($s != $totalBill) {
-                                        $options[(string)$s] = '💵 Rp. ' . number_format($s, 0, ',', '.');
+                                        $options[(string) $s] = '💵 Rp. '.number_format($s, 0, ',', '.');
                                     }
                                 }
 
@@ -197,22 +204,22 @@ class PaymentResource extends Resource
                         Forms\Components\Placeholder::make('kembalian_calculator')
                             ->label('Kembalian')
                             ->content(function (Forms\Get $get, $record, $livewire) {
-                                $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
+                                $amountPaid = (float) str_replace(['Rp. ', '.'], ['', ''], (string) ($get('amount_paid') ?? '0'));
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
 
-                                if (!$payable) {
+                                if (! $payable) {
                                     return '💵 Rp. 0';
                                 }
 
                                 $change = self::calculateChange($amountPaid, $payable, $record);
 
-                                return '💵 ' . self::formatCurrency($change);
+                                return '💵 '.app(InvoiceService::class)->formatCurrency($change);
                             })
                             ->extraAttributes(function (Forms\Get $get, $record, $livewire) {
-                                $amountPaid = (float)str_replace(['Rp. ', '.'], ['', ''], (string)($get('amount_paid') ?? '0'));
+                                $amountPaid = (float) str_replace(['Rp. ', '.'], ['', ''], (string) ($get('amount_paid') ?? '0'));
                                 $payable = self::getPayableFromContext($get, $record, $livewire);
 
-                                if (!$payable) {
+                                if (! $payable) {
                                     return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                                 }
 
@@ -223,6 +230,7 @@ class PaymentResource extends Resource
                                 } elseif ($change < 0) {
                                     return ['class' => 'bg-red-50 border border-red-200 rounded-lg p-4 text-red-700 font-bold text-xl'];
                                 }
+
                                 return ['class' => 'bg-gray-50 border border-gray-200 rounded-lg p-4 text-gray-700 font-bold text-xl'];
                             }),
 
@@ -250,7 +258,7 @@ class PaymentResource extends Resource
             ->columns([
                 Tables\Columns\TextColumn::make('payable')
                     ->label('Nomor Tagihan')
-                    ->formatStateUsing(fn($state) => $state->invoice_number ?? $state->po_number)
+                    ->formatStateUsing(fn ($state) => $state->invoice_number ?? $state->po_number)
                     ->searchable(
                         query: function ($query, string $search) {
                             // Membuat search berfungsi untuk kedua kolom
@@ -309,7 +317,7 @@ class PaymentResource extends Resource
 
                             foreach ($payables as $payable) {
                                 if ($payable instanceof Invoice) {
-                                    self::updateInvoiceStatus($payable);
+                                    app(InvoiceService::class)->updateInvoiceStatus($payable);
                                 }
                             }
                         }),
@@ -326,7 +334,7 @@ class PaymentResource extends Resource
 
     public static function calculateChange(float $amountPaid, Model $payable, ?Payment $currentPayment = null): float
     {
-        if (!$payable) {
+        if (! $payable) {
             return 0;
         }
 
@@ -339,14 +347,14 @@ class PaymentResource extends Resource
 
     public static function handleAfterPaymentAction(?Payment $payment = null): void
     {
-        if (!$payment) {
+        if (! $payment) {
             return;
         }
 
         $payable = $payment->payable;
 
         if ($payable instanceof Invoice) {
-            self::updateInvoiceStatus($payable);
+            app(InvoiceService::class)->updateInvoiceStatus($payable);
             $payable->refresh();
 
             $newStatus = $payable->status;
@@ -357,7 +365,7 @@ class PaymentResource extends Resource
                 if ($overpayment > 0) {
                     \Filament\Notifications\Notification::make()
                         ->title('✅ Invoice Lunas dengan Kembalian')
-                        ->body("Invoice {$payable->invoice_number} lunas. Kembalian: Rp. " . number_format($overpayment, 0, ',', '.'))
+                        ->body("Invoice {$payable->invoice_number} lunas. Kembalian: Rp. ".number_format($overpayment, 0, ',', '.'))
                         ->success()
                         ->send();
                 } else {
@@ -370,19 +378,19 @@ class PaymentResource extends Resource
             } elseif ($newStatus === 'partially_paid') {
                 \Filament\Notifications\Notification::make()
                     ->title('💰 Status Pembayaran Diperbarui')
-                    ->body("Invoice {$payable->invoice_number} sebagian dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} sebagian dibayar. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))
                     ->info()
                     ->send();
             } elseif ($newStatus === 'unpaid') {
                 \Filament\Notifications\Notification::make()
                     ->title('📋 Status Invoice Diperbarui')
-                    ->body("Invoice {$payable->invoice_number} menjadi belum dibayar. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} menjadi belum dibayar. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))
                     ->warning()
                     ->send();
             } elseif ($newStatus === 'overdue') {
                 \Filament\Notifications\Notification::make()
                     ->title('⚠️ Invoice Jatuh Tempo')
-                    ->body("Invoice {$payable->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. " . number_format($balanceDue, 0, ',', '.'))
+                    ->body("Invoice {$payable->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))
                     ->danger()
                     ->send();
             }

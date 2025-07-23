@@ -28,7 +28,7 @@ class InvoiceRelationSeeder extends Seeder
                     $service = $services->find($serviceId);
                     $invoice->services()->attach($serviceId, [
                         'price' => $service->price,
-                        'description' => $service->description
+                        'description' => $service->description,
                     ]);
                 }
 
@@ -39,7 +39,7 @@ class InvoiceRelationSeeder extends Seeder
                     $invoice->items()->attach($itemId, [
                         'quantity' => rand(1, 3),
                         'price' => $item->selling_price,
-                        'description' => $item->name
+                        'description' => $item->name,
                     ]);
                 }
             }

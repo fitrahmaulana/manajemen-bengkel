@@ -22,16 +22,14 @@ class Invoice extends Model
         return $this->belongsTo(Vehicle::class);
     }
 
-    public function services()
+    public function invoiceServices()
     {
-        return $this->belongsToMany(Service::class, 'invoice_service')->withPivot('price', 'description');
+        return $this->hasMany(InvoiceService::class);
     }
 
-    public function items()
+    public function invoiceItems()
     {
-        return $this->belongsToMany(Item::class, 'invoice_item')
-            ->withPivot('quantity', 'price', 'description')
-            ->using(InvoiceItem::class);
+        return $this->hasMany(InvoiceItem::class);
     }
 
     /**
@@ -44,8 +42,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the total amount paid.
-     *
-     * @return float
      */
     public function getTotalPaidAmountAttribute(): float
     {
@@ -54,8 +50,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the balance due.
-     *
-     * @return float
      */
     public function getBalanceDueAttribute(): float
     {
@@ -64,8 +58,6 @@ class Invoice extends Model
 
     /**
      * Accessor for the overpayment amount.
-     *
-     * @return float
      */
     public function getOverpaymentAttribute(): float
     {

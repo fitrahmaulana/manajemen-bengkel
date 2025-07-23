@@ -2,14 +2,11 @@
 
 namespace App\Filament\Resources\CustomerResource\RelationManagers;
 
-use Filament\Forms;
+use App\Filament\Resources\VehicleResource;
 use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
-use App\Filament\Resources\VehicleResource;
 
 class VehiclesRelationManager extends RelationManager
 {
@@ -19,7 +16,7 @@ class VehiclesRelationManager extends RelationManager
     {
         return $form
             ->schema(VehicleResource::getFormSchema());
-        }
+    }
 
     public function table(Table $table): Table
     {

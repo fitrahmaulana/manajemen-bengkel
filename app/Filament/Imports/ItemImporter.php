@@ -6,10 +6,9 @@ use App\Models\Item;
 use App\Models\Product;
 use App\Models\Supplier;
 use App\Models\TypeItem;
-use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\ImportColumn;
+use Filament\Actions\Imports\Importer;
 use Filament\Actions\Imports\Models\Import;
-use Illuminate\Support\Str;
 
 class ItemImporter extends Importer
 {
@@ -85,7 +84,6 @@ class ItemImporter extends Importer
             ImportColumn::make('name')
                 ->label('Nama Varian'),
 
-
             ImportColumn::make('sku')
                 ->label('SKU Varian')
                 ->requiredMapping()
@@ -133,7 +131,6 @@ class ItemImporter extends Importer
     /**
      * Cari Item berdasarkan SKU, atau buat baru.
      */
-
     public function resolveRecord(): ?Item
     {
         return Item::firstOrNew([
@@ -154,10 +151,10 @@ class ItemImporter extends Importer
 
     public static function getCompletedNotificationBody(Import $import): string
     {
-        $body = 'Your item import has completed and ' . number_format($import->successful_rows) . ' ' . str('row')->plural($import->successful_rows) . ' imported.';
+        $body = 'Your item import has completed and '.number_format($import->successful_rows).' '.str('row')->plural($import->successful_rows).' imported.';
 
         if ($failedRowsCount = $import->getFailedRowsCount()) {
-            $body .= ' ' . number_format($failedRowsCount) . ' ' . str('row')->plural($failedRowsCount) . ' failed to import.';
+            $body .= ' '.number_format($failedRowsCount).' '.str('row')->plural($failedRowsCount).' failed to import.';
         }
 
         return $body;

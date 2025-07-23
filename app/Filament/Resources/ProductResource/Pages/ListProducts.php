@@ -2,15 +2,13 @@
 
 namespace App\Filament\Resources\ProductResource\Pages;
 
-use App\Filament\Resources\ProductResource;
-use App\Models\Item;
-use Filament\Actions;
-use Filament\Resources\Pages\ListRecords;
 use App\Filament\Exports\ItemExporter;
 use App\Filament\Imports\ItemImporter;
-use Filament\Actions\ImportAction;
+use App\Filament\Resources\ProductResource;
+use Filament\Actions;
 use Filament\Actions\ExportAction;
-
+use Filament\Actions\ImportAction;
+use Filament\Resources\Pages\ListRecords;
 
 class ListProducts extends ListRecords
 {

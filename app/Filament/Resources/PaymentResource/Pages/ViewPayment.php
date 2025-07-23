@@ -15,7 +15,7 @@ class ViewPayment extends ViewRecord
         return [
             Actions\EditAction::make(),
             Actions\DeleteAction::make()
-             ->after(function ($record) {
+                ->after(function ($record) {
                     $invoice = $record->invoice()->withTrashed()->first();
                     if ($invoice) {
                         $invoice->refresh();
@@ -23,7 +23,7 @@ class ViewPayment extends ViewRecord
                         // POS Style status update
                         if ($invoice->total_paid_amount >= $invoice->total_amount) {
                             $invoice->status = 'paid';
-                        } else if ($invoice->payments()->exists()) {
+                        } elseif ($invoice->payments()->exists()) {
                             $invoice->status = 'partially_paid';
                         } else {
                             $invoice->status = 'unpaid';

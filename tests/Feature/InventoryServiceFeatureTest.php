@@ -4,22 +4,23 @@ namespace Tests\Feature;
 
 use App\Models\Item;
 use App\Models\User;
-use App\Services\StockConversionService;
+use App\Services\InventoryService;
+use Exception;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
-use Exception;
 
-class StockConversionServiceTest extends TestCase
+class InventoryServiceFeatureTest extends TestCase
 {
     use RefreshDatabase;
 
-    protected StockConversionService $stockConversionService;
+    protected InventoryService $inventoryService;
+
     protected User $user;
 
     protected function setUp(): void
     {
         parent::setUp();
-        $this->stockConversionService = $this->app->make(StockConversionService::class);
+        $this->inventoryService = $this->app->make(InventoryService::class);
         $this->user = User::factory()->create();
         $this->actingAs($this->user); // Authenticate a user for Auth::id()
     }
@@ -48,7 +49,7 @@ class StockConversionServiceTest extends TestCase
         $fromQuantity = 1;
         $toQuantity = 12; // 1 Dus = 12 Pcs
 
-        $conversion = $this->stockConversionService->convertStock(
+        $conversion = $this->inventoryService->convertStock(
             fromItemId: $itemA->id,
             toItemId: $itemB->id,
             fromQuantity: $fromQuantity,
@@ -78,7 +79,7 @@ class StockConversionServiceTest extends TestCase
         $this->expectException(Exception::class);
         $this->expectExceptionMessage("Stok item '{$itemA->display_name}' tidak mencukupi untuk konversi. Stok saat ini: 2.");
 
-        $this->stockConversionService->convertStock(
+        $this->inventoryService->convertStock(
             fromItemId: $itemA->id,
             toItemId: $itemB->id,
             fromQuantity: 3, // Attempting to convert more than available
@@ -93,11 +94,11 @@ class StockConversionServiceTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Kuantitas konversi harus lebih besar dari nol.');
-        $this->stockConversionService->convertStock($itemA->id, $itemB->id, 0, 5);
+        $this->inventoryService->convertStock($itemA->id, $itemB->id, 0, 5);
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Kuantitas konversi harus lebih besar dari nol.');
-        $this->stockConversionService->convertStock($itemA->id, $itemB->id, 5, 0);
+        $this->inventoryService->convertStock($itemA->id, $itemB->id, 5, 0);
     }
 
     public function test_conversion_fails_if_from_item_and_to_item_are_the_same(): void
@@ -106,7 +107,7 @@ class StockConversionServiceTest extends TestCase
 
         $this->expectException(Exception::class);
         $this->expectExceptionMessage('Tidak bisa mengkonversi item ke dirinya sendiri.');
-        $this->stockConversionService->convertStock($itemA->id, $itemA->id, 1, 1);
+        $this->inventoryService->convertStock($itemA->id, $itemA->id, 1, 1);
     }
 
     public function test_conversion_rolls_back_on_exception_after_first_item_update(): void
@@ -130,11 +131,12 @@ class StockConversionServiceTest extends TestCase
             static $callCount = 0;
             if ($callCount === 0) {
                 $callCount++;
+
                 return $itemA; // Return the real item A
             }
+
             return $mockedItemB; // Return the mocked item B for the second findOrFail
         });
-
 
         // A more direct way to test transaction, if possible, is to mock DB::transaction
         // or ensure an exception is thrown by one of the operations *inside* the transaction closure.
@@ -155,7 +157,7 @@ class StockConversionServiceTest extends TestCase
             // or to manually throw an exception within the DB::transaction in a test-specific version of the service.
 
             // Let's simulate a scenario where $toItem does not exist, forcing a ModelNotFoundException inside transaction
-            $this->stockConversionService->convertStock(
+            $this->inventoryService->convertStock(
                 fromItemId: $itemA->id,
                 toItemId: 99999, // Non-existent item
                 fromQuantity: 1,
@@ -167,8 +169,8 @@ class StockConversionServiceTest extends TestCase
 
         $this->app->offsetUnset(Item::class); // Unbind the mock
 
-        $this->assertEquals($initialStockA, $itemA->fresh()->stock, "Stock A should be rolled back.");
-        $this->assertEquals($initialStockB, $itemB->fresh()->stock, "Stock B should not have changed if toItem failed.");
+        $this->assertEquals($initialStockA, $itemA->fresh()->stock, 'Stock A should be rolled back.');
+        $this->assertEquals($initialStockB, $itemB->fresh()->stock, 'Stock B should not have changed if toItem failed.');
         $this->assertDatabaseMissing('item_stock_conversions', [
             'from_item_id' => $itemA->id,
         ]);

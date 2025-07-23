@@ -5,7 +5,6 @@ namespace App\Filament\Resources\ProductResource\Pages;
 use App\Filament\Resources\ProductResource;
 use App\Models\Item;
 use App\Models\Product;
-use Filament\Actions;
 use Filament\Resources\Pages\CreateRecord;
 use Illuminate\Database\Eloquent\Model;
 
@@ -50,7 +49,7 @@ class CreateProduct extends CreateRecord
         $product = Product::create($data);
 
         // Langsung buat item berdasarkan jenis product
-        if (!$product->has_variants) {
+        if (! $product->has_variants) {
             // Produk standard - gunakan data dari standardData
             $this->createDefaultItem($product);
         }
@@ -80,6 +79,7 @@ class CreateProduct extends CreateRecord
     private function generateDefaultSKU($product): string
     {
         $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $product->name), 0, 6));
-        return $productCode . '-STD';
+
+        return $productCode.'-STD';
     }
 }

@@ -30,7 +30,7 @@ class EditProduct extends EditRecord
         $data['has_variants'] = $product->has_variants;
 
         // Load existing items untuk pre-fill form
-        if (!$product->has_variants) {
+        if (! $product->has_variants) {
             $item = $product->items->first();
             if ($item) {
                 $data['standard_sku'] = $item->sku;
@@ -64,17 +64,18 @@ class EditProduct extends EditRecord
     protected function handleRecordUpdate(Model $record, array $data): Model
     {
         // Refactor: gunakan transaction untuk update product dan item
-        try{
+        try {
             DB::transaction(function () use ($record, $data) {
                 $record->update($data);
                 $this->handleItemsAfterProductUpdate($record);
             });
+
             return $record;
         } catch (\Exception $e) {
             // Tampilkan notifikasi error ke user
             Notification::make()
                 ->title('Gagal menyimpan data')
-                ->body('Terjadi kesalahan: ' . $e->getMessage())
+                ->body('Terjadi kesalahan: '.$e->getMessage())
                 ->danger()
                 ->send();
             throw $e;
@@ -97,7 +98,7 @@ class EditProduct extends EditRecord
             // Hapus semua items lama dulu
             $product->items()->delete();
 
-            $sku = $data['standard_sku'] ?: ($productCode . '-STD');
+            $sku = $data['standard_sku'] ?: ($productCode.'-STD');
 
             Item::create([
                 'product_id' => $product->id,

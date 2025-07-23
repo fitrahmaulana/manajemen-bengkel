@@ -12,19 +12,19 @@ class ItemTypeSeeder extends Seeder
         $types = [
             [
                 'name' => 'Spare Parts',
-                'description' => 'Suku cadang kendaraan seperti kampas rem, filter, busi, dll'
+                'description' => 'Suku cadang kendaraan seperti kampas rem, filter, busi, dll',
             ],
             [
                 'name' => 'Oli & Cairan',
-                'description' => 'Berbagai jenis oli mesin, oli transmisi, cairan rem, coolant, dll'
+                'description' => 'Berbagai jenis oli mesin, oli transmisi, cairan rem, coolant, dll',
             ],
             [
                 'name' => 'Ban & Velg',
-                'description' => 'Ban mobil, velg racing, ban dalam, dll'
+                'description' => 'Ban mobil, velg racing, ban dalam, dll',
             ],
             [
                 'name' => 'Aksesoris',
-                'description' => 'Aksesoris kendaraan seperti karpet, cover, parfum mobil, dll'
+                'description' => 'Aksesoris kendaraan seperti karpet, cover, parfum mobil, dll',
             ],
         ];
 

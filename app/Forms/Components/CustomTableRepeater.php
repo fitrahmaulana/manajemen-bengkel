@@ -11,15 +11,15 @@ use Illuminate\Contracts\View\View;
 
 class CustomTableRepeater extends TableRepeater
 {
-    protected bool | Closure $reorderAtStart = false;
+    protected bool|Closure $reorderAtStart = false;
 
-    protected View | Htmlable | Closure | null $footerItem = null;
+    protected View|Htmlable|Closure|null $footerItem = null;
 
     /**
      * @var array<string> | Closure | null
-     * Atribut yang akan dikecualikan saat melakukan clone/duplikasi baris
+     *                                     Atribut yang akan dikecualikan saat melakukan clone/duplikasi baris
      */
-    protected array | Closure | null $excludedAttributesForCloning = [
+    protected array|Closure|null $excludedAttributesForCloning = [
         'id',
         'uuid',
         'invoice_id',
@@ -27,7 +27,7 @@ class CustomTableRepeater extends TableRepeater
         'updated_at',
     ];
 
-    public function reorderAtStart(bool | Closure $condition = true): static
+    public function reorderAtStart(bool|Closure $condition = true): static
     {
         $this->reorderAtStart = $condition;
 
@@ -46,14 +46,14 @@ class CustomTableRepeater extends TableRepeater
      * atau
      * ->footerItem(fn() => 'Total: Rp ' . number_format($this->calculateTotal()))
      */
-    public function footerItem(View | Htmlable | Closure | null $footer = null): static
+    public function footerItem(View|Htmlable|Closure|null $footer = null): static
     {
         $this->footerItem = $footer;
 
         return $this;
     }
 
-    public function getFooterItem(): View | Htmlable | null
+    public function getFooterItem(): View|Htmlable|null
     {
         return $this->evaluate($this->footerItem);
     }
@@ -69,7 +69,7 @@ class CustomTableRepeater extends TableRepeater
      *
      * @param  array<string> | Closure | null  $attributes
      */
-    public function excludeAttributesForCloning(array | Closure | null $attributes): static
+    public function excludeAttributesForCloning(array|Closure|null $attributes): static
     {
         $this->excludedAttributesForCloning = $attributes;
 

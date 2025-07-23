@@ -1,44 +1,44 @@
 <?php
 
-namespace App\Traits;
+namespace App\Services;
 
 use App\Models\Invoice;
 use App\Models\Item;
 use Filament\Forms\Get;
 use Filament\Forms\Set;
 
-trait InvoiceCalculationTrait
+class InvoiceService
 {
     /**
      * Calculate invoice totals with optimized performance
      * Reduces server load by doing minimal processing
      */
-    public static function calculateInvoiceTotals(Get $get, Set $set): void
+    public function calculateInvoiceTotals(Get $get, Set $set): void
     {
-        $servicesData = $get('services') ?? [];
-        $itemsData = $get('items') ?? [];
+        $servicesData = $get('invoiceServices') ?? [];
+        $itemsData = $get('invoiceItems') ?? [];
 
         $subtotal = 0;
 
         // Calculate subtotal from services
         foreach ($servicesData as $service) {
-            if (!empty($service['service_id']) && isset($service['price'])) {
-                $price = self::parseCurrencyValue($service['price']);
+            if (! empty($service['service_id']) && isset($service['price'])) {
+                $price = $this->parseCurrencyValue($service['price']);
                 $subtotal += $price;
             }
         }
 
         // Calculate subtotal from items
         foreach ($itemsData as $item) {
-            if (!empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
-                $price = self::parseCurrencyValue($item['price']);
-                $quantity = (float)($item['quantity'] ?? 1.0); // Changed to float
+            if (! empty($item['item_id']) && isset($item['price']) && isset($item['quantity'])) {
+                $price = $this->parseCurrencyValue($item['price']);
+                $quantity = (float) ($item['quantity'] ?? 1.0); // Changed to float
                 $subtotal += $price * $quantity;
             }
         }
 
         // Calculate discount
-        $discountValue = self::parseCurrencyValue($get('discount_value') ?? '0');
+        $discountValue = $this->parseCurrencyValue($get('discount_value') ?? '0');
         $finalDiscount = 0;
 
         if ($get('discount_type') === 'percentage' && $discountValue > 0) {
@@ -56,39 +56,41 @@ trait InvoiceCalculationTrait
     /**
      * Parse currency value from masked input
      */
-    public static function parseCurrencyValue($value): float
+    public function parseCurrencyValue($value): float
     {
-        if (!$value) return 0;
+        if (! $value) {
+            return 0;
+        }
 
-        return (float)str_replace(
+        return (float) str_replace(
             ['Rp. ', '.', ','],
             ['', '', '.'],
-            (string)$value
+            (string) $value
         );
     }
 
     /**
      * Format currency for display
      */
-    public static function formatCurrency($value): string
+    public function formatCurrency($value): string
     {
-        return 'Rp. ' . number_format($value, 0, ',', '.');
+        return 'Rp. '.number_format($value, 0, ',', '.');
     }
 
     /**
      * Update invoice status based on payments (POS style logic)
      */
-    public static function updateInvoiceStatus(Invoice $invoice): void
+    public function updateInvoiceStatus(Invoice $invoice): void
     {
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
 
-        //jika tidak ada pembayaran, statusnya unpaid atau overdue
+        // jika tidak ada pembayaran, statusnya unpaid atau overdue
         if ($totalPaid <= 0) {
             $status = $invoice->due_date < now() ? 'overdue' : 'unpaid';
-        } elseif ($totalPaid >= $totalAmount) { //jika sudah terbayar penuh
+        } elseif ($totalPaid >= $totalAmount) { // jika sudah terbayar penuh
             $status = 'paid'; // POS style: overpayment is still "paid"
-        } else { //jika ada pembayaran tapi belum penuh
+        } else { // jika ada pembayaran tapi belum penuh
             $status = $invoice->due_date < now() ? 'overdue' : 'partially_paid';
         }
 
@@ -98,7 +100,7 @@ trait InvoiceCalculationTrait
     /**
      * Get payment status details for display
      */
-    public static function getPaymentStatusDetails(Invoice $invoice): array
+    public function getPaymentStatusDetails(Invoice $invoice): array
     {
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
@@ -119,7 +121,7 @@ trait InvoiceCalculationTrait
     /**
      * Create optimized afterStateUpdated function for price fields
      */
-    public static function createDebouncedCalculation(): callable
+    public function createDebouncedCalculation(): callable
     {
         return function (Get $get, Set $set) {
             // Only calculate if we have meaningful data
@@ -130,62 +132,60 @@ trait InvoiceCalculationTrait
                 return; // Skip calculation if no items/services
             }
 
-            self::calculateInvoiceTotals($get, $set);
+            $this->calculateInvoiceTotals($get, $set);
         };
     }
 
     /**
      * Validation helper for stock checking
      */
-    public static function validateStockAvailability(
+    public function validateStockAvailability(
         int $itemId,
-        float $quantity, // Ubah dari int ke float untuk mendukung desimal
+        float $quantity,
         ?Invoice $currentInvoice = null
     ): array {
-        $item = \App\Models\Item::find($itemId);
+        $item = Item::find($itemId);
 
-        if (!$item) {
-            return [
-                'valid' => false,
-                'message' => 'Item tidak valid.'
-            ];
+        if (! $item) {
+            return ['valid' => false, 'message' => 'Item tidak valid.'];
         }
 
+        // Kuantitas lama jika invoice sedang diedit
         $originalQuantity = 0;
         if ($currentInvoice) {
-            $originalItem = $currentInvoice->items()->where('item_id', $itemId)->first();
-            if ($originalItem) {
-                $originalQuantity = $originalItem->pivot->quantity;
+            $originalLine = $currentInvoice->relationLoaded('invoiceItems')
+                ? $currentInvoice->invoiceItems->firstWhere('item_id', $itemId)
+                : $currentInvoice->invoiceItems()->where('item_id', $itemId)->first();
+
+            if ($originalLine) {
+                $originalQuantity = (float) $originalLine->quantity;
             }
         }
 
-        $neededStock = $currentInvoice ? max(0, $quantity - $originalQuantity) : $quantity;
-
-        if ($neededStock > 0 && $item->stock < $neededStock) {
-            // Periksa apakah ada item lain dalam produk yang sama yang bisa dipecah
+        // Validasi: qty baru tidak boleh melebihi stok sekarang + qty lama (yang bisa direstore)
+        if ($quantity > ($item->stock + $originalQuantity)) {
             $hasSplitOption = Item::where('product_id', $item->product_id)
                 ->where('id', '!=', $item->id)
                 ->where('stock', '>', 0)
                 ->when($item->volume_value && $item->base_volume_unit, function ($query) use ($item) {
-                    // Hanya tampilkan item yang memiliki volume lebih besar dan satuan volume sama
                     $query->where('volume_value', '>', $item->volume_value)
-                          ->where('base_volume_unit', $item->base_volume_unit);
+                        ->where('base_volume_unit', $item->base_volume_unit);
                 })
                 ->exists();
 
             if ($hasSplitOption) {
                 return [
                     'valid' => false,
-                    'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$neededStock} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
-                    'can_split' => true
-                ];
-            } else {
-                return [
-                    'valid' => false,
-                    'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
-                    'can_split' => false
+                    'message' => "Stok {$item->display_name} tidak cukup untuk menambah {$quantity} {$item->unit}, silakan gunakan opsi 'Pecah Stok'.",
+                    'can_split' => true,
                 ];
             }
+
+            return [
+                'valid' => false,
+                'message' => "Stok {$item->display_name} hanya {$item->stock} {$item->unit}. Kuantitas ({$quantity} {$item->unit}) melebihi stok yang tersedia.",
+                'can_split' => false,
+            ];
         }
 
         return ['valid' => true];

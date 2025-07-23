@@ -2,9 +2,9 @@
 
 namespace App\Console;
 
+use App\Console\Commands\UpdateInvoiceStatusCommand;
 use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-use App\Console\Commands\UpdateInvoiceStatusCommand; // Import the command
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel; // Import the command
 
 class Kernel extends ConsoleKernel
 {
@@ -19,9 +19,6 @@ class Kernel extends ConsoleKernel
 
     /**
      * Define the application's command schedule.
-     *
-     * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
-     * @return void
      */
     protected function schedule(Schedule $schedule): void
     {
@@ -30,8 +27,6 @@ class Kernel extends ConsoleKernel
 
     /**
      * Register the commands for the application.
-     *
-     * @return void
      */
     protected function commands(): void
     {

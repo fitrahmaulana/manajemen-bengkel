@@ -7,27 +7,23 @@ use App\Models\Product;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
-use App\Filament\Exports\ProductExporter;
-use App\Filament\Imports\ProductImporter;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Filament\Infolists\Components\Section as InfolistSection;
-use Filament\Infolists\Components\TextEntry;
-use Filament\Notifications\Notification;
-use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Facades\Artisan;
-use Filament\Tables\Actions\ExportAction;
-use Filament\Tables\Actions\ImportAction;
 
 class ProductResource extends Resource
 {
     protected static ?string $model = Product::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-cube-transparent';
+
     protected static ?string $navigationGroup = 'Master Data';
+
     protected static ?string $navigationLabel = 'Produk';
+
     protected static ?string $modelLabel = 'Produk';
+
     protected static ?string $pluralModelLabel = 'Daftar Produk';
+
     protected static ?int $navigationSort = 1;
 
     public static function form(Form $form): Form
@@ -45,9 +41,9 @@ class ProductResource extends Resource
                             ->live(onBlur: true)
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, $state) {
                                 // Auto-generate SKU untuk produk standard
-                                if ($state && !$get('has_variants') && !$get('standard_sku')) {
+                                if ($state && ! $get('has_variants') && ! $get('standard_sku')) {
                                     $productCode = strtoupper(substr(preg_replace('/[^A-Za-z0-9]/', '', $state), 0, 6));
-                                    $sku = $productCode . '-STD';
+                                    $sku = $productCode.'-STD';
                                     $set('standard_sku', $sku);
                                 }
                             }),
@@ -119,7 +115,7 @@ class ProductResource extends Resource
                             ->numeric()
                             ->default(0),
                     ])
-                    ->visible(fn(Forms\Get $get): bool => !$get('has_variants')),
+                    ->visible(fn (Forms\Get $get): bool => ! $get('has_variants')),
 
                 // Info untuk produk dengan varian
                 Forms\Components\Section::make('Informasi Varian')
@@ -130,7 +126,7 @@ class ProductResource extends Resource
                             ->content('Setelah menyimpan produk, Anda dapat menambah dan mengelola varian melalui tab "Daftar Varian" di halaman detail produk.')
                             ->columnSpanFull(),
                     ])
-                    ->visible(fn(Forms\Get $get): bool => $get('has_variants')),
+                    ->visible(fn (Forms\Get $get): bool => $get('has_variants')),
             ]);
     }
 
@@ -146,7 +142,7 @@ class ProductResource extends Resource
                     ->searchable()
                     ->sortable()
                     ->weight('bold')
-                    ->description(fn(Product $record): string => $record->brand ? "Merek: {$record->brand}" : ''),
+                    ->description(fn (Product $record): string => $record->brand ? "Merek: {$record->brand}" : ''),
                 Tables\Columns\TextColumn::make('typeItem.name')
                     ->label('Kategori')
                     ->searchable()
@@ -167,7 +163,7 @@ class ProductResource extends Resource
                     ->searchable()
                     ->toggleable(isToggledHiddenByDefault: true)
                     ->limit(50)
-                    ->tooltip(fn(Product $record): ?string => $record->description),
+                    ->tooltip(fn (Product $record): ?string => $record->description),
                 Tables\Columns\TextColumn::make('created_at')
                     ->label('Tanggal Dibuat')
                     ->dateTime()

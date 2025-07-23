@@ -19,7 +19,7 @@ class InvoiceFactory extends Factory
         return [
             'customer_id' => \App\Models\Customer::factory(),
             'vehicle_id' => \App\Models\Vehicle::factory(),
-            'invoice_number' => 'INV-' . $this->faker->unique()->numerify('##########'),
+            'invoice_number' => 'INV-'.$this->faker->unique()->numerify('##########'),
             'invoice_date' => $this->faker->date(),
             'due_date' => $this->faker->dateTimeBetween('+1 day', '+1 month')->format('Y-m-d'),
             'status' => $this->faker->randomElement(['unpaid', 'paid', 'partially_paid', 'overdue']),

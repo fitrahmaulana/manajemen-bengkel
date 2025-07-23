@@ -2,9 +2,8 @@
 
 namespace Tests\Feature;
 
-use App\Models\PurchaseOrder;
-use App\Models\Supplier;
 use App\Models\Payment;
+use App\Models\PurchaseOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 

@@ -5,26 +5,21 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\Pivot;
 
-class InvoiceItem extends Pivot
+class InvoiceService extends Pivot
 {
     public $timestamps = false;
 
     public $incrementing = true;
 
-    protected $table = 'invoice_item';
+    protected $table = 'invoice_service';
 
     public function invoice(): BelongsTo
     {
         return $this->belongsTo(Invoice::class);
     }
 
-    public function item(): BelongsTo
+    public function service(): BelongsTo
     {
-        return $this->belongsTo(Item::class);
-    }
-
-    public function getQuantityAttribute($value)
-    {
-        return $value + 0;
+        return $this->belongsTo(Service::class);
     }
 }

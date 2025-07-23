@@ -17,6 +17,7 @@ class CreatePurchaseOrder extends CreateRecord
         // Tambahkan hasil kalkulasi ke dalam array data yang akan disimpan
         $data['subtotal'] = $totals['subtotal'];
         $data['total_amount'] = $totals['total_amount'];
+
         return $data;
     }
 }

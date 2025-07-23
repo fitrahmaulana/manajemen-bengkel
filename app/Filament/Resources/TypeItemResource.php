@@ -3,25 +3,27 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\TypeItemResource\Pages;
-use App\Filament\Resources\TypeItemResource\RelationManagers;
 use App\Models\TypeItem;
 use Filament\Forms;
 use Filament\Forms\Form;
 use Filament\Resources\Resource;
 use Filament\Tables;
 use Filament\Tables\Table;
-use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Database\Eloquent\SoftDeletingScope;
 
 class TypeItemResource extends Resource
 {
     protected static ?string $model = TypeItem::class;
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
+
     protected static ?string $navigationGroup = 'Master Data';
+
     protected static ?string $navigationLabel = 'Tipe Barang';
+
     protected static ?string $modelLabel = 'Tipe Barang';
+
     protected static ?string $pluralModelLabel = 'Tipe Barang';
+
     protected static ?int $navigationSort = 2;
 
     public static function form(Form $form): Form
@@ -66,8 +68,8 @@ class TypeItemResource extends Resource
 
     public static function getRelations(): array
     {
-       return [
-        //
+        return [
+            //
         ];
     }
 
