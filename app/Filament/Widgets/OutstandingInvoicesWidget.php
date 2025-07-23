@@ -6,7 +6,6 @@ use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Carbon\Carbon;
 
 class OutstandingInvoicesWidget extends BaseWidget
 {
@@ -17,7 +16,7 @@ class OutstandingInvoicesWidget extends BaseWidget
         $outstandingInvoices = Invoice::whereIn('status', [
             InvoiceStatus::UNPAID,
             InvoiceStatus::PARTIALLY_PAID,
-            InvoiceStatus::OVERDUE
+            InvoiceStatus::OVERDUE,
         ])->get();
 
         $outstandingInvoicesCount = $outstandingInvoices->count();
@@ -29,7 +28,7 @@ class OutstandingInvoicesWidget extends BaseWidget
                 ->description('Jumlah invoice yang belum lunas')
                 ->descriptionIcon('heroicon-m-document-chart-bar')
                 ->color('warning'),
-            Stat::make('Total Piutang', 'Rp ' . number_format($totalOutstandingAmount, 0, ',', '.'))
+            Stat::make('Total Piutang', 'Rp '.number_format($totalOutstandingAmount, 0, ',', '.'))
                 ->description('Total nominal piutang dari invoice')
                 ->descriptionIcon('heroicon-m-arrow-trending-down')
                 ->color('danger'),

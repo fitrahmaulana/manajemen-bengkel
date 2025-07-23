@@ -3,7 +3,6 @@
 namespace App\Filament\Resources;
 
 use App\Enums\DiscountType;
-use App\Enums\PaymentStatus;
 use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrderResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers;

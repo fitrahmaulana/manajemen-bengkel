@@ -6,7 +6,6 @@ use App\Filament\Resources\ItemResource;
 use App\Models\Item;
 use Filament\Forms\Components\Select as FormSelect;
 use Filament\Pages\Page;
-use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;

@@ -3,9 +3,9 @@
 namespace App\Filament\Widgets;
 
 use App\Models\Payment;
+use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Carbon\Carbon;
 
 class RevenueOverviewWidget extends BaseWidget
 {
@@ -29,11 +29,11 @@ class RevenueOverviewWidget extends BaseWidget
         }
 
         return [
-            Stat::make('Pendapatan Hari Ini', 'Rp ' . number_format($revenueToday, 0, ',', '.'))
+            Stat::make('Pendapatan Hari Ini', 'Rp '.number_format($revenueToday, 0, ',', '.'))
                 ->description('Total pendapatan hari ini')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Pendapatan Bulan Ini', 'Rp ' . number_format($revenueThisMonth, 0, ',', '.'))
+            Stat::make('Pendapatan Bulan Ini', 'Rp '.number_format($revenueThisMonth, 0, ',', '.'))
                 ->description('Total pendapatan bulan ini')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),

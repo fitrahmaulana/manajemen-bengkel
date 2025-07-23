@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
 use App\Enums\DiscountType;
-use App\Enums\InvoiceStatus;
 use App\Filament\Resources\InvoiceResource;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
 use App\Models\Invoice;
@@ -36,8 +35,8 @@ class ViewInvoice extends ViewRecord
                                     Infolists\Components\TextEntry::make('customer.name')->label('Pelanggan'),
                                     Infolists\Components\TextEntry::make('vehicle_info')
                                         ->label('Kendaraan')
-                                        ->state(fn($record) => $record->vehicle
-                                            ? $record->vehicle->license_plate . ' - ' . $record->vehicle->brand
+                                        ->state(fn ($record) => $record->vehicle
+                                            ? $record->vehicle->license_plate.' - '.$record->vehicle->brand
                                             : 'Tidak ada kendaraan'),
 
                                 ]),
@@ -55,13 +54,13 @@ class ViewInvoice extends ViewRecord
 
                 // === BAGIAN TENGAH: DAFTAR JASA & BARANG ===
                 Infolists\Components\Section::make('Detail Jasa / Layanan')
-                    ->visible(fn($record) => $record->invoiceServices->isNotEmpty())
+                    ->visible(fn ($record) => $record->invoiceServices->isNotEmpty())
                     ->schema([
                         Infolists\Components\RepeatableEntry::make('invoiceServices')
                             ->hiddenLabel()
                             ->schema([
                                 Infolists\Components\TextEntry::make('service.name')
-                                    ->state(fn($record) => optional($record->service)->name ?? '-')
+                                    ->state(fn ($record) => optional($record->service)->name ?? '-')
                                     ->label('Nama Jasa')
                                     ->weight('bold'),
                                 Infolists\Components\TextEntry::make('description')->label('Deskripsi')->placeholder('Tidak ada deskripsi.'),
@@ -70,9 +69,8 @@ class ViewInvoice extends ViewRecord
                             ->columns(3),
                     ]),
 
-
                 Infolists\Components\Section::make('Detail Barang / Suku Cadang')
-                    ->visible(fn($record) => $record->invoiceItems->isNotEmpty())
+                    ->visible(fn ($record) => $record->invoiceItems->isNotEmpty())
                     ->schema([
                         Infolists\Components\RepeatableEntry::make('invoiceItems')
                             ->hiddenLabel()
@@ -86,13 +84,13 @@ class ViewInvoice extends ViewRecord
                                     ->formatStateUsing(function ($record) {
                                         $unit = $record->item->unit;
 
-                                        return ($record->quantity ?? ' ') . " $unit";
+                                        return ($record->quantity ?? ' ')." $unit";
                                     }),
                                 Infolists\Components\TextEntry::make('price')->label('Harga Satuan')->currency('IDR'),
                                 Infolists\Components\TextEntry::make('sub_total_calculated')
                                     ->label('Subtotal')
                                     ->currency('IDR')
-                                    ->state(fn($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
+                                    ->state(fn ($record): float => ($record->quantity ?? 0) * ($record->price ?? 0)),
                                 Infolists\Components\TextEntry::make('description')->label('Deskripsi')->columnSpanFull()->placeholder('Tidak ada deskripsi.'),
 
                             ])->columns(5),
@@ -114,11 +112,11 @@ class ViewInvoice extends ViewRecord
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
                                             if ($record->discount_type === DiscountType::PERCENTAGE->value) {
-                                                return ($record->discount_value ?? 0) . '%';
+                                                return ($record->discount_value ?? 0).'%';
                                             }
 
                                             // For fixed discount, format as currency
-                                            return 'Rp. ' . number_format($record->discount_value ?? 0, 0, ',', '.');
+                                            return 'Rp. '.number_format($record->discount_value ?? 0, 0, ',', '.');
                                         }),
 
                                 ]),
@@ -129,25 +127,25 @@ class ViewInvoice extends ViewRecord
                                     Infolists\Components\TextEntry::make('total_paid_amount')
                                         ->label('Total Dibayar')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->total_paid_amount)
+                                        ->state(fn ($record) => $record->total_paid_amount)
                                         ->weight('semibold'),
                                     Infolists\Components\TextEntry::make('balance_due')
                                         ->label('Sisa Tagihan')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->balance_due)
+                                        ->state(fn ($record) => $record->balance_due)
                                         ->weight('bold')
                                         ->color('danger') // Red untuk urgent
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->balance_due > 0)
+                                        ->visible(fn ($record) => $record->balance_due > 0)
                                         ->icon('heroicon-o-exclamation-triangle'),
                                     Infolists\Components\TextEntry::make('overpayment')
                                         ->label('Kembalian')
                                         ->currency('IDR')
-                                        ->state(fn($record) => $record->overpayment)
+                                        ->state(fn ($record) => $record->overpayment)
                                         ->weight('bold')
                                         ->color('success') // Green untuk positive
                                         ->size('lg')
-                                        ->visible(fn($record) => $record->overpayment > 0)
+                                        ->visible(fn ($record) => $record->overpayment > 0)
                                         ->icon('heroicon-o-banknotes'),
                                 ]),
                             ]),
@@ -165,7 +163,7 @@ class ViewInvoice extends ViewRecord
                 ->label('Cetak Faktur')
                 ->icon('heroicon-o-printer')
                 ->color('info')
-                ->url(fn(Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
+                ->url(fn (Invoice $record): string => route('filament.admin.resources.invoices.print', $record))
                 ->openUrlInNewTab(),
             Actions\DeleteAction::make()
                 ->label('Hapus Faktur')

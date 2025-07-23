@@ -2,11 +2,11 @@
 
 namespace App\Filament\Widgets;
 
-use App\Models\Invoice;
 use App\Models\Customer;
+use App\Models\Invoice;
+use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
-use Carbon\Carbon;
 
 class StatsOverviewWidget extends BaseWidget
 {
@@ -27,7 +27,7 @@ class StatsOverviewWidget extends BaseWidget
                 ->description('Jumlah invoice bulan ini')
                 ->descriptionIcon('heroicon-m-clipboard-document-list')
                 ->color('info'),
-            Stat::make('Rata-rata Nilai Transaksi', 'Rp ' . number_format($averageTransactionValue, 0, ',', '.'))
+            Stat::make('Rata-rata Nilai Transaksi', 'Rp '.number_format($averageTransactionValue, 0, ',', '.'))
                 ->description('Rata-rata nilai transaksi bulan ini')
                 ->descriptionIcon('heroicon-m-chart-bar')
                 ->color('info'),

@@ -2,7 +2,6 @@
 
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
-use App\Enums\DiscountType;
 use App\Filament\Resources\InvoiceResource;
 use App\Services\InvoiceService;
 use Filament\Notifications\Notification;

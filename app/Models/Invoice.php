@@ -11,6 +11,8 @@ class Invoice extends Model
 {
     use HasFactory, SoftDeletes; // Use HasFactory and SoftDeletes trait
 
+    public const DEFAULT_DUE_DATE_DAYS = 7;
+
     protected $fillable = ['customer_id', 'vehicle_id', 'invoice_number', 'invoice_date', 'due_date', 'status', 'subtotal', 'discount_type', 'discount_value', 'total_amount', 'terms'];
 
     protected $casts = [
@@ -68,5 +70,4 @@ class Invoice extends Model
     {
         return max(0, $this->total_paid_amount - $this->total_amount);
     }
-
 }
