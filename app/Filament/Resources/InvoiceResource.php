@@ -2,7 +2,9 @@
 
 namespace App\Filament\Resources;
 
+use App\Filament\Resources\CustomerResource;
 use App\Filament\Resources\InvoiceResource\Pages;
+use App\Filament\Resources\VehicleResource;
 use App\Forms\Components\CustomTableRepeater;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
@@ -87,14 +89,7 @@ class InvoiceResource extends Resource
                                 // Reset vehicle_id when customer changes
                                 $set('vehicle_id', null);
                             })
-                            ->createOptionForm([
-                                Forms\Components\TextInput::make('name')
-                                    ->required()->label('Nama Pelanggan'),
-                                Forms\Components\TextInput::make('phone_number')
-                                    ->label('Nomor Telepon'),
-                                Forms\Components\Textarea::make('address')
-                                    ->label('Alamat'),
-                            ])
+                            ->createOptionForm(fn (Form $form) => CustomerResource::form($form))
                             ->default(function () {
                                 $generalCustomer = Customer::firstOrCreate(
                                     ['name' => 'Umum'],
@@ -113,13 +108,12 @@ class InvoiceResource extends Resource
                             })
                             ->searchable()
                             ->preload()
-                            ->createOptionForm(fn (Get $get) => [
-                                Forms\Components\TextInput::make('license_plate')->label('No. Polisi')->required(),
-                                Forms\Components\TextInput::make('brand')->label('Merek'),
-                                Forms\Components\TextInput::make('model')->label('Model'),
-                                Forms\Components\TextInput::make('year')->label('Tahun')->numeric(),
-                                Forms\Components\Hidden::make('customer_id')->default($get('customer_id'))
-                            ])
+                            ->createOptionForm(function (Get $get) {
+                                $customer_id = $get('customer_id');
+                                $form = VehicleResource::getFormSchema();
+                                array_unshift($form, Forms\Components\Hidden::make('customer_id')->default($customer_id));
+                                return $form;
+                            })
                             ->visible(fn (Get $get) => !empty($get('customer_id'))),
                     ]),
                     Group::make()->schema([
