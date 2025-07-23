@@ -40,9 +40,8 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\\Filament\\Widgets')
             ->widgets([
-                \App\Filament\Widgets\RevenueOverviewWidget::class,
-                \App\Filament\Widgets\OutstandingInvoicesWidget::class,
-                \App\Filament\Widgets\StatsOverviewWidget::class,
+                Widgets\AccountWidget::class,
+                Widgets\FilamentInfoWidget::class,
                 LowStockWidget::class,
             ])
             ->middleware([
