@@ -60,6 +60,12 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+            ])
+            ->navigationGroups([
+                'Dasbor',
+                'Transaksi',
+                'Customer Management',
+                'Produk & Stok',
             ]);
     }
 }

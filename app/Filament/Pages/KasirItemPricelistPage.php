@@ -20,7 +20,7 @@ class KasirItemPricelistPage extends Page implements HasTable
 
     protected static ?string $navigationLabel = 'Pricelist Kasir';
 
-    protected static ?string $navigationGroup = 'Operasional Kasir'; // New group for cashier specific pages
+    protected static ?string $navigationGroup = 'Transaksi';
 
     protected static ?string $title = 'Daftar Harga & Stok Barang';
 
