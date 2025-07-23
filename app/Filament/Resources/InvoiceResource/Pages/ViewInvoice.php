@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
+use App\Enums\DiscountType;
 use App\Enums\InvoiceStatus;
 use App\Filament\Resources\InvoiceResource;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
@@ -112,7 +113,7 @@ class ViewInvoice extends ViewRecord
                                     Infolists\Components\TextEntry::make('discount_value')
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
-                                            if ($record->discount_type === 'percentage') {
+                                            if ($record->discount_type === DiscountType::PERCENTAGE->value) {
                                                 return ($record->discount_value ?? 0) . '%';
                                             }
 

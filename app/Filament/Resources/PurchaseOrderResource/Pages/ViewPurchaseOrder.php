@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
+use App\Enums\DiscountType;
 use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
@@ -147,7 +148,7 @@ class ViewPurchaseOrder extends ViewRecord
                                     Infolists\Components\TextEntry::make('discount_value')
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
-                                            if ($record->discount_type === 'percentage') {
+                                            if ($record->discount_type === DiscountType::PERCENTAGE->value) {
                                                 return ($record->discount_value ?? 0).'%';
                                             }
 

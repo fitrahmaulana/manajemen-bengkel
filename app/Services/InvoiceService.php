@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Enums\DiscountType;
 use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Item;
@@ -42,7 +43,7 @@ class InvoiceService
         $discountValue = $this->parseCurrencyValue($get('discount_value') ?? '0');
         $finalDiscount = 0;
 
-        if ($get('discount_type') === 'percentage' && $discountValue > 0) {
+        if ($get('discount_type') === DiscountType::PERCENTAGE->value && $discountValue > 0) {
             $finalDiscount = ($subtotal * $discountValue) / 100;
         } else {
             $finalDiscount = $discountValue;

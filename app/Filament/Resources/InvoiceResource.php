@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Filament\Resources\CustomerResource;
+use App\Enums\DiscountType;
 use App\Enums\InvoiceStatus;
 use App\Filament\Resources\InvoiceResource\Pages;
 use App\Filament\Resources\VehicleResource;
@@ -527,14 +528,14 @@ class InvoiceResource extends Resource
                         Grid::make(2)->schema([
                             Forms\Components\Select::make('discount_type')
                                 ->label('Tipe Diskon')
-                                ->options(['fixed' => 'Nominal (Rp)', 'percentage' => 'Persen (%)'])
-                                ->default('fixed')
+                                ->options(DiscountType::class)
+                                ->default(DiscountType::FIXED)
                                 ->live(), // Changed to onBlur
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix(fn(Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->prefix(fn(Get $get) => $get('discount_type') === DiscountType::FIXED->value ? 'Rp. ' : '% ')
                                 ->live(), // Added debounce to reduce server load
                         ]),
 
@@ -559,11 +560,11 @@ class InvoiceResource extends Resource
                                 $subtotal = $servicesTotal + $itemsTotal;
 
                                 // Hitung diskon
-                                $discountType = $get('discount_type') ?? 'fixed';
+                                $discountType = $get('discount_type') ?? DiscountType::FIXED->value;
                                 $discountValue = $invoiceService->parseCurrencyValue($get('discount_value') ?? '0');
 
                                 $discountAmount = 0;
-                                if ($discountType === 'percentage') {
+                                if ($discountType === DiscountType::PERCENTAGE->value) {
                                     $discountAmount = ($subtotal * $discountValue) / 100;
                                 } else {
                                     $discountAmount = $discountValue;

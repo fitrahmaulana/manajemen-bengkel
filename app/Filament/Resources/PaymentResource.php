@@ -3,6 +3,7 @@
 namespace App\Filament\Resources;
 
 use App\Enums\PaymentInputStatus;
+use App\Enums\PaymentMethod;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager as InvoicePaymentsRelationManager;
 use App\Filament\Resources\PaymentResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelationManager as PurchaseOrderPaymentsRelationManager;
@@ -237,12 +238,8 @@ class PaymentResource extends Resource
 
                         Forms\Components\Select::make('payment_method')
                             ->label('Metode Pembayaran')
-                            ->options([
-                                'cash' => 'Cash',
-                                'transfer' => 'Bank Transfer',
-                                'qris' => 'QRIS',
-                            ])
-                            ->default('cash')
+                            ->options(PaymentMethod::class)
+                            ->default(PaymentMethod::CASH)
                             ->required(),
 
                         Forms\Components\Textarea::make('notes')

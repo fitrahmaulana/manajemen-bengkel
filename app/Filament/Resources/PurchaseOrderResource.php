@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\DiscountType;
 use App\Enums\PaymentStatus;
 use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrderResource\Pages;
@@ -155,14 +156,14 @@ class PurchaseOrderResource extends Resource
                         Grid::make(2)->schema([
                             Forms\Components\Select::make('discount_type')
                                 ->label('Tipe Diskon')
-                                ->options(['fixed' => 'Nominal (Rp)', 'percentage' => 'Persen (%)'])
-                                ->default('fixed')
+                                ->options(DiscountType::class)
+                                ->default(DiscountType::FIXED)
                                 ->live(),
                             Forms\Components\TextInput::make('discount_value')
                                 ->label('Nilai Diskon')
                                 ->default(0)
                                 ->currencyMask(thousandSeparator: '.', decimalSeparator: ',', precision: 0)
-                                ->prefix(fn (Get $get) => $get('discount_type') === 'fixed' ? 'Rp. ' : '% ')
+                                ->prefix(fn (Get $get) => $get('discount_type') === DiscountType::FIXED->value ? 'Rp. ' : '% ')
                                 ->live(),
                         ]),
 
@@ -177,11 +178,11 @@ class PurchaseOrderResource extends Resource
                                     return $quantity * $price;
                                 });
 
-                                $discountType = $get('discount_type') ?? 'fixed';
+                                $discountType = $get('discount_type') ?? DiscountType::FIXED->value;
                                 $discountValue = self::parseCurrencyValue($get('discount_value') ?? '0');
 
                                 $discountAmount = 0;
-                                if ($discountType === 'percentage') {
+                                if ($discountType === DiscountType::PERCENTAGE->value) {
                                     $discountAmount = ($itemsTotal * $discountValue) / 100;
                                 } else {
                                     $discountAmount = $discountValue;
@@ -323,12 +324,12 @@ class PurchaseOrderResource extends Resource
         });
 
         // Ambil tipe dan nilai diskon
-        $discountType = $data['discount_type'] ?? 'fixed';
+        $discountType = $data['discount_type'] ?? DiscountType::FIXED->value;
         $discountValue = self::parseCurrencyValue($data['discount_value'] ?? '0');
 
         // Hitung jumlah diskon
         $discountAmount = 0;
-        if ($discountType === 'percentage') {
+        if ($discountType === DiscountType::PERCENTAGE->value) {
             $discountAmount = ($subtotal * $discountValue) / 100;
         } else {
             $discountAmount = $discountValue;
