@@ -9,6 +9,8 @@ use Carbon\Carbon;
 
 class RevenueOverviewWidget extends BaseWidget
 {
+    protected static ?int $sort = 1;
+
     protected function getStats(): array
     {
         $today = Carbon::today();
@@ -36,6 +38,8 @@ class RevenueOverviewWidget extends BaseWidget
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
             Stat::make('Trend 7 Hari Terakhir', null)
+                ->description('Grafik pendapatan 7 hari terakhir')
+                ->descriptionIcon('heroicon-m-chart-line')
                 ->chart($revenueLast7Days)
                 ->color('success'),
         ];

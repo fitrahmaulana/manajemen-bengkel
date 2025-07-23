@@ -9,7 +9,7 @@ use Filament\Widgets\TableWidget as BaseWidget;
 
 class LowStockWidget extends BaseWidget
 {
-    protected static ?int $sort = 2;
+    protected static ?int $sort = 4;
 
     protected int|string|array $columnSpan = 'full';
 
@@ -31,6 +31,9 @@ class LowStockWidget extends BaseWidget
                     ->label('Stok Saat Ini'),
                 Tables\Columns\TextColumn::make('minimum_stock')
                     ->label('Stok Minimum'),
-            ]);
+            ])
+            ->emptyStateHeading('Stok semua aman')
+            ->emptyStateDescription('')
+            ->emptyStateIcon('heroicon-o-check-circle');
     }
 }

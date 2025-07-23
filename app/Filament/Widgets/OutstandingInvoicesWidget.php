@@ -9,6 +9,8 @@ use Carbon\Carbon;
 
 class OutstandingInvoicesWidget extends BaseWidget
 {
+    protected static ?int $sort = 2;
+
     protected function getStats(): array
     {
         $outstandingInvoices = Invoice::where('status', 'unpaid')->orWhere('status', 'partially_paid')->get();
