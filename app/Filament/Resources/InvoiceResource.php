@@ -16,6 +16,7 @@ use Filament\Forms;
 use Filament\Forms\Components\Actions\Action;
 use Filament\Forms\Components\Grid;
 use Filament\Forms\Components\Group;
+use App\Models\Customer;
 use Filament\Forms\Components\Section;
 use Filament\Forms\Form;
 use Filament\Forms\Get;
@@ -81,13 +82,45 @@ class InvoiceResource extends Resource
                             ->label('Pelanggan')
                             ->searchable()
                             ->preload()
-                            ->required()
                             ->live()
                             ->afterStateUpdated(function (Set $set, Get $get, $state) {
                                 // Reset vehicle_id when customer changes
                                 $set('vehicle_id', null);
+                            })
+                            ->createOptionForm([
+                                Forms\Components\TextInput::make('name')
+                                    ->required()->label('Nama Pelanggan'),
+                                Forms\Components\TextInput::make('phone_number')
+                                    ->label('Nomor Telepon'),
+                                Forms\Components\Textarea::make('address')
+                                    ->label('Alamat'),
+                            ])
+                            ->default(function () {
+                                $generalCustomer = Customer::firstOrCreate(
+                                    ['name' => 'Umum'],
+                                    ['phone_number' => '-', 'address' => '-']
+                                );
+                                return $generalCustomer->id;
                             }),
-                        Forms\Components\Select::make('vehicle_id')->label('Kendaraan (No. Polisi)')->options(fn (Get $get) => Vehicle::query()->where('customer_id', $get('customer_id'))->pluck('license_plate', 'id'))->searchable()->preload()->required(),
+                        Forms\Components\Select::make('vehicle_id')
+                            ->label('Kendaraan (No. Polisi)')
+                            ->options(function (Get $get) {
+                                $customerId = $get('customer_id');
+                                if (empty($customerId)) {
+                                    return [];
+                                }
+                                return Vehicle::query()->where('customer_id', $customerId)->pluck('license_plate', 'id');
+                            })
+                            ->searchable()
+                            ->preload()
+                            ->createOptionForm(fn (Get $get) => [
+                                Forms\Components\TextInput::make('license_plate')->label('No. Polisi')->required(),
+                                Forms\Components\TextInput::make('brand')->label('Merek'),
+                                Forms\Components\TextInput::make('model')->label('Model'),
+                                Forms\Components\TextInput::make('year')->label('Tahun')->numeric(),
+                                Forms\Components\Hidden::make('customer_id')->default($get('customer_id'))
+                            ])
+                            ->visible(fn (Get $get) => !empty($get('customer_id'))),
                     ]),
                     Group::make()->schema([
                         Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-'.date('Ymd-His'))->required(),
