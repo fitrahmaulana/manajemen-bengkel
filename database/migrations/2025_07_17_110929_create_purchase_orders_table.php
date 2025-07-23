@@ -17,6 +17,7 @@ return new class extends Migration
             $table->string('po_number')->unique();
             $table->date('order_date');
             $table->string('status')->default('draft');
+            $table->string('payment_status')->default('unpaid');
             $table->decimal('discount_value', 15, 0)->default(0);
             $table->string('discount_type')->default('percentage');
             $table->decimal('subtotal', 15, 0)->default(0);

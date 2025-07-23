@@ -37,6 +37,8 @@ return new class extends Migration
             $table->decimal('purchase_price', 15, 0);
             $table->decimal('selling_price', 15, 0);
             $table->decimal('stock', 15, 2)->default(0); // Changed to decimal for fractional quantities like 3.5 liter
+            $table->integer('minimum_stock')->default(0);
+
             $table->string('unit', 50)->default('Pcs'); // "Liter", "Botol", dll
 
             // Tambahan volume
