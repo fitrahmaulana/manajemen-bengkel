@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\InvoiceResource\Pages;
 
+use App\Enums\InvoiceStatus;
 use App\Filament\Resources\InvoiceResource;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager;
 use App\Models\Invoice;
@@ -42,18 +43,7 @@ class ViewInvoice extends ViewRecord
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_number')->label('No. Invoice'),
                                     Infolists\Components\TextEntry::make('status')
-                                        ->formatStateUsing(fn(string $state): string => match ($state) {
-                                            'unpaid' => 'Belum Dibayar',
-                                            'partially_paid' => 'Sebagian Dibayar',
-                                            'paid' => 'Lunas',
-                                            'overdue' => 'Terlambat',
-                                        })
-                                        ->badge()->color(fn(string $state): string => match ($state) {
-                                            'unpaid' => 'gray',
-                                            'partially_paid' => 'info',
-                                            'paid' => 'success',
-                                            'overdue' => 'danger',
-                                        }),
+                                        ->badge(),
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('invoice_date')->label('Tanggal Invoice')->date('d M Y'),

@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\PaymentResource\Pages;
 
+use App\Enums\InvoiceStatus;
 use App\Filament\Resources\PaymentResource;
 use App\Models\Payment;
 use Filament\Actions;
@@ -55,7 +56,7 @@ class ManagePayments extends ManageRecords
 
                         // Update status berdasarkan total pembayaran
                         if ($invoice->total_paid_amount >= $invoice->total_amount) {
-                            $invoice->status = 'paid';
+                            $invoice->status = InvoiceStatus::PAID;
                             $invoice->save();
 
                             if ($invoice->overpayment > 0) {
@@ -72,7 +73,7 @@ class ManagePayments extends ManageRecords
                                     ->send();
                             }
                         } elseif ($invoice->payments()->exists()) {
-                            $invoice->status = 'partially_paid';
+                            $invoice->status = InvoiceStatus::PARTIALLY_PAID;
                             $invoice->save();
                             $remaining = $invoice->balance_due;
 
@@ -82,7 +83,7 @@ class ManagePayments extends ManageRecords
                                 ->info()
                                 ->send();
                         } else {
-                            $invoice->status = 'unpaid';
+                            $invoice->status = InvoiceStatus::UNPAID;
                             $invoice->save();
                         }
 
