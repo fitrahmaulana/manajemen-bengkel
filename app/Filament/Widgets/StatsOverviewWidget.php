@@ -9,6 +9,8 @@ use Carbon\Carbon;
 
 class StatsOverviewWidget extends BaseWidget
 {
+    protected int|string|array $columnSpan = 1;
+
     protected function getStats(): array
     {
         $startOfMonth = Carbon::now()->startOfMonth();

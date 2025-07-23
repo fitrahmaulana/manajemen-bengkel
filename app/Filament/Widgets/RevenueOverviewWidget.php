@@ -9,6 +9,8 @@ use Carbon\Carbon;
 
 class RevenueOverviewWidget extends BaseWidget
 {
+    protected int|string|array $columnSpan = 1;
+
     protected function getStats(): array
     {
         $today = Carbon::today();

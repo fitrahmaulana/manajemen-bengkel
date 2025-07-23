@@ -8,6 +8,8 @@ use Filament\Widgets\StatsOverviewWidget\Stat;
 
 class OutstandingInvoicesWidget extends BaseWidget
 {
+    protected int|string|array $columnSpan = 1;
+
     protected function getStats(): array
     {
         $outstandingInvoices = Invoice::where('status', 'unpaid')->orWhere('status', 'partially_paid')->get();
