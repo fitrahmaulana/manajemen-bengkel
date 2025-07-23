@@ -12,6 +12,9 @@ class InvoiceObserver
      */
     public function deleting(Invoice $invoice): void
     {
+        if ($invoice->isForceDeleting()) {
+            return;
+        }
         $inventoryService = app(InventoryService::class);
         foreach ($invoice->invoiceItems as $invoiceItem) {
             // Restore stock by passing a negative value, which gets subtracted (thus, added)

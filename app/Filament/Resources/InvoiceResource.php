@@ -586,12 +586,7 @@ class InvoiceResource extends Resource
                 Tables\Actions\BulkActionGroup::make([
                     Tables\Actions\DeleteBulkAction::make(),
                     ForceDeleteBulkAction::make(),
-                    RestoreBulkAction::make()
-                        ->after(function (\Illuminate\Database\Eloquent\Collection $records) {
-                            foreach ($records as $invoice) {
-                                app(InvoiceService::class)->updateInvoiceStatus($invoice);
-                            }
-                        }),
+                    RestoreBulkAction::make(),
                 ]),
             ]);
     }

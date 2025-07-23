@@ -9,7 +9,7 @@ use App\Models\Payment;
 use Filament\Actions;
 use Filament\Infolists;
 use Filament\Infolists\Infolist;
-use Filament\Notifications\Notification; // Added for infolist method
+// Added for infolist method
 use Filament\Resources\Pages\ViewRecord; // Added for components namespace
 
 class ViewInvoice extends ViewRecord
@@ -169,29 +169,8 @@ class ViewInvoice extends ViewRecord
                 ->label('Hapus Faktur')
                 ->icon('heroicon-o-trash'),
             Actions\ForceDeleteAction::make(),
-            Actions\RestoreAction::make()
-                ->after(function (Invoice $record) {
-                    // Re-decrement stock for items on the restored invoice
-                    foreach ($record->invoiceItems as $invoiceItem) {
-                        $itemModel = $invoiceItem->item;
-                        if ($itemModel) {
-                            $quantityToDecrement = $invoiceItem->quantity;
+            Actions\RestoreAction::make(),
 
-                            // Check if stock would go negative
-                            if ($itemModel->stock >= $quantityToDecrement) {
-                                $itemModel->stock -= $quantityToDecrement;
-                                $itemModel->save();
-                            } else {
-                                // Handle negative stock scenario
-                                Notification::make()
-                                    ->title('⚠️ Stock Tidak Mencukupi')
-                                    ->body("Item {$itemModel->name} tidak memiliki stock yang cukup untuk di-restore.")
-                                    ->warning()
-                                    ->send();
-                            }
-                        }
-                    }
-                }),
         ];
     }
 
