@@ -7,6 +7,7 @@ use Filament\Forms\Form;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Tables;
 use Filament\Tables\Table;
+use Illuminate\Database\Eloquent\Model;
 
 class ItemsRelationManager extends RelationManager
 {
@@ -28,7 +29,13 @@ class ItemsRelationManager extends RelationManager
 
     public function table(Table $table): Table
     {
-        return ItemResource::table($table)
+        $itemResourceTable = ItemResource::table($table);
+
+        return $itemResourceTable
+            ->recordUrl(
+                fn(Model $record): string => ItemResource::getUrl('view', ['record' => $record])
+            )
+            ->openRecordUrlInNewTab()
             ->headerActions([
                 Tables\Actions\CreateAction::make()
                     ->label('Tambah Varian')
