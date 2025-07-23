@@ -16,7 +16,7 @@ class TypeItemResource extends Resource
 
     protected static ?string $navigationIcon = 'heroicon-o-tag';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Produk & Stok';
 
     protected static ?string $navigationLabel = 'Tipe Barang';
 

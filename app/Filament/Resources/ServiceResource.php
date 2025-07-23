@@ -23,7 +23,7 @@ class ServiceResource extends Resource
 
     protected static ?string $modelLabel = 'Jasa';
 
-    protected static ?string $navigationGroup = 'Master Data';
+    protected static ?string $navigationGroup = 'Produk & Stok';
 
     protected static ?int $navigationSort = 3;
 
