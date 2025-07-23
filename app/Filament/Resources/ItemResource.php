@@ -14,6 +14,7 @@ use Filament\Forms\Components\TextInput as FormsTextInput;
 use Filament\Forms\Form;
 use Filament\Infolists\Components\Section as InfolistSection;
 use Filament\Infolists\Components\TextEntry;
+use Filament\Infolists;
 use Filament\Infolists\Infolist;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -378,7 +379,9 @@ class ItemResource extends Resource
                         TextEntry::make('product.name')->label('Nama Barang'),
                         TextEntry::make('name')
                             ->label('Spesifikasi')
-                            ->formatStateUsing(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
+
+                            ->placeholder(fn(?string $state): string => ($state === '-' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
+
                             ->color(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'gray' : 'primary'),
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
@@ -394,11 +397,6 @@ class ItemResource extends Resource
                 InfolistSection::make('Harga & Stok')
                     ->columns(3)
                     ->schema([
-                        TextEntry::make('stock')
-                            ->label('Stok Saat Ini')
-                            ->badge()
-                            ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success')
-                            ->suffix(fn($record) => ' ' . $record->unit),
 
                         TextEntry::make('minimum_stock')
                             ->label('Stok Minimum')
@@ -406,15 +404,24 @@ class ItemResource extends Resource
                             ->color('danger')
                             ->suffix(fn($record) => ' ' . $record->unit),
 
-                        TextEntry::make('purchase_price')
-                            ->label('Harga Beli')
-                            ->currency('IDR'),
+                        TextEntry::make('stock')
+                            ->label('Stok Saat Ini')
+                            ->badge()
+                            ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success')
+                            ->suffix(fn($record) => ' ' . $record->unit),
 
-                        TextEntry::make('selling_price')
-                            ->label('Harga Jual')
-                            ->currency('IDR')
-                            ->weight('bold')
-                            ->size('lg'),
+                        //group
+                        Infolists\Components\Group::make()->schema([
+                            TextEntry::make('purchase_price')
+                                ->label('Harga Beli')
+                                ->currency('IDR'),
+
+                            TextEntry::make('selling_price')
+                                ->label('Harga Jual')
+                                ->currency('IDR')
+                                ->weight('bold')
+                                ->size('lg'),
+                        ]),
                     ]),
 
                 // Section "Detail Konversi" yang lama sudah dihapus
