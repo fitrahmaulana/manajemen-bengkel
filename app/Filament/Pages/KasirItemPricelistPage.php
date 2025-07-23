@@ -89,8 +89,26 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->alignCenter()
                     ->sortable()
                     ->badge()
-                    ->color(fn ($state) => $state > 20 ? 'success' : ($state > 0 ? 'warning' : 'danger'))
+                    ->color(function ($state, Item $record) {
+                        if ($state > $record->stock_minimum) {
+                            return 'success';
+                        }
+                        if ($state > 0) {
+                            return 'warning';
+                        }
+
+                        return 'danger';
+                    })
                     ->formatStateUsing(fn ($state, Item $record) => $state.' '.$record->unit),
+
+                TextColumn::make('stock_minimum')
+                    ->label('Stok Min.')
+                    ->sortable()
+                    ->alignCenter()
+                    ->badge()
+                    ->color('gray')
+                    ->formatStateUsing(fn ($state, Item $record) => $state.' '.$record->unit),
+
             ])
             ->filters([
                 SelectFilter::make('type_item_id')
@@ -109,9 +127,9 @@ class KasirItemPricelistPage extends Page implements HasTable
                         FormSelect::make('stock_type') // Using aliased FormSelect
                             ->label('Status')
                             ->options([
-                                'available' => 'Tersedia (>20)',
-                                'low_stock' => 'Stok Menipis (1-20)',
-                                'out_of_stock' => 'Habis (0)',
+                                'available' => 'Tersedia',
+                                'low_stock' => 'Stok Menipis',
+                                'out_of_stock' => 'Habis',
                             ])
                             ->placeholder('Semua Status'),
                     ])
@@ -121,8 +139,8 @@ class KasirItemPricelistPage extends Page implements HasTable
                         }
 
                         return match ($data['stock_type']) {
-                            'available' => $query->where('items.stock', '>', 20),
-                            'low_stock' => $query->where('items.stock', '>', 0)->where('items.stock', '<=', 20),
+                            'available' => $query->whereColumn('items.stock', '>', 'items.stock_minimum'),
+                            'low_stock' => $query->whereColumn('items.stock', '<=', 'items.stock_minimum')->where('items.stock', '>', 0),
                             'out_of_stock' => $query->where('items.stock', '<=', 0),
                             default => $query,
                         };
