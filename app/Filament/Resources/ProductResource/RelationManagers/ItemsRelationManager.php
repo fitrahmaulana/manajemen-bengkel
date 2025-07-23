@@ -33,7 +33,7 @@ class ItemsRelationManager extends RelationManager
 
         return $itemResourceTable
             ->recordUrl(
-                fn(Model $record): string => ItemResource::getUrl('view', ['record' => $record])
+                fn (Model $record): string => ItemResource::getUrl('view', ['record' => $record])
             )
             ->openRecordUrlInNewTab()
             ->headerActions([

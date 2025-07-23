@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Enums\InvoiceStatus;
 use Illuminate\Console\Command;
 
 class UpdateInvoiceStatusCommand extends Command
@@ -27,7 +28,11 @@ class UpdateInvoiceStatusCommand extends Command
     {
         $this->info('Checking for overdue invoices...');
 
-        $invoices = \App\Models\Invoice::whereNotIn('status', ['Paid', 'Cancelled', 'Overdue']) // Add 'Overdue' to prevent re-processing
+        $invoices = \App\Models\Invoice::whereNotIn('status', [
+            InvoiceStatus::PAID,
+            InvoiceStatus::CANCELLED,
+            InvoiceStatus::OVERDUE,
+        ])
             ->whereDate('due_date', '<', now())
             ->get();
 
@@ -40,7 +45,7 @@ class UpdateInvoiceStatusCommand extends Command
         $this->info(sprintf('Found %d overdue invoices to update.', $invoices->count()));
 
         foreach ($invoices as $invoice) {
-            $invoice->status = 'Overdue';
+            $invoice->status = InvoiceStatus::OVERDUE;
             $invoice->save();
             $this->info(sprintf('Invoice #%s status updated to Overdue.', $invoice->invoice_number));
         }

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\PaymentInputStatus;
+use App\Enums\PaymentMethod;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager as InvoicePaymentsRelationManager;
 use App\Filament\Resources\PaymentResource\Pages;
 use App\Filament\Resources\PurchaseOrderResource\RelationManagers\PaymentsRelationManager as PurchaseOrderPaymentsRelationManager;
@@ -120,13 +122,13 @@ class PaymentResource extends Resource
                                     if ($amountPaid > $balanceDue) {
                                         $overpayment = $amountPaid - $balanceDue;
                                         $set('change_amount', $overpayment);
-                                        $set('payment_status', 'overpaid');
+                                        $set('payment_status', PaymentInputStatus::OVERPAID);
                                     } elseif ($amountPaid == $balanceDue) {
                                         $set('change_amount', 0);
-                                        $set('payment_status', 'exact');
+                                        $set('payment_status', PaymentInputStatus::EXACT);
                                     } else {
                                         $set('change_amount', 0);
-                                        $set('payment_status', 'underpaid');
+                                        $set('payment_status', PaymentInputStatus::UNDERPAID);
                                     }
                                 }
                             })
@@ -236,12 +238,8 @@ class PaymentResource extends Resource
 
                         Forms\Components\Select::make('payment_method')
                             ->label('Metode Pembayaran')
-                            ->options([
-                                'cash' => 'Cash',
-                                'transfer' => 'Bank Transfer',
-                                'qris' => 'QRIS',
-                            ])
-                            ->default('cash')
+                            ->options(PaymentMethod::class)
+                            ->default(PaymentMethod::CASH)
                             ->required(),
 
                         Forms\Components\Textarea::make('notes')
@@ -361,7 +359,7 @@ class PaymentResource extends Resource
             $balanceDue = $payable->balance_due;
             $overpayment = $payable->overpayment;
 
-            if ($newStatus === 'paid') {
+            if ($newStatus === InvoiceStatus::PAID) {
                 if ($overpayment > 0) {
                     \Filament\Notifications\Notification::make()
                         ->title('✅ Invoice Lunas dengan Kembalian')
@@ -375,19 +373,19 @@ class PaymentResource extends Resource
                         ->success()
                         ->send();
                 }
-            } elseif ($newStatus === 'partially_paid') {
+            } elseif ($newStatus === InvoiceStatus::PARTIALLY_PAID) {
                 \Filament\Notifications\Notification::make()
                     ->title('💰 Status Pembayaran Diperbarui')
                     ->body("Invoice {$payable->invoice_number} sebagian dibayar. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))
                     ->info()
                     ->send();
-            } elseif ($newStatus === 'unpaid') {
+            } elseif ($newStatus === InvoiceStatus::UNPAID) {
                 \Filament\Notifications\Notification::make()
                     ->title('📋 Status Invoice Diperbarui')
                     ->body("Invoice {$payable->invoice_number} menjadi belum dibayar. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))
                     ->warning()
                     ->send();
-            } elseif ($newStatus === 'overdue') {
+            } elseif ($newStatus === InvoiceStatus::OVERDUE) {
                 \Filament\Notifications\Notification::make()
                     ->title('⚠️ Invoice Jatuh Tempo')
                     ->body("Invoice {$payable->invoice_number} telah jatuh tempo. Sisa tagihan: Rp. ".number_format($balanceDue, 0, ',', '.'))

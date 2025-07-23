@@ -2,6 +2,8 @@
 
 namespace App\Services;
 
+use App\Enums\DiscountType;
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use App\Models\Item;
 use Filament\Forms\Get;
@@ -41,7 +43,7 @@ class InvoiceService
         $discountValue = $this->parseCurrencyValue($get('discount_value') ?? '0');
         $finalDiscount = 0;
 
-        if ($get('discount_type') === 'percentage' && $discountValue > 0) {
+        if ($get('discount_type') === DiscountType::PERCENTAGE->value && $discountValue > 0) {
             $finalDiscount = ($subtotal * $discountValue) / 100;
         } else {
             $finalDiscount = $discountValue;
@@ -85,13 +87,12 @@ class InvoiceService
         $totalAmount = $invoice->total_amount;
         $totalPaid = $invoice->payments()->sum('amount_paid');
 
-        // jika tidak ada pembayaran, statusnya unpaid atau overdue
         if ($totalPaid <= 0) {
-            $status = $invoice->due_date < now() ? 'overdue' : 'unpaid';
-        } elseif ($totalPaid >= $totalAmount) { // jika sudah terbayar penuh
-            $status = 'paid'; // POS style: overpayment is still "paid"
-        } else { // jika ada pembayaran tapi belum penuh
-            $status = $invoice->due_date < now() ? 'overdue' : 'partially_paid';
+            $status = $invoice->due_date < now() ? InvoiceStatus::OVERDUE : InvoiceStatus::UNPAID;
+        } elseif ($totalPaid >= $totalAmount) {
+            $status = InvoiceStatus::PAID;
+        } else {
+            $status = $invoice->due_date < now() ? InvoiceStatus::OVERDUE : InvoiceStatus::PARTIALLY_PAID;
         }
 
         $invoice->update(['status' => $status]);

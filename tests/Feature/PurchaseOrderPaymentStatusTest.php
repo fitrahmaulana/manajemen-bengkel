@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\PaymentStatus;
 use App\Models\Payment;
 use App\Models\PurchaseOrder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +19,7 @@ class PurchaseOrderPaymentStatusTest extends TestCase
 
         $purchaseOrder->updatePaymentStatus();
 
-        $this->assertEquals('unpaid', $purchaseOrder->payment_status);
+        $this->assertEquals(PaymentStatus::UNPAID, $purchaseOrder->payment_status);
     }
 
     /** @test */
@@ -33,7 +34,7 @@ class PurchaseOrderPaymentStatusTest extends TestCase
 
         $purchaseOrder->updatePaymentStatus();
 
-        $this->assertEquals('partial', $purchaseOrder->payment_status);
+        $this->assertEquals(PaymentStatus::PARTIAL, $purchaseOrder->payment_status);
     }
 
     /** @test */
@@ -48,6 +49,6 @@ class PurchaseOrderPaymentStatusTest extends TestCase
 
         $purchaseOrder->updatePaymentStatus();
 
-        $this->assertEquals('paid', $purchaseOrder->payment_status);
+        $this->assertEquals(PaymentStatus::PAID, $purchaseOrder->payment_status);
     }
 }

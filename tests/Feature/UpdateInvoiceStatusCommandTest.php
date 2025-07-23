@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -17,28 +18,28 @@ class UpdateInvoiceStatusCommandTest extends TestCase
         // Create an invoice that is due yesterday and status is 'Pending'
         $overdueInvoice = Invoice::factory()->create([
             'due_date' => Carbon::yesterday(),
-            'status' => 'Pending',
+            'status' => InvoiceStatus::PENDING,
             'total_amount' => 100,
         ]);
 
         // Create an invoice that is due tomorrow and status is 'Pending'
         $notOverdueInvoice = Invoice::factory()->create([
             'due_date' => Carbon::tomorrow(),
-            'status' => 'Pending',
+            'status' => InvoiceStatus::PENDING,
             'total_amount' => 100,
         ]);
 
         // Create an invoice that is due yesterday but status is 'Paid'
         $paidInvoice = Invoice::factory()->create([
             'due_date' => Carbon::yesterday(),
-            'status' => 'Paid',
+            'status' => InvoiceStatus::PAID,
             'total_amount' => 100,
         ]);
 
         // Create an invoice that is due yesterday and status is already 'Overdue'
         $alreadyOverdueInvoice = Invoice::factory()->create([
             'due_date' => Carbon::yesterday(),
-            'status' => 'Overdue',
+            'status' => InvoiceStatus::OVERDUE,
             'total_amount' => 100,
         ]);
 
@@ -51,22 +52,22 @@ class UpdateInvoiceStatusCommandTest extends TestCase
 
         $this->assertDatabaseHas('invoices', [
             'id' => $overdueInvoice->id,
-            'status' => 'Overdue',
+            'status' => InvoiceStatus::OVERDUE,
         ]);
 
         $this->assertDatabaseHas('invoices', [
             'id' => $notOverdueInvoice->id,
-            'status' => 'Pending', // Should not change
+            'status' => InvoiceStatus::PENDING, // Should not change
         ]);
 
         $this->assertDatabaseHas('invoices', [
             'id' => $paidInvoice->id,
-            'status' => 'Paid', // Should not change
+            'status' => InvoiceStatus::PAID, // Should not change
         ]);
 
         $this->assertDatabaseHas('invoices', [
             'id' => $alreadyOverdueInvoice->id,
-            'status' => 'Overdue', // Should not change
+            'status' => InvoiceStatus::OVERDUE, // Should not change
         ]);
     }
 
@@ -76,14 +77,14 @@ class UpdateInvoiceStatusCommandTest extends TestCase
         // Create an invoice that is due tomorrow and status is 'Pending'
         Invoice::factory()->create([
             'due_date' => Carbon::tomorrow(),
-            'status' => 'Pending',
+            'status' => InvoiceStatus::PENDING,
             'total_amount' => 100,
         ]);
 
         // Create an invoice that is due yesterday but status is 'Paid'
         Invoice::factory()->create([
             'due_date' => Carbon::yesterday(),
-            'status' => 'Paid',
+            'status' => InvoiceStatus::PAID,
             'total_amount' => 100,
         ]);
 

@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\PurchaseOrderResource\Pages;
 
+use App\Enums\DiscountType;
+use App\Enums\PurchaseOrderStatus;
 use App\Filament\Resources\PurchaseOrderResource;
 use App\Models\PurchaseOrder;
 use Filament\Actions;
@@ -25,7 +27,7 @@ class ViewPurchaseOrder extends ViewRecord
             Actions\Action::make('complete')
                 ->label('Complete')
                 ->action(function (PurchaseOrder $record) {
-                    if ($record->status === 'completed') {
+                    if ($record->status === PurchaseOrderStatus::COMPLETED) {
                         Notification::make()
                             ->title('Error')
                             ->body('Purchase order is already completed.')
@@ -40,7 +42,7 @@ class ViewPurchaseOrder extends ViewRecord
                         $item->item->save();
                     }
 
-                    $record->status = 'completed';
+                    $record->status = PurchaseOrderStatus::COMPLETED;
                     $record->save();
 
                     Notification::make()
@@ -52,11 +54,11 @@ class ViewPurchaseOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('success')
                 ->icon('heroicon-o-check-circle')
-                ->visible(fn (PurchaseOrder $record) => $record->status === 'draft'),
+                ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::DRAFT),
             Actions\Action::make('revert')
                 ->label('Kembalikan ke Draft')
                 ->action(function (PurchaseOrder $record) {
-                    if ($record->status !== 'completed') {
+                    if ($record->status !== PurchaseOrderStatus::COMPLETED) {
                         Notification::make()
                             ->title('Error')
                             ->body('Purchase order must be completed before reverting.')
@@ -69,7 +71,7 @@ class ViewPurchaseOrder extends ViewRecord
                         $item->item->decrement('stock', $item->quantity);
                     }
 
-                    $record->status = 'draft';
+                    $record->status = PurchaseOrderStatus::DRAFT;
                     $record->save();
 
                     Notification::make()->title('Sukses')->body('Pesanan dikembalikan ke draft dan stok telah disesuaikan.')->success()->send();
@@ -77,7 +79,7 @@ class ViewPurchaseOrder extends ViewRecord
                 ->requiresConfirmation()
                 ->color('warning')
                 ->icon('heroicon-o-arrow-uturn-left')
-                ->visible(fn (PurchaseOrder $record) => $record->status === 'completed'),
+                ->visible(fn (PurchaseOrder $record) => $record->status === PurchaseOrderStatus::COMPLETED),
         ];
     }
 
@@ -95,34 +97,13 @@ class ViewPurchaseOrder extends ViewRecord
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('po_number')->label('No. PO'),
                                     Infolists\Components\TextEntry::make('status')
-                                        ->formatStateUsing(fn (string $state): string => match ($state) {
-                                            'draft' => 'Draft',
-                                            'completed' => 'Selesai',
-                                        })
-                                        ->badge()->color(fn (string $state): string => match ($state) {
-                                            'draft' => 'gray',
-                                            'completed' => 'success',
-                                        }),
+                                        ->badge(),
                                 ]),
                                 Infolists\Components\Group::make()->schema([
                                     Infolists\Components\TextEntry::make('order_date')->label('Tanggal PO')->date('d M Y'),
                                     Infolists\Components\TextEntry::make('payment_status')
                                         ->label('Status Pembayaran')
-                                        ->state(function (PurchaseOrder $record): string {
-                                            if ($record->balance_due <= 0) {
-                                                return 'Lunas';
-                                            } elseif ($record->total_paid_amount > 0) {
-                                                return 'Sebagian Dibayar';
-                                            } else {
-                                                return 'Belum Dibayar';
-                                            }
-                                        })
-                                        ->badge()
-                                        ->color(fn (string $state): string => match ($state) {
-                                            'Belum Dibayar' => 'gray',
-                                            'Sebagian Dibayar' => 'info',
-                                            'Lunas' => 'success',
-                                        }),
+                                        ->badge(),
                                 ]),
                             ]),
                     ]),
@@ -167,7 +148,7 @@ class ViewPurchaseOrder extends ViewRecord
                                     Infolists\Components\TextEntry::make('discount_value')
                                         ->label('Diskon')
                                         ->formatStateUsing(function ($record) {
-                                            if ($record->discount_type === 'percentage') {
+                                            if ($record->discount_type === DiscountType::PERCENTAGE->value) {
                                                 return ($record->discount_value ?? 0).'%';
                                             }
 

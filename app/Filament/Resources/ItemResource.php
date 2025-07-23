@@ -145,8 +145,8 @@ class ItemResource extends Resource
                                     ->label('Nilai Volume Standar')
                                     ->numeric()
                                     ->step('0.01')
-                                    ->helperText(fn(Forms\Get $get) => 'Isi jika item ini memiliki representasi volume standar. Cth: Botol 1 Liter -> Nilai: 1, Satuan Standar: Liter. Atau 1 Dus isi 12 Pcs -> Nilai: 12, Satuan Standar: Pcs.')
-                                    ->placeholder(fn(Forms\Get $get) => match (strtolower($get('unit'))) {
+                                    ->helperText(fn (Forms\Get $get) => 'Isi jika item ini memiliki representasi volume standar. Cth: Botol 1 Liter -> Nilai: 1, Satuan Standar: Liter. Atau 1 Dus isi 12 Pcs -> Nilai: 12, Satuan Standar: Pcs.')
+                                    ->placeholder(fn (Forms\Get $get) => match (strtolower($get('unit'))) {
                                         'liter' => '1000 (jika satuan standar ml)',
                                         'ml' => 'Isi jumlah ml',
                                         'dus' => '12 (jika isi 12 pcs)',
@@ -181,8 +181,8 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Spesifikasi')
                     ->searchable()
-                    ->formatStateUsing(fn(?string $state): string => $state === 'Standard' || empty($state) ? '-' : $state)
-                    ->description(fn($record): string => ($record->name === 'Standard' || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
+                    ->formatStateUsing(fn (?string $state): string => $state === 'Standard' || empty($state) ? '-' : $state)
+                    ->description(fn ($record): string => ($record->name === 'Standard' || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
                     ->searchable(),
@@ -198,7 +198,7 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('stock')
                     ->label('Stok')
                     ->badge()
-                    ->color(fn(string $state): string => $state <= 5 ? 'warning' : 'success')
+                    ->color(fn (string $state): string => $state <= Item::LOW_STOCK_THRESHOLD ? 'warning' : 'success')
                     ->sortable(),
                 Tables\Columns\TextColumn::make('product.brand')
                     ->label('Merek')
@@ -220,7 +220,7 @@ class ItemResource extends Resource
                     ->form([
                         Forms\Components\Placeholder::make('to_item_info')
                             ->label('Item Tujuan (Saat Ini)')
-                            ->content(fn(Item $record): string => "{$record->display_name} (Stok: {$record->stock} {$record->unit})"),
+                            ->content(fn (Item $record): string => "{$record->display_name} (Stok: {$record->stock} {$record->unit})"),
 
                         Select::make('from_item_id')
                             ->label('Pilih Item Sumber (Induk)')
@@ -232,7 +232,7 @@ class ItemResource extends Resource
                                 return Item::where('product_id', $record->product_id)
                                     ->where('id', '!=', $record->id) // Exclude self
                                     ->get()
-                                    ->mapWithKeys(fn(Item $item) => [$item->id => $item->display_name . " (Stok: {$item->stock} {$item->unit})"]);
+                                    ->mapWithKeys(fn (Item $item) => [$item->id => $item->display_name." (Stok: {$item->stock} {$item->unit})"]);
                             })
                             ->searchable()
                             ->required()
@@ -273,7 +273,7 @@ class ItemResource extends Resource
                             ->default(1)
                             ->required()
                             ->minValue(1)
-                            ->maxValue(fn(Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
+                            ->maxValue(fn (Forms\Get $get) => $get('current_from_item_stock') ?? null) // Max based on selected item's stock
                             ->live()
                             ->afterStateUpdated(function (Forms\Set $set, Forms\Get $get, ?string $state, Item $record) {
                                 $fromItemId = $get('from_item_id');
@@ -291,7 +291,7 @@ class ItemResource extends Resource
 
                         Forms\Components\Placeholder::make('to_quantity_display')
                             ->label('Jumlah Item Ini yang Akan Dihasilkan')
-                            ->content(fn(Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity') . ' ' . $get('to_quantity_unit_suffix') : '-'),
+                            ->content(fn (Forms\Get $get) => $get('calculated_to_quantity') ? $get('calculated_to_quantity').' '.$get('to_quantity_unit_suffix') : '-'),
 
                         // Hidden field to store the actual calculated to_quantity for submission
                         Forms\Components\Hidden::make('calculated_to_quantity')->default(null),
@@ -379,9 +379,7 @@ class ItemResource extends Resource
                         TextEntry::make('product.name')->label('Nama Barang'),
                         TextEntry::make('name')
                             ->label('Spesifikasi')
-
                             ->placeholder(fn(?string $state): string => ($state === '-' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
-
                             ->color(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'gray' : 'primary'),
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
@@ -389,20 +387,24 @@ class ItemResource extends Resource
                         TextEntry::make('supplier.name')->label('Supplier'),
                         TextEntry::make('volume_value')
                             ->label('Nilai Volume Std.')
-                            ->suffix(fn($record) => ' ' . $record->base_volume_unit)
+                            ->suffix(fn ($record) => ' '.$record->base_volume_unit)
                             ->placeholder('-')
-                            ->visible(fn($record) => ! is_null($record->volume_value)),
+                            ->visible(fn ($record) => ! is_null($record->volume_value)),
                     ]),
 
                 InfolistSection::make('Harga & Stok')
                     ->columns(3)
                     ->schema([
-
+                        TextEntry::make('stock')
+                            ->label('Stok Saat Ini')
+                            ->badge()
+                            ->color(fn (string $state): string => $state <= Item::LOW_STOCK_THRESHOLD ? 'warning' : 'success')
+                            ->suffix(fn ($record) => ' '.$record->unit),
                         TextEntry::make('minimum_stock')
                             ->label('Stok Minimum')
                             ->badge()
                             ->color('danger')
-                            ->suffix(fn($record) => ' ' . $record->unit),
+                            ->suffix(fn ($record) => ' '.$record->unit),
 
                         TextEntry::make('stock')
                             ->label('Stok Saat Ini')
