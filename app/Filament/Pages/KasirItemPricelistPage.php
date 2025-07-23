@@ -2,6 +2,7 @@
 
 namespace App\Filament\Pages;
 
+use App\Filament\Resources\ItemResource;
 use App\Models\Item;
 use Filament\Forms\Components\Select as FormSelect;
 use Filament\Pages\Page;
@@ -41,6 +42,7 @@ class KasirItemPricelistPage extends Page implements HasTable
             )
             ->heading('Daftar Harga & Stok Semua Item')
             ->description('Tampilan semua item/varian yang bisa dijual untuk referensi kasir.')
+            ->recordUrl(fn (Item $record): string => ItemResource::getUrl('view', ['record' => $record]), true)
             ->columns([
                 TextColumn::make('product_name_with_variant')
                     ->label('Nama Produk')
@@ -64,7 +66,6 @@ class KasirItemPricelistPage extends Page implements HasTable
 
                 TextColumn::make('product.typeItem.name')
                     ->label('Kategori')
-                    ->searchable(isIndividual: true, isGlobal: false)
                     ->sortable()
                     ->badge()
                     ->color('success'),
