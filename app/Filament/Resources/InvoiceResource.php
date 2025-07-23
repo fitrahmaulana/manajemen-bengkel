@@ -117,7 +117,7 @@ class InvoiceResource extends Resource
                     Group::make()->schema([
                         Forms\Components\TextInput::make('invoice_number')->label('Nomor Invoice')->default('INV-' . date('Ymd-His'))->required(),
                         Forms\Components\Select::make('status')
-                            ->options(collect(InvoiceStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->getLabel()]))
+                            ->options(InvoiceStatus::class)
                             ->default(InvoiceStatus::UNPAID)
                             ->required(),
                     ]),

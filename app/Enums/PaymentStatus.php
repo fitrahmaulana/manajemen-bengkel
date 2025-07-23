@@ -2,7 +2,10 @@
 
 namespace App\Enums;
 
-enum PaymentStatus: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum PaymentStatus: string implements HasLabel, HasColor
 {
     case UNPAID = 'unpaid';
     case PARTIAL = 'partial';

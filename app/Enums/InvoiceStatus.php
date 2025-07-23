@@ -2,7 +2,10 @@
 
 namespace App\Enums;
 
-enum InvoiceStatus: string
+use Filament\Support\Contracts\HasColor;
+use Filament\Support\Contracts\HasLabel;
+
+enum InvoiceStatus: string implements HasLabel, HasColor
 {
     case UNPAID = 'unpaid';
     case PARTIALLY_PAID = 'partially_paid';
@@ -31,6 +34,7 @@ enum InvoiceStatus: string
             self::PAID => 'success',
             self::OVERDUE => 'danger',
             self::CANCELLED => 'warning',
+            self::PENDING => 'warning',
         };
     }
 }

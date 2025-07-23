@@ -56,7 +56,7 @@ class PurchaseOrderResource extends Resource
                     Group::make()->schema([
                         Forms\Components\TextInput::make('po_number')->label('Nomor PO')->default('PO-'.date('Ymd-His'))->required(),
                         Forms\Components\Select::make('status')
-                            ->options(collect(PurchaseOrderStatus::cases())->mapWithKeys(fn ($status) => [$status->value => $status->getLabel()]))
+                            ->options(PurchaseOrderStatus::class)
                             ->default(PurchaseOrderStatus::DRAFT)
                             ->required()
                             ->disabled(fn (string $operation): bool => $operation !== 'create'),
