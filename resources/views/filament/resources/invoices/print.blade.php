@@ -172,8 +172,13 @@
             </div>
             <div class="info-col">
                 <p>Pelanggan : {{ $invoice->customer->name }}</p>
-                <p>No. Polisi : {{ $invoice->vehicle->license_plate }}</p>
-                <p>Kendaraan : {{ $invoice->vehicle->brand }} {{ $invoice->vehicle->model }}</p>
+                @if ($invoice->vehicle)
+                    <p>No. Polisi : {{ $invoice->vehicle->license_plate }}</p>
+                    <p>Kendaraan : {{ $invoice->vehicle->brand }} {{ $invoice->vehicle->model }}</p>
+                @else
+                    <p>Kendaraan : -</p>
+                @endif
+
             </div>
         </div>
 
@@ -211,10 +216,10 @@
                         <td>
                             {{ $displayName }}
                             @if ($line->description)
-                                (<small class="text-muted">{{ $line->description }}</small>)
+                                <br>(<small class="text-muted">{{ $line->description }}</small>)
                             @endif
                         </td>
-                        <td class="text-center">{{ $line->quantity }}</td>
+                        <td class="text-center">{{ $line->quantity }} <small class="text-muted">{{ $line->item->unit }}</small></td>
                         <td class="text-right">{{ number_format($line->price, 0, ',', '.') }}</td>
                         <td class="text-right">{{ number_format($line->quantity * $line->price, 0, ',', '.') }}</td>
                     </tr>

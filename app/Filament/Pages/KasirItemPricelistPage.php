@@ -3,15 +3,19 @@
 namespace App\Filament\Pages;
 
 use App\Filament\Resources\ItemResource;
+use App\Filament\Resources\ProductResource;
 use App\Models\Item;
 use Filament\Forms\Components\Select as FormSelect;
 use Filament\Pages\Page;
+use Filament\Tables\Columns\ImageColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\Filter;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table; // Alias for form component select
+use Filament\Tables\Actions\ViewAction;
+
 
 class KasirItemPricelistPage extends Page implements HasTable
 {
@@ -126,8 +130,7 @@ class KasirItemPricelistPage extends Page implements HasTable
                     }),
             ])
             ->actions([
-                // Potentially an action to quickly view the Product master
-                // Tables\Actions\ViewAction::make()->url(fn (Item $record): string => ProductResource::getUrl('view', ['record' => $record->product_id])),
+                ViewAction::make()->url(fn (Item $record): string => ItemResource::getUrl('view', ['record' => $record->id])),
             ])
             ->bulkActions([
                 // No bulk actions needed for a pricelist view

@@ -13,7 +13,12 @@ class ViewItem extends ViewRecord
     protected function getHeaderActions(): array
     {
         return [
-            Actions\EditAction::make(),
+            Actions\Action::make('back')
+                ->label('Kembali')
+                ->icon('heroicon-o-arrow-left')
+                ->color('secondary')
+                ->url(fn() => url()->previous()),
+                Actions\EditAction::make(),
             Actions\DeleteAction::make(),
         ];
     }
