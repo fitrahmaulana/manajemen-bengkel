@@ -64,7 +64,7 @@ class CreateProduct extends CreateRecord
     {
         Item::create([
             'product_id' => $product->id,
-            'name' => null, // Null untuk produk standard
+            'name' => null, // null untuk produk standard
             'sku' => $this->standardData['standard_sku'] ?? $this->generateDefaultSKU($product),
             'unit' => $this->standardData['standard_unit'] ?? 'Pcs',
             'purchase_price' => $this->standardData['standard_purchase_price'] ?? 0,

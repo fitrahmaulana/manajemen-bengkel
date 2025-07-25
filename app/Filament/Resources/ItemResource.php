@@ -379,8 +379,8 @@ class ItemResource extends Resource
                         TextEntry::make('product.name')->label('Nama Barang'),
                         TextEntry::make('name')
                             ->label('Spesifikasi')
-                            ->placeholder(fn(?string $state): string => ($state === '-' || empty($state)) ? 'Tidak ada spesifikasi' : $state)
-                            ->color(fn(?string $state): string => ($state === 'Standard' || empty($state)) ? 'gray' : 'primary'),
+                            ->placeholder(fn(?string $state): string => (empty($state)) ? 'Tidak ada spesifikasi' : $state)
+                            ->color(fn(?string $state): string => (empty($state)) ? 'gray' : 'primary'),
                         TextEntry::make('product.typeItem.name')->label('Kategori Barang'),
                         TextEntry::make('sku')->label('Kode Barang'),
                         TextEntry::make('product.brand')->label('Merek'),

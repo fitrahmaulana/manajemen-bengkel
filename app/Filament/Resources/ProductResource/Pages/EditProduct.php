@@ -91,8 +91,8 @@ class EditProduct extends EditRecord
 
         if (isset($data['has_variants']) && $data['has_variants']) {
             // Produk dengan varian - varian akan dikelola melalui RelationManager
-            // Hapus hanya item default produk tunggal (name kosong)
-        $product->items()->where('name', null)->delete();
+            // Hapus hanya item default produk tunggal (name null)
+            $product->items()->whereNull('name')->delete();
         } else {
             // Produk tanpa varian - buat atau update single item
             // Hapus semua items lama dulu
@@ -102,7 +102,7 @@ class EditProduct extends EditRecord
 
             Item::create([
                 'product_id' => $product->id,
-                'name' => null, // Null untuk produk standard
+                'name' => null, // null untuk produk standard
                 'sku' => $sku,
                 'unit' => $data['standard_unit'] ?? 'Pcs',
                 'purchase_price' => $data['standard_purchase_price'] ?? 0,
