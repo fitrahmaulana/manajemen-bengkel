@@ -73,6 +73,13 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->badge()
                     ->color('success'),
 
+                TextColumn::make('purchase_price')
+                    ->label('Harga Beli')
+                    ->currency('IDR')
+                    ->sortable()
+                    ->weight('semibold')
+                    ->color('secondary'),
+
                 TextColumn::make('selling_price')
                     ->label('Harga Jual')
                     ->currency('IDR')
@@ -130,7 +137,7 @@ class KasirItemPricelistPage extends Page implements HasTable
                     }),
             ])
             ->actions([
-                ViewAction::make()->url(fn (Item $record): string => ItemResource::getUrl('view', ['record' => $record->id])),
+                //
             ])
             ->bulkActions([
                 // No bulk actions needed for a pricelist view

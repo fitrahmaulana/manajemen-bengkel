@@ -24,11 +24,9 @@ class SupplierResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('name')
                     ->required(),
-                Forms\Components\TextInput::make('sales_name')
-                    ->required(),
+                Forms\Components\TextInput::make('sales_name'),
                 Forms\Components\TextInput::make('phone_number')
-                    ->tel()
-                    ->required(),
+                    ->tel(),
                 Forms\Components\TextInput::make('email')
                     ->email(),
                 Forms\Components\Textarea::make('address')

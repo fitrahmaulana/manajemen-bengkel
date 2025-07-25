@@ -16,13 +16,13 @@ class ItemExporter extends Exporter
     {
         return [
             ExportColumn::make('product.name')
-                ->label('product_name'),
+                ->label('Nama Produk'),
             ExportColumn::make('product.brand')
-                ->label('product_brand'),
+                ->label('Brand Produk'),
             ExportColumn::make('product.description')
-                ->label('product_description'),
+                ->label('Deskripsi Produk'),
             ExportColumn::make('product.typeItem.name')
-                ->label('product_type_item_name'),
+                ->label('Tipe Produk'),
             ExportColumn::make('product.has_variants')
                 ->label('product_has_variants')
                 ->formatStateUsing(fn ($state) => $state ? 'True' : 'False'),
