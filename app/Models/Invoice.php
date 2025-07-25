@@ -7,6 +7,9 @@ use Illuminate\Database\Eloquent\Factories\HasFactory; // Import HasFactory
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes; // Import SoftDeletes
 
+/**
+ * @mixin IdeHelperInvoice
+ */
 class Invoice extends Model
 {
     use HasFactory, SoftDeletes; // Use HasFactory and SoftDeletes trait
