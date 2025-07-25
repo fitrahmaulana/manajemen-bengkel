@@ -12,6 +12,10 @@ use Filament\Resources\Pages\ViewRecord;
 
 class ViewProduct extends ViewRecord
 {
+    protected $listeners = [
+        'refresh' => '$refresh',
+    ];
+
     protected static string $resource = ProductResource::class;
 
     protected function getHeaderActions(): array
@@ -23,7 +27,7 @@ class ViewProduct extends ViewRecord
                 ->icon('heroicon-o-trash')
                 ->requiresConfirmation()
                 ->successNotificationTitle('Produk berhasil dihapus')
-                ->requiresConfirmation(fn ($record) => $record->items->count() > 0)
+                ->requiresConfirmation(fn($record) => $record->items->count() > 0)
                 ->modalDescription('Produk ini memiliki varian. Apakah Anda yakin ingin menghapusnya?')
                 ->successNotificationTitle('Produk dan semua variannya telah dihapus.'),
         ];
@@ -31,14 +35,9 @@ class ViewProduct extends ViewRecord
 
     public function getRelationManagers(): array
     {
-        // Hanya tampilkan ItemsRelationManager jika produk memiliki varian
-        if ($this->record->has_variants) {
-            return [
-                ItemsRelationManager::class,
-            ];
-        }
-
-        return [];
+        return [
+            ItemsRelationManager::class,
+        ];
     }
 
     public function infolist(Infolist $infolist): Infolist
@@ -53,7 +52,7 @@ class ViewProduct extends ViewRecord
                         TextEntry::make('typeItem.name')->label('Kategori'),
                         TextEntry::make('has_variants')
                             ->label('Jenis Produk')
-                            ->getStateUsing(fn ($record) => $record->has_variants ? 'Memiliki Varian' : 'Produk Tunggal'),
+                            ->getStateUsing(fn($record) => $record->has_variants ? 'Memiliki Varian' : 'Produk Tunggal'),
                         TextEntry::make('description')
                             ->label('Deskripsi')
                             ->columnSpanFull(),
@@ -64,13 +63,13 @@ class ViewProduct extends ViewRecord
                     ->schema([
                         TextEntry::make('items_count')
                             ->label('Jumlah Varian')
-                            ->getStateUsing(fn ($record) => $record->items->count() > 0 ? $record->items->count() : '-'),
+                            ->getStateUsing(fn($record) => $record->items->count() > 0 ? $record->items->count() : '-'),
                         TextEntry::make('total_stock')
                             ->label('Total Stok')
-                            ->getStateUsing(fn ($record) => $record->items->sum('stock')),
+                            ->getStateUsing(fn($record) => $record->items->sum('stock')),
                         TextEntry::make('average_price')
                             ->label('Rata-rata Harga')
-                            ->getStateUsing(fn ($record) => 'Rp '.number_format($record->items->avg('selling_price'), 0, ',', '.')),
+                            ->getStateUsing(fn($record) => 'Rp ' . number_format($record->items->avg('selling_price'), 0, ',', '.')),
                     ]),
             ]);
     }
