@@ -17,10 +17,6 @@ class ItemsRelationManager extends RelationManager
 
     protected static ?string $title = 'Daftar Varian';
 
-    public static function canViewForRecord(\Illuminate\Database\Eloquent\Model $ownerRecord, string $pageClass): bool
-    {
-        return $ownerRecord->has_variants;
-    }
 
     public function form(Form $form): Form
     {
