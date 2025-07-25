@@ -55,7 +55,7 @@ class KasirItemPricelistPage extends Page implements HasTable
                     ->getStateUsing(function (Item $record): string {
                         $variantName = $record->name;
 
-                        return $variantName && $variantName !== 'Standard'
+                        return $variantName && $variantName !== null
                             ? "{$record->product->name} - {$variantName}"
                             : $record->product->name;
                     })

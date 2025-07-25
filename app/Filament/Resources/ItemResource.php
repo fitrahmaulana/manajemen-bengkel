@@ -181,8 +181,8 @@ class ItemResource extends Resource
                 Tables\Columns\TextColumn::make('name')
                     ->label('Spesifikasi')
                     ->searchable()
-                    ->formatStateUsing(fn (?string $state): string => $state === 'Standard' || empty($state) ? '-' : $state)
-                    ->description(fn ($record): string => ($record->name === 'Standard' || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
+                    ->formatStateUsing(fn (?string $state): string => $state === null || empty($state) ? '-' : $state)
+                    ->description(fn ($record): string => ($record->name === null || empty($record->name)) ? 'Tidak ada spesifikasi' : ''),
                 Tables\Columns\TextColumn::make('sku')
                     ->label('Kode Barang')
                     ->searchable(),

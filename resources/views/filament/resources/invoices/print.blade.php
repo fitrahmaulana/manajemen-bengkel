@@ -208,9 +208,13 @@
                 @endforeach
                 @foreach ($invoice->invoiceItems as $line)
                     @php
-                        $productName = optional(optional($line->item)->product)->name;
-                        $lineName = $line->name === 'Eceran' ? '' : $line->name;
-                        $displayName = $productName ?: $lineName;
+                        $productName = $line->item->product->name ?? '';
+                        $itemName = $line->item->name ?? '';
+
+                        $displayName =
+                            $itemName === 'Eceran' || $itemName === null || $itemName === ''
+                                ? $productName
+                                : "{$productName} {$itemName}";
                     @endphp
                     <tr>
                         <td>
@@ -219,7 +223,8 @@
                                 <br>(<small class="text-muted">{{ $line->description }}</small>)
                             @endif
                         </td>
-                        <td class="text-center">{{ $line->quantity }} <small class="text-muted">{{ $line->item->unit }}</small></td>
+                        <td class="text-center">{{ $line->quantity }} <small
+                                class="text-muted">{{ $line->item->unit }}</small></td>
                         <td class="text-right">{{ number_format($line->price, 0, ',', '.') }}</td>
                         <td class="text-right">{{ number_format($line->quantity * $line->price, 0, ',', '.') }}</td>
                     </tr>
