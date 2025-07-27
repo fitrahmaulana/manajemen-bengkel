@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources;
 
+use App\Enums\InvoiceStatus;
 use App\Enums\PaymentInputStatus;
 use App\Enums\PaymentMethod;
 use App\Filament\Resources\InvoiceResource\RelationManagers\PaymentsRelationManager as InvoicePaymentsRelationManager;
