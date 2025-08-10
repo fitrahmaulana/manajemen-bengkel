@@ -66,4 +66,3 @@ Setelah server berjalan, buka `http://localhost:8000` di browser. Contoh alur pe
 
 ## Lisensi
 Proyek ini dirilis di bawah lisensi [MIT](LICENSE).
-
