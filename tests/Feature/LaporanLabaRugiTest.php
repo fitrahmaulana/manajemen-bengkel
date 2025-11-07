@@ -44,6 +44,7 @@ class LaporanLabaRugiTest extends TestCase
         Livewire::test(LaporanLabaRugi::class)
             ->set('data.startDate', '2023-01-01')
             ->set('data.endDate', '2023-01-31')
+            ->dispatch('datesChanged', '2023-01-01', '2023-01-31')
             ->assertSee('Rp 6.000') // Revenue (from invoice total)
             ->assertSee('Rp 4.000') // COGS (2000 + 2000)
             ->assertSee('Rp 2.000'); // Profit (6000 - 4000)

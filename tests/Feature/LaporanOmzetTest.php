@@ -31,6 +31,7 @@ class LaporanOmzetTest extends TestCase
         Livewire::test(LaporanOmzet::class)
             ->set('data.startDate', '2023-01-01')
             ->set('data.endDate', '2023-01-31')
+            ->dispatch('datesChanged', '2023-01-01', '2023-01-31')
             ->assertSee('Rp 3.000')
             ->assertDontSee('Rp 5.000')
             ->assertCanSeeTableRecords(Payment::whereBetween('payment_date', ['2023-01-01', '2023-01-31'])->get());

@@ -10,8 +10,22 @@ use Illuminate\Support\Facades\DB;
 
 class LabaRugiStatsOverviewWidget extends BaseWidget
 {
+    protected $listeners = ['datesChanged'];
+
     public ?string $startDate = null;
     public ?string $endDate = null;
+
+    public function mount(): void
+    {
+        $this->startDate = now()->startOfMonth()->format('Y-m-d');
+        $this->endDate = now()->endOfMonth()->format('Y-m-d');
+    }
+
+    public function datesChanged($startDate, $endDate): void
+    {
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+    }
 
     protected function getStats(): array
     {

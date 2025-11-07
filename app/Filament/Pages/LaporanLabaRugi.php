@@ -4,6 +4,7 @@ namespace App\Filament\Pages;
 
 use App\Filament\Widgets\LabaRugiStatsOverviewWidget;
 use App\Models\InvoiceItem;
+use Closure;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Concerns\InteractsWithForms;
 use Filament\Forms\Contracts\HasForms;
@@ -13,7 +14,6 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
-use Filament\Widgets\WidgetConfiguration;
 use Illuminate\Support\Facades\DB;
 
 class LaporanLabaRugi extends Page implements HasForms, HasTable
@@ -44,11 +44,17 @@ class LaporanLabaRugi extends Page implements HasForms, HasTable
                 DatePicker::make('startDate')
                     ->label('Tanggal Mulai')
                     ->default(now()->startOfMonth())
-                    ->reactive(),
+                    ->reactive()
+                    ->afterStateUpdated(function (Closure $get) {
+                        $this->dispatch('datesChanged', $get('startDate'), $get('endDate'));
+                    }),
                 DatePicker::make('endDate')
                     ->label('Tanggal Selesai')
                     ->default(now()->endOfMonth())
-                    ->reactive(),
+                    ->reactive()
+                    ->afterStateUpdated(function (Closure $get) {
+                        $this->dispatch('datesChanged', $get('startDate'), $get('endDate'));
+                    }),
             ])
             ->statePath('data');
     }
@@ -80,14 +86,8 @@ class LaporanLabaRugi extends Page implements HasForms, HasTable
 
     protected function getHeaderWidgets(): array
     {
-        $startDate = $this->form->getState()['startDate'] ?? now()->startOfMonth()->format('Y-m-d');
-        $endDate = $this->form->getState()['endDate'] ?? now()->endOfMonth()->format('Y-m-d');
-
         return [
-            WidgetConfiguration::make(LabaRugiStatsOverviewWidget::class, [
-                'startDate' => $startDate,
-                'endDate' => $endDate,
-            ]),
+            LabaRugiStatsOverviewWidget::class,
         ];
     }
 }
