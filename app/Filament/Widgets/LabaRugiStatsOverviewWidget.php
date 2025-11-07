@@ -2,8 +2,8 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\Payment;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
 use Filament\Widgets\StatsOverviewWidget\Stat;
 use Illuminate\Support\Facades\DB;
@@ -15,9 +15,9 @@ class LabaRugiStatsOverviewWidget extends BaseWidget
 
     protected function getStats(): array
     {
-        $revenue = Payment::query()
-            ->whereBetween('payment_date', [$this->startDate, $this->endDate])
-            ->sum('amount_paid');
+        $revenue = Invoice::query()
+            ->whereBetween('invoice_date', [$this->startDate, $this->endDate])
+            ->sum('total_amount');
 
         $cogs = InvoiceItem::query()
             ->join('items', 'invoice_item.item_id', '=', 'items.id')
@@ -28,8 +28,8 @@ class LabaRugiStatsOverviewWidget extends BaseWidget
         $profit = $revenue - $cogs;
 
         return [
-            Stat::make('Total Pendapatan', 'Rp ' . number_format($revenue, 0, ',', '.'))
-                ->description('Total pendapatan dari semua transaksi')
+            Stat::make('Total Pendapatan (Invoice)', 'Rp ' . number_format($revenue, 0, ',', '.'))
+                ->description('Total pendapatan berdasarkan invoice')
                 ->color('success'),
             Stat::make('Total HPP (COGS)', 'Rp ' . number_format($cogs, 0, ',', '.'))
                 ->description('Total harga pokok penjualan')

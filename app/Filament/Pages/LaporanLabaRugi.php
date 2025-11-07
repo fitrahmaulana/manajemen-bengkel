@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Filament\Widgets\WidgetConfiguration;
 use Illuminate\Support\Facades\DB;
 
 class LaporanLabaRugi extends Page implements HasForms, HasTable
@@ -83,25 +84,10 @@ class LaporanLabaRugi extends Page implements HasForms, HasTable
         $endDate = $this->form->getState()['endDate'] ?? now()->endOfMonth()->format('Y-m-d');
 
         return [
-            LabaRugiStatsOverviewWidget::class => [
+            WidgetConfiguration::make(LabaRugiStatsOverviewWidget::class, [
                 'startDate' => $startDate,
                 'endDate' => $endDate,
-            ],
+            ]),
         ];
-    }
-
-    public function updated($name, $value): void
-    {
-        $this->form->fill();
-        $this->table->query(
-            InvoiceItem::query()
-                ->join('items', 'invoice_item.item_id', '=', 'items.id')
-                ->join('invoices', 'invoice_item.invoice_id', '=', 'invoices.id')
-                ->whereBetween('invoices.invoice_date', [
-                    $this->form->getState()['startDate'],
-                    $this->form->getState()['endDate'],
-                ])
-                ->select('invoice_item.*', 'items.name as item_name', 'items.purchase_price', 'invoices.invoice_number', 'invoices.invoice_date')
-        );
     }
 }

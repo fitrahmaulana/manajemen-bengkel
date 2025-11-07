@@ -13,6 +13,7 @@ use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Table;
+use Filament\Widgets\WidgetConfiguration;
 
 class LaporanOmzet extends Page implements HasForms, HasTable
 {
@@ -74,21 +75,10 @@ class LaporanOmzet extends Page implements HasForms, HasTable
         $endDate = $this->form->getState()['endDate'] ?? now()->endOfMonth()->format('Y-m-d');
 
         return [
-            OmzetStatsOverviewWidget::class => [
+            WidgetConfiguration::make(OmzetStatsOverviewWidget::class, [
                 'startDate' => $startDate,
                 'endDate' => $endDate,
-            ],
+            ]),
         ];
-    }
-
-    public function updated($name, $value): void
-    {
-        $this->form->fill();
-        $this->table->query(
-            Payment::query()->whereBetween('payment_date', [
-                $this->form->getState()['startDate'],
-                $this->form->getState()['endDate'],
-            ])
-        );
     }
 }
