@@ -2,6 +2,7 @@
 
 namespace App\Filament\Widgets;
 
+use App\Models\Invoice;
 use App\Models\Payment;
 use Carbon\Carbon;
 use Filament\Widgets\StatsOverviewWidget as BaseWidget;
@@ -17,23 +18,23 @@ class RevenueOverviewWidget extends BaseWidget
         $startOfMonth = Carbon::now()->startOfMonth();
         $endOfMonth = Carbon::now()->endOfMonth();
 
-        $revenueToday = Payment::whereDate('payment_date', $today)->sum('amount_paid');
-        $revenueThisMonth = Payment::whereBetween('payment_date', [$startOfMonth, $endOfMonth])->sum('amount_paid');
+        $revenueToday = Invoice::whereDate('invoice_date', $today)->sum('total_amount');
+        $revenueThisMonth = Invoice::whereBetween('invoice_date', [$startOfMonth, $endOfMonth])->sum('total_amount');
 
         // Data for the chart
         $revenueLast7Days = [];
         for ($i = 6; $i >= 0; $i--) {
             $date = Carbon::today()->subDays($i);
-            $revenue = Payment::whereDate('payment_date', $date)->sum('amount_paid');
+            $revenue = Invoice::whereDate('invoice_date', $date)->sum('total_amount');
             $revenueLast7Days[] = $revenue;
         }
 
         return [
-            Stat::make('Pendapatan Hari Ini', 'Rp '.number_format($revenueToday, 0, ',', '.'))
+            Stat::make('Pendapatan (Omzet) Hari Ini', 'Rp '.number_format($revenueToday, 0, ',', '.'))
                 ->description('Total pendapatan hari ini')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
-            Stat::make('Pendapatan Bulan Ini', 'Rp '.number_format($revenueThisMonth, 0, ',', '.'))
+            Stat::make('Pendapatan (Omzet) Bulan Ini', 'Rp '.number_format($revenueThisMonth, 0, ',', '.'))
                 ->description('Total pendapatan bulan ini')
                 ->descriptionIcon('heroicon-m-arrow-trending-up')
                 ->color('success'),
