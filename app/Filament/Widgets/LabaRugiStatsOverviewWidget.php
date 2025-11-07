@@ -1,0 +1,42 @@
+<?php
+
+namespace App\Filament\Widgets;
+
+use App\Models\InvoiceItem;
+use App\Models\Payment;
+use Filament\Widgets\StatsOverviewWidget as BaseWidget;
+use Filament\Widgets\StatsOverviewWidget\Stat;
+use Illuminate\Support\Facades\DB;
+
+class LabaRugiStatsOverviewWidget extends BaseWidget
+{
+    public ?string $startDate = null;
+    public ?string $endDate = null;
+
+    protected function getStats(): array
+    {
+        $revenue = Payment::query()
+            ->whereBetween('payment_date', [$this->startDate, $this->endDate])
+            ->sum('amount_paid');
+
+        $cogs = InvoiceItem::query()
+            ->join('items', 'invoice_item.item_id', '=', 'items.id')
+            ->join('invoices', 'invoice_item.invoice_id', '=', 'invoices.id')
+            ->whereBetween('invoices.invoice_date', [$this->startDate, $this->endDate])
+            ->sum(DB::raw('invoice_item.quantity * items.purchase_price'));
+
+        $profit = $revenue - $cogs;
+
+        return [
+            Stat::make('Total Pendapatan', 'Rp ' . number_format($revenue, 0, ',', '.'))
+                ->description('Total pendapatan dari semua transaksi')
+                ->color('success'),
+            Stat::make('Total HPP (COGS)', 'Rp ' . number_format($cogs, 0, ',', '.'))
+                ->description('Total harga pokok penjualan')
+                ->color('warning'),
+            Stat::make('Laba Kotor', 'Rp ' . number_format($profit, 0, ',', '.'))
+                ->description('Pendapatan - HPP')
+                ->color($profit >= 0 ? 'success' : 'danger'),
+        ];
+    }
+}
